@@ -14,7 +14,6 @@ const layoutConfig: IJsonModel = {
     tabSetEnableMaximize: true,
     tabSetMinWidth: 260,
     tabSetMinHeight: 180,
-    splitterSize: 6,
   },
   borders: [],
   layout: {
