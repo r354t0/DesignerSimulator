@@ -46,11 +46,16 @@ export function ToolbarSymbol({ kind }: { kind: Instruction }) {
 export function Wire({
   x1, y1, x2, y2, live = false,
 }: { x1: number; y1: number; x2: number; y2: number; live?: boolean }) {
+  // One SVG path per wire: active flow recolors the original centerline.
+  // Do not render a second shifted highlight line.
   return (
-    <g fill="none" strokeLinecap="square">
-      <path d={"M" + x1 + " " + y1 + " L" + x2 + " " + y2} stroke="#b5bbc2" strokeWidth="1.5" />
-      {live && <path d={"M" + x1 + " " + y1 + " L" + x2 + " " + y2} stroke={HOT} strokeWidth="2.6" />}
-    </g>
+    <path
+      d={"M" + x1 + " " + y1 + " L" + x2 + " " + y2}
+      fill="none"
+      stroke={live ? HOT : "#b5bbc2"}
+      strokeWidth={live ? 2.6 : 1.5}
+      strokeLinecap="square"
+    />
   );
 }
 
@@ -77,9 +82,9 @@ export function Contact({
       <Wire x1={x - 44} y1={y} x2={x - 14} y2={y} live={online && powerIn} />
       <Wire x1={x + 14} y1={y} x2={x + 44} y2={y} live={online && flow} />
       {online && condition && (
-        <g stroke={HOT} strokeWidth="4.4" strokeLinecap="square">
-          <path d={"M" + (x - 36) + " " + (y - 5) + "h18"} />
-          <path d={"M" + (x + 18) + " " + (y - 5) + "h18"} />
+        <g stroke={HOT} strokeWidth="2.6" strokeLinecap="square">
+          <path d={"M" + (x - 36) + " " + y + "h18"} />
+          <path d={"M" + (x + 18) + " " + y + "h18"} />
         </g>
       )}
     </g>
@@ -105,9 +110,9 @@ export function Coil({
       <Wire x1={x - 48} y1={y} x2={x - 22} y2={y} live={online && live} />
       <Wire x1={x + 22} y1={y} x2={x + 48} y2={y} live={online && live} />
       {online && live && (
-        <g stroke={HOT} strokeWidth="4.4">
-          <path d={"M" + (x - 37) + " " + (y - 5) + "h15"} />
-          <path d={"M" + (x + 22) + " " + (y - 5) + "h15"} />
+        <g stroke={HOT} strokeWidth="2.6" strokeLinecap="square">
+          <path d={"M" + (x - 37) + " " + y + "h15"} />
+          <path d={"M" + (x + 22) + " " + y + "h15"} />
         </g>
       )}
     </g>
