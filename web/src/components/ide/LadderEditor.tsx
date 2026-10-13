@@ -1,90 +1,160 @@
-export type Instruction = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "TON" | "CTU";
+import { Contact, Coil, RungFrame, Wire } from "./LadderSymbols";
+import {
+  demoTagMetadata,
+  type DemoInputs,
+  type DemoValues,
+  type InputTag,
+} from "../../plc/demoModel";
 
-export const INSTRUCTIONS: { id: Instruction; label: string; symbol: string }[] = [
-  { id: "XIC", label: "Examine If Closed", symbol: "─| |─" },
-  { id: "XIO", label: "Examine If Open", symbol: "─|/|─" },
-  { id: "OTE", label: "Output Energize", symbol: "─( )─" },
-  { id: "OTL", label: "Output Latch", symbol: "─(L)─" },
-  { id: "OTU", label: "Output Unlatch", symbol: "─(U)─" },
-  { id: "TON", label: "Timer On Delay", symbol: "TON" },
-  { id: "CTU", label: "Count Up", symbol: "CTU" },
-];
+interface MonitorProps {
+  online: boolean;
+  values: DemoValues;
+  inputs: DemoInputs;
+  onTagChange: (tag: InputTag, value: boolean) => void;
+}
 
-const tags = [
-  { name: "Start_PB", type: "BOOL", value: "0", desc: "Pulsador de arranque" },
-  { name: "Stop_PB", type: "BOOL", value: "0", desc: "Pulsador de parada" },
-  { name: "Motor_Run", type: "BOOL", value: "0", desc: "Estado de salida del motor" },
-];
-
-export function ProgramTags() {
+export function ProgramTags({ online, values, inputs, onTagChange }: MonitorProps) {
   return (
-    <section className="h-full overflow-auto bg-[#17212b] p-4">
-      <h2 className="text-sm font-semibold">Program Tags</h2>
-      <p className="mt-1 text-xs text-slate-400">Variables de ejemplo · Edición disponible en una próxima etapa</p>
-      <div className="mt-4 overflow-x-auto rounded-md border border-slate-700">
-        <table className="w-full border-collapse text-left text-xs">
-          <thead className="bg-slate-800 text-slate-300">
-            <tr><th className="p-2">Nombre</th><th className="p-2">Tipo</th><th className="p-2">Valor</th><th className="p-2">Descripción</th></tr>
+    <section className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-slate-800">
+      <div className="border-b border-slate-200 bg-[#f7f9fb] px-4 py-3">
+        <h2 className="text-sm font-semibold">Program Tags</h2>
+        <p className="mt-1 text-xs text-slate-500">
+          Variables del ejemplo · Los BOOL de entrada se pueden modificar para probar la visualización.
+        </p>
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto p-4">
+        <table className="w-full min-w-[590px] border-collapse border border-slate-200 text-left text-xs">
+          <thead className="bg-[#edf1f5] text-slate-600">
+            <tr>
+              <th className="border border-slate-200 px-3 py-2">Nombre</th>
+              <th className="border border-slate-200 px-3 py-2">Tipo</th>
+              <th className="border border-slate-200 px-3 py-2">Valor</th>
+              <th className="border border-slate-200 px-3 py-2">Acceso</th>
+              <th className="border border-slate-200 px-3 py-2">Descripción</th>
+            </tr>
           </thead>
           <tbody>
-            {tags.map((tag) => (
-              <tr key={tag.name} className="border-t border-slate-700/70">
-                <td className="p-2 font-mono text-sky-300">{tag.name}</td>
-                <td className="p-2">{tag.type}</td>
-                <td className="p-2 font-mono">{tag.value}</td>
-                <td className="p-2 text-slate-400">{tag.desc}</td>
+            {demoTagMetadata.map((tag) => (
+              <tr key={tag.name} className="hover:bg-sky-50/60">
+                <td className="border border-slate-200 px-3 py-2 font-mono font-medium text-slate-800">{tag.name}</td>
+                <td className="border border-slate-200 px-3 py-2">{tag.type}</td>
+                <td className="border border-slate-200 px-3 py-2 font-mono">
+                  {tag.access === "input" ? (
+                    <button
+                      type="button"
+                      aria-label={"Cambiar " + tag.name}
+                      aria-pressed={inputs[tag.name as InputTag]}
+                      onClick={() => onTagChange(tag.name as InputTag, !inputs[tag.name as InputTag])}
+                      className="min-w-12 rounded border border-sky-300 bg-sky-50 px-2 py-1 font-semibold text-sky-800 hover:bg-sky-100"
+                    >
+                      {values[tag.name] ? "1" : "0"} ↺
+                    </button>
+                  ) : (
+                    <span className={online && values[tag.name] ? "font-semibold text-emerald-700" : "text-slate-600"}>
+                      {values[tag.name] ? "1" : "0"}
+                    </span>
+                  )}
+                </td>
+                <td className="border border-slate-200 px-3 py-2 text-slate-500">{tag.access === "input" ? "Demo input" : "Calculado"}</td>
+                <td className="border border-slate-200 px-3 py-2 text-slate-500">{tag.description}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        <p className="mt-3 text-xs text-slate-500">
+          Valores de prueba en memoria. No existe conexión con Studio 5000 ni con un PLC físico.
+        </p>
       </div>
     </section>
   );
 }
 
-interface Props {
-  instruction: Instruction;
-}
-
-export function LadderEditor({ instruction }: Props) {
+export function LadderEditor({ online, inputs, values, onTagChange }: MonitorProps) {
+  const stopCondition = !values.Stop_PB;
+  const startCondition = values.Start_PB;
+  const sealCondition = values.Motor_Run;
+  const mainRung = stopCondition && (startCondition || sealCondition);
+  const lampRung = values.Motor_Run && values.Auto_Mode;
+  const live = (condition: boolean) => online && condition;
 
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#121b24]">
-      <div className="flex shrink-0 items-center justify-between border-b border-slate-700/70 bg-[#1a2631] px-4 py-2">
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-slate-800">
+      <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-[#f4f6f8] px-4 py-2">
         <div>
-          <h2 className="text-xs font-semibold">MainRoutine.LAD</h2>
-          <p className="mt-0.5 text-[11px] text-slate-400">MainTask / MainProgram</p>
+          <h2 className="text-xs font-semibold text-slate-900">MainRoutine.LAD</h2>
+          <p className="mt-0.5 text-[11px] text-slate-500">MainTask / MainProgram · Monitoreo de ejemplo</p>
         </div>
-        <span className="rounded border border-slate-600 px-2 py-1 text-[10px] text-slate-400">VIEW ONLY</span>
+        <span className={online ? "rounded border border-green-300 bg-green-50 px-2 py-1 text-[10px] font-semibold text-green-800" : "rounded border border-slate-300 bg-white px-2 py-1 text-[10px] text-slate-500"}>
+          {online ? "ONLINE · DEMO RUN" : "OFFLINE"}
+        </span>
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-3 md:p-5">
-        <div className="min-w-[590px] rounded border border-slate-700 bg-[#202d38] p-3">
-          <div className="flex justify-between text-[11px] text-slate-400">
-            <span>Rung 000</span><span>Arranque y enclavamiento de motor · ejemplo</span>
-          </div>
-          <svg viewBox="0 0 1000 210" role="img" aria-label="Rung Ladder: contacto de parada normalmente cerrado, arranque con auto-retención y bobina de motor" className="mt-2 h-auto w-full text-slate-200">
-            <g fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="square">
-              <path d="M24 18 V198 M976 18 V198 M24 91 H180 M234 91 H290 M290 91 H390 M442 91 H580 M580 91 H760 M822 91 H976" />
-              <path d="M180 66 V116 M234 66 V116 M183 116 L231 66" />
-              <path d="M390 66 V116 M442 66 V116" />
-              <path d="M290 91 V161 H390 M442 161 H580 V91 M390 138 V184 M442 138 V184" />
-              <path d="M760 64 C745 80 745 102 760 118 M822 64 C837 80 837 102 822 118" />
-            </g>
-            <g fontSize="20" fontFamily="ui-monospace, monospace" textAnchor="middle" fill="#93c5fd">
-              <text x="207" y="51">Stop_PB</text>
-              <text x="416" y="51">Start_PB</text>
-              <text x="416" y="132">Motor_Run</text>
-              <text x="791" y="51">Motor_Run</text>
-            </g>
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-[#f7f9fb] px-3 py-2 text-[11px]">
+        <span className="mr-1 font-semibold text-slate-600">Monitor de entradas</span>
+        {(["Start_PB", "Stop_PB", "Auto_Mode"] as InputTag[]).map((tag) => (
+          <button
+            key={tag}
+            type="button"
+            aria-pressed={inputs[tag]}
+            title={"Alternar bit " + tag}
+            onClick={() => onTagChange(tag, !inputs[tag])}
+            className={inputs[tag]
+              ? "rounded border border-sky-300 bg-sky-100 px-2 py-1 font-mono font-medium text-sky-800 hover:bg-sky-200"
+              : "rounded border border-slate-300 bg-white px-2 py-1 font-mono text-slate-700 hover:bg-slate-100"}
+          >
+            {tag}: {inputs[tag] ? "1" : "0"}
+          </button>
+        ))}
+        <span className="ml-auto text-slate-500">Verde = instrucción verdadera / continuidad activa</span>
+      </div>
+      <div className="min-h-0 flex-1 overflow-auto bg-white">
+        <div className="min-w-[820px] bg-white">
+          <svg viewBox="0 0 1180 585" role="img" aria-label="Tres rungs Ladder con contactos XIC y XIO y bobinas OTE, con resaltado verde en modo online" className="block h-auto w-full">
+            <rect x="0" y="0" width="1180" height="585" fill="#ffffff" />
+            <rect x="1" y="24" width="53" height="530" fill="#f4f7fa" />
+            <path d="M61 31V550 M1153 31V550" stroke={online ? "#00c83a" : "#bcc5ce"} strokeWidth={online ? 2.8 : 1.6} fill="none" />
+            <path d="M54 241H1159 M54 404H1159" stroke="#e5e9ed" strokeWidth="1" />
+            <RungFrame index={0} y={92} selected live={online}>
+              <Wire x1={92} y1={92} x2={216} y2={92} live={online} />
+              <Contact x={260} y={92} kind="XIO" tag="Stop_PB" comment="Parada simulada" value={values.Stop_PB} online={online} powerIn />
+              <Wire x1={304} y1={92} x2={442} y2={92} live={live(stopCondition)} />
+              <Wire x1={442} y1={92} x2={566} y2={92} live={live(stopCondition)} />
+              <Wire x1={442} y1={92} x2={442} y2={174} live={live(stopCondition)} />
+              <Wire x1={442} y1={174} x2={566} y2={174} live={live(stopCondition)} />
+              <Contact x={610} y={92} kind="XIC" tag="Start_PB" comment="Arranque" value={values.Start_PB} online={online} powerIn={stopCondition} />
+              <Contact x={610} y={174} kind="XIC" tag="Motor_Run" value={values.Motor_Run} online={online} powerIn={stopCondition} />
+              <Wire x1={654} y1={92} x2={760} y2={92} live={live(stopCondition && startCondition)} />
+              <Wire x1={654} y1={174} x2={760} y2={174} live={live(stopCondition && sealCondition)} />
+              <Wire x1={760} y1={174} x2={760} y2={92} live={live(stopCondition && sealCondition)} />
+              <Wire x1={760} y1={92} x2={962} y2={92} live={live(mainRung)} />
+              <Coil x={1010} y={92} tag="Motor_Run" comment="Marcha del motor" online={online} live={values.Motor_Run} />
+              <Wire x1={1058} y1={92} x2={1153} y2={92} live={live(values.Motor_Run)} />
+            </RungFrame>
+            <RungFrame index={1} y={309} live={online}>
+              <Wire x1={92} y1={309} x2={216} y2={309} live={online} />
+              <Contact x={260} y={309} kind="XIO" tag="Stop_PB" comment="Parada libre" value={values.Stop_PB} online={online} powerIn />
+              <Wire x1={304} y1={309} x2={962} y2={309} live={live(stopCondition)} />
+              <Coil x={1010} y={309} tag="Stop_OK" comment="Permisivo" online={online} live={values.Stop_OK} />
+              <Wire x1={1058} y1={309} x2={1153} y2={309} live={live(values.Stop_OK)} />
+            </RungFrame>
+            <RungFrame index={2} y={479} live={online}>
+              <Wire x1={92} y1={479} x2={216} y2={479} live={online} />
+              <Contact x={260} y={479} kind="XIC" tag="Motor_Run" comment="Marcha" value={values.Motor_Run} online={online} powerIn />
+              <Wire x1={304} y1={479} x2={566} y2={479} live={live(values.Motor_Run)} />
+              <Contact x={610} y={479} kind="XIC" tag="Auto_Mode" comment="Automático" value={values.Auto_Mode} online={online} powerIn={values.Motor_Run} />
+              <Wire x1={654} y1={479} x2={962} y2={479} live={live(lampRung)} />
+              <Coil x={1010} y={479} tag="Lamp_Run" comment="Indicador de marcha" online={online} live={values.Lamp_Run} />
+              <Wire x1={1058} y1={479} x2={1153} y2={479} live={live(values.Lamp_Run)} />
+            </RungFrame>
           </svg>
         </div>
-        <p className="mt-3 text-xs text-slate-400">
-          Herramienta seleccionada: <span className="font-mono font-semibold text-sky-300">{instruction}</span>.
-          La inserción, evaluación del rung y edición de tags se habilitarán en los próximos incrementos.
+        <p className="px-4 pb-4 text-xs text-slate-500">
+          Vista de referencia: en XIC el bit 1 es TRUE; en XIO el bit 0 es TRUE. La posición de los símbolos nunca cambia.
+          El motor de programación PLC completo se implementará en una fase posterior.
         </p>
       </div>
-      <div className="shrink-0 border-t border-slate-700 bg-[#1a2631] px-4 py-2 text-[11px] text-slate-400">
-        1 rung de referencia · Sin ejecución Ladder
+      <div className="flex h-8 shrink-0 items-center justify-between border-t border-slate-200 bg-[#f2f5f8] px-4 text-[11px] text-slate-600">
+        <span>Rung 0–2 · Monitoreo demostrativo</span>
+        <span>{online ? "Evaluación visual activa" : "Sin resaltado online"}</span>
       </div>
     </div>
   );
