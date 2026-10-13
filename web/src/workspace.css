@@ -1,0 +1,46 @@
+.ide-shell .flexlayout__layout {
+  --font-family: 'Geist Variable', sans-serif;
+  --color-tabset-background: #16212b;
+  --color-tabset-background-selected: #1a2631;
+  --color-tabset-background-maximized: #16212b;
+  --color-splitter: #304152;
+  --color-splitter-hover: #3d84b3;
+  --color-tabset-divider-line: #304152;
+  --color-tab-selected-background: #243746;
+  --color-tab-selected: #f1f5f9;
+}
+.ide-shell .flexlayout__tab_button {
+  font-size: 12px;
+}
+.ide-icon-button {
+  display: inline-flex;
+  height: 32px;
+  width: 32px;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border-radius: 5px;
+  color: #cbd5e1;
+}
+.ide-icon-button:hover,
+.ide-icon-button:focus-visible {
+  background: #354657;
+  color: #ffffff;
+}
+.ide-tree-row {
+  display: flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  border-radius: 5px;
+  padding: 0 8px;
+  color: #cbd5e1;
+  text-align: left;
+}
+button.ide-tree-row:hover {
+  background: #263949;
+}
+.ide-tree-selected {
+  background: #1d4e70;
+  color: #eff6ff;
+}
