@@ -1,5 +1,3 @@
-import type { EditorView } from "./ControllerOrganizer";
-
 export type Instruction = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "TON" | "CTU";
 
 export const INSTRUCTIONS: { id: Instruction; label: string; symbol: string }[] = [
@@ -18,7 +16,7 @@ const tags = [
   { name: "Motor_Run", type: "BOOL", value: "0", desc: "Estado de salida del motor" },
 ];
 
-function TagsTable() {
+export function ProgramTags() {
   return (
     <section className="h-full overflow-auto bg-[#17212b] p-4">
       <h2 className="text-sm font-semibold">Program Tags</h2>
@@ -45,12 +43,10 @@ function TagsTable() {
 }
 
 interface Props {
-  view: EditorView;
   instruction: Instruction;
 }
 
-export function LadderEditor({ view, instruction }: Props) {
-  if (view === "tags") return <TagsTable />;
+export function LadderEditor({ instruction }: Props) {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-[#121b24]">
