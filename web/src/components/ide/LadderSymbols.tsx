@@ -14,7 +14,8 @@ export const INSTRUCTIONS: { id: Instruction; label: string }[] = [
 
 const BASE = "#58636f";
 const HOT = "#00c83a";
-const ACTIVE_STROKE = 4;
+// Online green: 25% thinner than the previous 4px stroke.
+const ACTIVE_STROKE = 3;
 const SYMBOL_BASE_STROKE = 1.8;
 
 // Compact editor prototype: halve the geometry, without shrinking the tag text.
@@ -142,7 +143,7 @@ export function Coil({
 }
 
 export function RungFrame({
-  index, y, selected = false, live, children, onSelect,
+  index, y, selected = false, live, children, onSelect, width = 712,
 }: {
   index: number;
   y: number;
@@ -150,6 +151,7 @@ export function RungFrame({
   live?: boolean;
   children: ReactNode;
   onSelect?: () => void;
+  width?: number;
 }) {
   const bottom = index === 0 ? 68 : 40;
   return (
@@ -167,7 +169,7 @@ export function RungFrame({
       }}
       style={{ cursor: "pointer" }}
     >
-      <rect x="1" y={y - 47} width="710" height={47 + bottom} fill="transparent" />
+      <rect x="1" y={y - 47} width={width} height={47 + bottom} fill="transparent" />
       {selected && <rect x="1" y={y - 47} width="48" height={47 + bottom} fill="#087bd1" />}
       <text
         x="25"
