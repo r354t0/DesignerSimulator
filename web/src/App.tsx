@@ -1,15 +1,15 @@
 import { useCallback, useState } from "react";
-import { Layout, Model, type IJsonModel, type TabNode } from "flexlayout-react";
+import { Actions, DockLocation, Layout, Model, type IJsonModel, type TabNode, type TabSetNode } from "flexlayout-react";
 import { Cpu, Menu, PanelLeftClose, PanelLeftOpen, CircleHelp, BookOpen } from "lucide-react";
 import { ControllerOrganizer, type EditorView } from "./components/ide/ControllerOrganizer";
-import { LadderEditor, INSTRUCTIONS, type Instruction } from "./components/ide/LadderEditor";
+import { LadderEditor, ProgramTags, INSTRUCTIONS, type Instruction } from "./components/ide/LadderEditor";
 import { SimulationScene } from "./components/ide/SimulationScene";
 import "flexlayout-react/style/dark.css";
 import "./workspace.css";
 
 const layoutConfig: IJsonModel = {
   global: {
-    tabEnableClose: false,
+    tabEnableClose: true,
     tabEnableRename: false,
     tabSetEnableMaximize: true,
     tabSetMinWidth: 260,
@@ -21,16 +21,19 @@ const layoutConfig: IJsonModel = {
     children: [
       {
         type: "tabset",
+        id: "workspace-editor",
         weight: 55,
+        selected: 0,
         children: [
-          { type: "tab", id: "editor", name: "Editor de programa", component: "editor" },
+          { type: "tab", id: "editor-mainroutine", name: "MainRoutine.LAD", component: "ladder" },
+          { type: "tab", id: "editor-tags", name: "Program Tags", component: "tags" },
         ],
       },
       {
         type: "tabset",
         weight: 45,
         children: [
-          { type: "tab", id: "simulation", name: "Simulación industrial", component: "simulation" },
+          { type: "tab", id: "simulation", name: "Simulación industrial", component: "simulation", enableClose: false },
         ],
       },
     ],
@@ -46,16 +49,52 @@ export default function App() {
   const factory = useCallback(
     (node: TabNode) => {
       switch (node.getComponent()) {
-        case "editor":
-          return <LadderEditor view={editorView} instruction={instruction} />;
+        case "ladder":
+          return <LadderEditor instruction={instruction} />;
+        case "tags":
+          return <ProgramTags />;
         case "simulation":
           return <SimulationScene />;
         default:
           return <div className="p-4">Panel no disponible</div>;
       }
     },
-    [editorView, instruction],
+    [instruction],
   );
+
+  const openEditorView = useCallback((view: EditorView) => {
+    const tab = view === "ladder"
+      ? { id: "editor-mainroutine", name: "MainRoutine.LAD", component: "ladder" }
+      : { id: "editor-tags", name: "Program Tags", component: "tags" };
+
+    // Select an existing document, instead of replacing the content of another tab.
+    if (model.getNodeById(tab.id)) {
+      model.doAction(Actions.selectTab(tab.id));
+    } else {
+      // A closed document can be reopened from Controller Organizer.
+      const tabsetExists = model.getNodeById("workspace-editor") !== undefined;
+      model.doAction(Actions.addNode(
+        { type: "tab", ...tab },
+        tabsetExists ? "workspace-editor" : "simulation",
+        tabsetExists ? DockLocation.CENTER : DockLocation.LEFT,
+        -1,
+        true,
+      ));
+    }
+    setEditorView(view);
+  }, [model]);
+
+  const syncTabSelection = useCallback((updatedModel: Model) => {
+    const editor = updatedModel.getNodeById("editor-mainroutine");
+    const tags = updatedModel.getNodeById("editor-tags");
+    // While both documents share a tabset, reflect clicks on the actual tabs in the tree.
+    if (!editor || !tags || editor.getParent() !== tags.getParent()) return;
+    const parent = editor.getParent();
+    if (parent?.getType() !== "tabset") return;
+    const selectedId = (parent as TabSetNode).getSelectedNode()?.getId();
+    if (selectedId === "editor-mainroutine") setEditorView("ladder");
+    if (selectedId === "editor-tags") setEditorView("tags");
+  }, []);
 
   return (
     <div className="dark ide-shell flex h-dvh flex-col overflow-hidden bg-[#101820] text-slate-100">
@@ -97,7 +136,7 @@ export default function App() {
             type="button"
             onClick={() => {
               setInstruction(id);
-              setEditorView("ladder");
+              openEditorView("ladder");
             }}
             aria-pressed={instruction === id}
             title={label}
@@ -113,11 +152,11 @@ export default function App() {
       <div className="flex min-h-0 flex-1">
         {organizerOpen && (
           <aside className="w-56 shrink-0 overflow-hidden border-r border-slate-700/70 bg-[#17212b] xl:w-64">
-            <ControllerOrganizer view={editorView} onSelectView={setEditorView} />
+            <ControllerOrganizer view={editorView} onSelectView={openEditorView} />
           </aside>
         )}
         <main className="relative min-w-0 flex-1" aria-label="Área de trabajo acoplable">
-          <Layout model={model} factory={factory} />
+          <Layout model={model} factory={factory} onModelChange={syncTabSelection} />
         </main>
       </div>
 
