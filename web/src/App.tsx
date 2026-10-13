@@ -1,8 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Actions, DockLocation, Layout, Model, type IJsonModel, type TabNode, type TabSetNode } from "flexlayout-react";
 import { Cpu, Menu, PanelLeftClose, PanelLeftOpen, CircleHelp, BookOpen } from "lucide-react";
 import { ControllerOrganizer, type EditorView } from "./components/ide/ControllerOrganizer";
-import { LadderEditor, ProgramTags, INSTRUCTIONS, type Instruction } from "./components/ide/LadderEditor";
+import { LadderEditor, ProgramTags } from "./components/ide/LadderEditor";
+import { INSTRUCTIONS, ToolbarSymbol, type Instruction } from "./components/ide/LadderSymbols";
+import { evaluateDemo, initialDemoInputs, type DemoInputs, type InputTag } from "./plc/demoModel";
 import { SimulationScene } from "./components/ide/SimulationScene";
 import "flexlayout-react/style/dark.css";
 import "./workspace.css";
@@ -45,21 +47,34 @@ export default function App() {
   const [organizerOpen, setOrganizerOpen] = useState(true);
   const [editorView, setEditorView] = useState<EditorView>("ladder");
   const [instruction, setInstruction] = useState<Instruction>("XIC");
+  const [online, setOnline] = useState(false);
+  const [inputs, setInputs] = useState<DemoInputs>(initialDemoInputs);
+  const [motorLatched, setMotorLatched] = useState(false);
+
+  // Small fixed-rung evaluator for the visual demo, NOT the final PLC scan engine.
+  useEffect(() => {
+    setMotorLatched((previous) => online && !inputs.Stop_PB && (inputs.Start_PB || previous));
+  }, [inputs.Start_PB, inputs.Stop_PB, online]);
+
+  const values = useMemo(() => evaluateDemo(inputs, motorLatched), [inputs, motorLatched]);
+  const handleTagChange = useCallback((tag: InputTag, value: boolean) => {
+    setInputs((current) => ({ ...current, [tag]: value }));
+  }, []);
 
   const factory = useCallback(
     (node: TabNode) => {
       switch (node.getComponent()) {
         case "ladder":
-          return <LadderEditor instruction={instruction} />;
+          return <LadderEditor online={online} inputs={inputs} values={values} onTagChange={handleTagChange} />;
         case "tags":
-          return <ProgramTags />;
+          return <ProgramTags online={online} inputs={inputs} values={values} onTagChange={handleTagChange} />;
         case "simulation":
-          return <SimulationScene />;
+          return <SimulationScene online={online} inputs={inputs} values={values} onTagChange={handleTagChange} />;
         default:
           return <div className="p-4">Panel no disponible</div>;
       }
     },
-    [instruction],
+    [online, inputs, values, handleTagChange],
   );
 
   const openEditorView = useCallback((view: EditorView) => {
@@ -119,9 +134,17 @@ export default function App() {
           <span className="hidden items-center gap-1.5 rounded-md border border-slate-600/70 px-2 py-1 text-xs text-slate-300 sm:flex">
             <BookOpen size={13} /> Desde cero / Estudio
           </span>
-          <span className="rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-[11px] font-medium text-slate-300">
-            OFFLINE
-          </span>
+          <button
+            type="button"
+            onClick={() => setOnline((current) => !current)}
+            aria-pressed={online}
+            title="Alternar monitor de demostración; no conecta con Studio 5000 ni un PLC"
+            className={online
+              ? "rounded-md border border-emerald-700 bg-emerald-950 px-2 py-1 text-[11px] font-semibold text-emerald-300"
+              : "rounded-md border border-slate-600 bg-slate-800 px-2 py-1 text-[11px] font-medium text-slate-300"}
+          >
+            {online ? "DEMO · REM RUN" : "OFFLINE"}
+          </button>
           <button type="button" className="ide-icon-button" title="Versión inicial de la interfaz" aria-label="Información">
             <CircleHelp size={18} />
           </button>
@@ -130,7 +153,7 @@ export default function App() {
 
       <div className="flex h-13 shrink-0 items-center gap-1.5 overflow-x-auto border-b border-slate-700/70 bg-[#1b252f] px-3">
         <span className="mr-2 shrink-0 text-[10px] font-bold tracking-widest text-slate-400">LADDER</span>
-        {INSTRUCTIONS.map(({ id, symbol, label }) => (
+        {INSTRUCTIONS.map(({ id, label }) => (
           <button
             key={id}
             type="button"
@@ -142,7 +165,7 @@ export default function App() {
             title={label}
             className={`flex min-w-13 shrink-0 flex-col items-center justify-center rounded border px-2 py-1 text-[10px] leading-4 transition-colors ${instruction === id ? "border-sky-500 bg-sky-700/30 text-white" : "border-transparent text-slate-300 hover:border-slate-600 hover:bg-slate-700/50"}`}
           >
-            <span className="font-mono text-[14px] font-semibold">{symbol}</span>
+            <ToolbarSymbol kind={id} />
             <span>{id}</span>
           </button>
         ))}
@@ -164,7 +187,7 @@ export default function App() {
         <Menu size={12} />
         <span>VirtualPLC</span>
         <span className="text-slate-600">|</span>
-        <span>Sin conexión a controlador</span>
+        <span>{online ? "Monitoreo DEMO · Sin controlador físico" : "Sin conexión a controlador"}</span>
         <span className="ml-auto">Etapa 1 · Interfaz</span>
       </footer>
     </div>
