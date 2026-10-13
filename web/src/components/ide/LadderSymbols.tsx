@@ -17,6 +17,10 @@ const HOT = "#00c83a";
 const ACTIVE_STROKE = 4;
 const SYMBOL_BASE_STROKE = 1.8;
 
+// Compact editor prototype: halve the geometry, without shrinking the tag text.
+// One value controls contacts and coils consistently.
+export const SYMBOL_SCALE = 0.5;
+
 export function ToolbarSymbol({ kind }: { kind: Instruction }) {
   const isContact = kind === "XIC" || kind === "XIO";
   const isBlock = kind === "TON" || kind === "CTU";
@@ -71,12 +75,15 @@ export function Contact({
   const condition = kind === "XIC" ? value : !value;
   const flow = powerIn && condition;
   const activeSymbol = online && condition;
+  const halfBarGap = 14 * SYMBOL_SCALE;
+  const halfBarHeight = 15 * SYMBOL_SCALE;
+  const leadLength = 30 * SYMBOL_SCALE;
+  const terminalX = halfBarGap + leadLength;
   return (
     <g>
       <g fill={BASE} textAnchor="middle" fontFamily="Arial, sans-serif">
-        {comment && <text x={x} y={y - 55} fontSize="12" fill="#8b949e">{comment}</text>}
-        <text x={x} y={y - 36} fontSize="14" fill="#1c354b">{tag}</text>
-        <text x={x} y={y + 33} fontSize="11" fill="#66717c">{kind} · {value ? "1" : "0"}</text>
+        {comment && <text x={x} y={y - 40} fontSize="11" fill="#8b949e">{comment}</text>}
+        <text x={x} y={y - 23} fontSize="12" fill="#1c354b">{tag}</text>
       </g>
       <g
         fill="none"
@@ -84,11 +91,13 @@ export function Contact({
         strokeWidth={activeSymbol ? ACTIVE_STROKE : SYMBOL_BASE_STROKE}
         strokeLinecap="square"
       >
-        <path d={"M" + (x - 14) + " " + (y - 15) + "v30 M" + (x + 14) + " " + (y - 15) + "v30"} />
-        {kind === "XIO" && <path d={"M" + (x - 14) + " " + (y + 15) + "L" + (x + 14) + " " + (y - 15)} />}
+        <path d={"M" + (x - halfBarGap) + " " + (y - halfBarHeight) + "v" + (2 * halfBarHeight) +
+          " M" + (x + halfBarGap) + " " + (y - halfBarHeight) + "v" + (2 * halfBarHeight)} />
+        {kind === "XIO" && <path d={"M" + (x - halfBarGap) + " " + (y + halfBarHeight) +
+          "L" + (x + halfBarGap) + " " + (y - halfBarHeight)} />}
       </g>
-      <Wire x1={x - 44} y1={y} x2={x - 14} y2={y} live={online && powerIn} />
-      <Wire x1={x + 14} y1={y} x2={x + 44} y2={y} live={online && flow} />
+      <Wire x1={x - terminalX} y1={y} x2={x - halfBarGap} y2={y} live={online && powerIn} />
+      <Wire x1={x + halfBarGap} y1={y} x2={x + terminalX} y2={y} live={online && flow} />
     </g>
   );
 }
@@ -99,12 +108,17 @@ export function Coil({
   x: number; y: number; tag: string; comment?: string; online: boolean; live: boolean;
 }) {
   const activeSymbol = online && live;
+  const curveEdge = 14 * SYMBOL_SCALE;
+  const curveControl = 26 * SYMBOL_SCALE;
+  const halfHeight = 15 * SYMBOL_SCALE;
+  const curveControlY = 5 * SYMBOL_SCALE;
+  const wireStart = 22 * SYMBOL_SCALE;
+  const wireEnd = 48 * SYMBOL_SCALE;
   return (
     <g>
       <g fill={BASE} textAnchor="middle" fontFamily="Arial, sans-serif">
-        {comment && <text x={x} y={y - 55} fontSize="12" fill="#8b949e">{comment}</text>}
-        <text x={x} y={y - 36} fontSize="14" fill="#1c354b">{tag}</text>
-        <text x={x} y={y + 33} fontSize="11" fill="#66717c">OTE</text>
+        {comment && <text x={x} y={y - 40} fontSize="11" fill="#8b949e">{comment}</text>}
+        <text x={x} y={y - 23} fontSize="12" fill="#1c354b">{tag}</text>
       </g>
       <g
         fill="none"
@@ -112,25 +126,60 @@ export function Coil({
         strokeWidth={activeSymbol ? ACTIVE_STROKE : SYMBOL_BASE_STROKE}
         strokeLinecap="square"
       >
-        <path d={"M" + (x - 14) + " " + (y - 15) + "C" + (x - 26) + " " + (y - 5) + " " + (x - 26) + " " + (y + 5) + " " + (x - 14) + " " + (y + 15)} />
-        <path d={"M" + (x + 14) + " " + (y - 15) + "C" + (x + 26) + " " + (y - 5) + " " + (x + 26) + " " + (y + 5) + " " + (x + 14) + " " + (y + 15)} />
+        <path d={"M" + (x - curveEdge) + " " + (y - halfHeight) +
+          "C" + (x - curveControl) + " " + (y - curveControlY) + " " +
+          (x - curveControl) + " " + (y + curveControlY) + " " +
+          (x - curveEdge) + " " + (y + halfHeight)} />
+        <path d={"M" + (x + curveEdge) + " " + (y - halfHeight) +
+          "C" + (x + curveControl) + " " + (y - curveControlY) + " " +
+          (x + curveControl) + " " + (y + curveControlY) + " " +
+          (x + curveEdge) + " " + (y + halfHeight)} />
       </g>
-      <Wire x1={x - 48} y1={y} x2={x - 22} y2={y} live={online && live} />
-      <Wire x1={x + 22} y1={y} x2={x + 48} y2={y} live={online && live} />
+      <Wire x1={x - wireEnd} y1={y} x2={x - wireStart} y2={y} live={activeSymbol} />
+      <Wire x1={x + wireStart} y1={y} x2={x + wireEnd} y2={y} live={activeSymbol} />
     </g>
   );
 }
 
 export function RungFrame({
-  index, y, selected, live, children,
-}: { index: number; y: number; selected?: boolean; live?: boolean; children: ReactNode }) {
+  index, y, selected = false, live, children, onSelect,
+}: {
+  index: number;
+  y: number;
+  selected?: boolean;
+  live?: boolean;
+  children: ReactNode;
+  onSelect?: () => void;
+}) {
+  const bottom = index === 0 ? 68 : 40;
   return (
-    <g>
-      {selected && <rect x="1" y={y - 55} width="53" height="116" fill="#087bd1" />}
-      <text x="25" y={y + 4} textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="14" fill={selected ? "#fff" : "#7c8793"}>
+    <g
+      role="button"
+      tabIndex={0}
+      aria-label={"Seleccionar rung " + index}
+      aria-pressed={selected}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          onSelect?.();
+        }
+      }}
+      style={{ cursor: "pointer" }}
+    >
+      <rect x="1" y={y - 47} width="710" height={47 + bottom} fill="transparent" />
+      {selected && <rect x="1" y={y - 47} width="48" height={47 + bottom} fill="#087bd1" />}
+      <text
+        x="25"
+        y={y + 4}
+        textAnchor="middle"
+        fontFamily="Arial, sans-serif"
+        fontSize="13"
+        fill={selected ? "#fff" : "#7c8793"}
+      >
         {index}
       </text>
-      <Wire x1={62} y1={y} x2={92} y2={y} live={live} />
+      <Wire x1={60} y1={y} x2={100} y2={y} live={live} />
       {children}
     </g>
   );
