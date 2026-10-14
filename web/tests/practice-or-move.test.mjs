@@ -129,8 +129,9 @@ test("wide OR paths gain dynamic room for text and additional contacts", () => {
   p = addParallelContact(p, "rung-1", "anchor", xio("two"));
   p = addParallelContact(p, "rung-1", "anchor", xic("three"));
   const wide = getRungGeometry(p.rungs[0], 760);
-  assert.ok(wide.width > initial.width);
+  assert.equal(wide.width, initial.width,
+    "three OR contacts must fit in the base editor without forced scrolling");
   assert.equal(wide.groups[0].branchCenters.length, 3);
-  assert.ok(wide.groups[0].branchCenters[1] - wide.groups[0].branchCenters[0] >= 130);
+  assert.equal(wide.groups[0].branchCenters[1] - wide.groups[0].branchCenters[0], 104);
   assert.equal(findVisualLadderDropTarget(p, "rung-1", "XIC", wide.groups[0].branchCenters[1], 166, wide.width)?.lane, "parallel");
 });
