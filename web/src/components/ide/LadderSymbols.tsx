@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-export type Instruction = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "TON" | "CTU";
+export type Instruction = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "TON" | "TOF" | "TONOFF" | "CTU" | "CTD";
 
 export const INSTRUCTIONS: { id: Instruction; label: string }[] = [
   { id: "XIC", label: "Examine If Closed" },
@@ -9,7 +9,10 @@ export const INSTRUCTIONS: { id: Instruction; label: string }[] = [
   { id: "OTL", label: "Output Latch" },
   { id: "OTU", label: "Output Unlatch" },
   { id: "TON", label: "Timer On Delay" },
+  { id: "TOF", label: "Timer Off Delay" },
+  { id: "TONOFF", label: "Dual On/Off Delay (custom simulator block)" },
   { id: "CTU", label: "Count Up" },
+  { id: "CTD", label: "Count Down" },
 ];
 
 const BASE = "#58636f";
@@ -24,7 +27,7 @@ export const SYMBOL_SCALE = 0.5;
 
 export function ToolbarSymbol({ kind }: { kind: Instruction }) {
   const isContact = kind === "XIC" || kind === "XIO";
-  const isBlock = kind === "TON" || kind === "CTU";
+  const isBlock = ["TON", "TOF", "TONOFF", "CTU", "CTD"].includes(kind);
   return (
     <svg width="46" height="28" viewBox="0 0 92 50" aria-hidden="true">
       <g stroke="currentColor" strokeWidth="2.4" fill="none" strokeLinecap="square">
@@ -42,7 +45,7 @@ export function ToolbarSymbol({ kind }: { kind: Instruction }) {
         )}
       </g>
       {(kind === "OTL" || kind === "OTU" || isBlock) && (
-        <text x="46" y="30" textAnchor="middle" fill="currentColor" fontSize={isBlock ? 12 : 16} fontWeight="600" fontFamily="Arial, sans-serif">
+        <text x="46" y="30" textAnchor="middle" fill="currentColor" fontSize={kind === "TONOFF" ? 8.5 : isBlock ? 12 : 16} fontWeight="600" fontFamily="Arial, sans-serif">
           {isBlock ? kind : kind === "OTL" ? "L" : "U"}
         </text>
       )}
@@ -153,7 +156,9 @@ export function RungFrame({
   onSelect?: () => void;
   width?: number;
 }) {
-  const bottom = index === 0 ? 68 : 40;
+  const blockRow = index >= 3;
+  const top = blockRow ? 70 : 47;
+  const bottom = blockRow ? 70 : index === 0 ? 68 : 40;
   return (
     <g
       role="button"
@@ -169,8 +174,8 @@ export function RungFrame({
       }}
       style={{ cursor: "pointer" }}
     >
-      <rect x="1" y={y - 47} width={width} height={47 + bottom} fill="transparent" />
-      {selected && <rect x="1" y={y - 47} width="48" height={47 + bottom} fill="#087bd1" />}
+      <rect x="1" y={y - top} width={width} height={top + bottom} fill="transparent" />
+      {selected && <rect x="1" y={y - top} width="48" height={top + bottom} fill="#087bd1" />}
       <text
         x="25"
         y={y + 4}
