@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
-import { ArrowLeft, ArrowRight, Copy, FileCode2, GitBranch, GripVertical, Trash2 } from "lucide-react";
+import { FileCode2, GitBranch, Trash2 } from "lucide-react";
 import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
@@ -54,12 +54,12 @@ export function PracticeEditor({
 }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedRungId, setSelectedRungId] = useState<string | null>(null);
+  const [selectedOrBranch, setSelectedOrBranch] = useState<{ rungId: string; branchId: string } | null>(null);
   const [error, setError] = useState("");
   const [dropPreview, setDropPreview] = useState<(VisualLadderDropTarget & { rungId: string }) | null>(null);
   const [moving, setMoving] = useState<InternalDrag | null>(null);
   const [tagDragSource, setTagDragSource] = useState<string | null>(null);
   const [tagDropTarget, setTagDropTarget] = useState<string | null>(null);
-  const [tagFeedback, setTagFeedback] = useState("");
   const [tagSelector, setTagSelector] = useState<TagSelectorState | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLElement | null>(null);
@@ -98,6 +98,9 @@ export function PracticeEditor({
       key: event.key,
       hasSelectedInstruction: Boolean(selected && findInstruction(project, selected)),
       hasSelectedRung: Boolean(selectedRungId && project.rungs.some((rung) => rung.id === selectedRungId)),
+      hasSelectedBranch: Boolean(selectedOrBranch && project.rungs.some((rung) =>
+        rung.id === selectedOrBranch.rungId &&
+        rung.parallelBranches?.some((branch) => branch.id === selectedOrBranch.branchId))),
       isTextEditing,
       isTagSelectorOpen: Boolean(tagSelector),
       isDragging: Boolean(moving || tagDragSource || draggingKind),
@@ -112,22 +115,28 @@ export function PracticeEditor({
     if (action === "instruction" && selected) {
       if (update(() => removeInstruction(project, selected))) {
         setSelected(null);
-        setTagFeedback("");
         setTagDropTarget(null);
+      }
+    } else if (action === "branch" && selectedOrBranch) {
+      const rung = project.rungs.find((item) => item.id === selectedOrBranch.rungId);
+      const branch = rung?.parallelBranches?.find((item) => item.id === selectedOrBranch.branchId);
+      if (branch && update(() =>
+        removeParallelBranch(project, selectedOrBranch.rungId, branch.anchorId, branch.id))) {
+        setSelectedOrBranch(null);
+        setDropPreview(null);
       }
     } else if (action === "rung" && selectedRungId) {
       // Removing the rung also removes its contacts, coil and all OR branches.
       if (update(() => removeRung(project, selectedRungId))) {
         setSelected(null);
         setSelectedRungId(null);
-        setTagFeedback("");
+        setSelectedOrBranch(null);
         setTagDropTarget(null);
         setDropPreview(null);
       }
     }
   };
 
-  const boolTags = project.tags.filter((tag) => tag.type === "BOOL");
   const insertAt = (rungId: string, position: number, kind: EditableKind,
     anchorId?: string, branchId?: string) => {
     // Newly inserted instructions start without any operand, as in Logix Designer.
@@ -139,6 +148,7 @@ export function PracticeEditor({
       : insertInstruction(project, rungId, position, instruction));
     if (done) {
       setSelected(id);
+      setSelectedOrBranch(null);
       // After dropping from the toolbar, give the editable routine keyboard focus.
       editorRef.current?.focus({ preventScroll: true });
     }
@@ -148,6 +158,7 @@ export function PracticeEditor({
     event.dataTransfer.setData(LADDER_MOVE_MIME, id);
     setMoving({ id, kind });
     setSelected(id);
+    setSelectedOrBranch(null);
     setDropPreview(null);
   };
 
@@ -162,7 +173,6 @@ export function PracticeEditor({
     setTagDragSource(instructionId);
     setTagDropTarget(null);
     setDropPreview(null);
-    setTagFeedback("");
     setTagSelector(null);
   };
 
@@ -176,6 +186,7 @@ export function PracticeEditor({
     if (!location) return;
     const box = event.currentTarget.getBoundingClientRect();
     setSelected(instructionId);
+    setSelectedOrBranch(null);
     setTagSelector({
       instructionId,
       kind: location.instruction.kind,
@@ -183,7 +194,6 @@ export function PracticeEditor({
       mode,
       anchor: { left: box.left, top: box.top, bottom: box.bottom },
     });
-    setTagFeedback("");
   };
 
   const assignSelectedTag = (tag: string) => {
@@ -193,7 +203,6 @@ export function PracticeEditor({
     const done = update(() => changeInstructionTag(project, tagSelector.instructionId, tag));
     if (done) {
       setSelected(tagSelector.instructionId);
-      setTagFeedback("Variable " + tag + " asignada a " + location.instruction.kind + ".");
       setTagSelector(null);
     }
   };
@@ -221,8 +230,7 @@ export function PracticeEditor({
     if (!source?.instruction.tag || !target) return;
     if (update(() => copyInstructionTag(project, sourceId, targetId))) {
       setSelected(targetId);
-      setTagFeedback("Tag " + source.instruction.tag + " copiado a " + target.instruction.kind +
-        " del rung " + project.rungs.findIndex((rung) => rung.id === target.rungId) + ".");
+      setSelectedOrBranch(null);
     }
   };
 
@@ -265,6 +273,7 @@ export function PracticeEditor({
           : moveInstruction(project, sourceId, rungId, target.position));
         if (done) {
           setSelected(sourceId);
+          setSelectedOrBranch(null);
           editorRef.current?.focus({ preventScroll: true });
         }
       } else if (isPalette && isEditableKind(paletteKind)) {
@@ -283,7 +292,6 @@ export function PracticeEditor({
     ...project.rungs.map((rung) => getRungGeometry(rung, viewportWidth).width),
   );
   const selectedLocation = selected ? findInstruction(project, selected) : null;
-  const selectedInstruction = selectedLocation?.instruction;
   const selectedRungForInsert = selectedLocation?.rungId ?? selectedRungId;
   const parallelTarget = getParallelBranchTarget(project, selected, selectedRungId);
 
@@ -291,8 +299,8 @@ export function PracticeEditor({
     const id = nextId("rung");
     if (update(() => insertRungBelow(project, id, selectedRungForInsert))) {
       setSelected(null);
+      setSelectedOrBranch(null);
       setSelectedRungId(id);
-      setTagFeedback("");
       editorRef.current?.focus({ preventScroll: true });
     }
   };
@@ -304,6 +312,7 @@ export function PracticeEditor({
     }
     if (update(() => createParallelBranch(project, parallelTarget.rungId, parallelTarget.anchorId))) {
       setSelectedRungId(parallelTarget.rungId);
+      setSelectedOrBranch(null);
       editorRef.current?.focus({ preventScroll: true });
     }
   };
@@ -318,11 +327,6 @@ export function PracticeEditor({
     insertAt(target.rungId, target.position, kind, target.anchorId, target.branchId);
     setSelectedRungId(target.rungId);
   };
-  const selectedBranch = selectedLocation ? project.rungs
-    .find((rung) => rung.id === selectedLocation.rungId)?.parallelBranches
-    ?.find((branch) => selectedLocation.lane === "parallel"
-      ? branch.id === selectedLocation.branchId
-      : branch.anchorId === selected) : undefined;
 
 
   return (
@@ -378,7 +382,7 @@ export function PracticeEditor({
             const showLowerLane = Boolean(maxLanes || draggingKind || moving);
             const svgHeight = showLowerLane ? 204 + Math.max(0, maxLanes - 1) * PRACTICE_BRANCH_GAP : 122;
             const preferredAnchor = selectedLocation?.rungId === rung.id &&
-              selectedLocation.lane === "main" && selectedInstruction?.kind !== "OTE"
+              selectedLocation.lane === "main" && selectedLocation.instruction.kind !== "OTE"
               ? selected : contacts[0]?.id;
 
             const drawContact = (item: typeof contacts[number], x: number, centerY: number) => (
@@ -396,7 +400,7 @@ export function PracticeEditor({
               <button key={"drag-" + item.id} type="button" draggable
                 aria-label={"Mover instrucción " + item.kind + " " + item.tag}
                 title="Arrastra el símbolo para mover la instrucción; arrastra el tag para copiarlo"
-                onClick={() => setSelected(item.id)}
+                onClick={() => { setSelected(item.id); setSelectedOrBranch(null); }}
                 onDragStart={(event) => beginMove(event, item.id, item.kind)}
                 onDragEnd={() => { setMoving(null); setDropPreview(null); }}
                 onDragOver={(event) => dragOverTagTarget(event, item.id)}
@@ -457,6 +461,7 @@ export function PracticeEditor({
                   aria-pressed={selectedRungId === rung.id}
                   onClick={() => {
                     setSelected(null);
+                    setSelectedOrBranch(null);
                     setSelectedRungId((current) => current === rung.id ? null : rung.id);
                     editorRef.current?.focus({ preventScroll: true });
                   }}
@@ -478,7 +483,7 @@ export function PracticeEditor({
                     <GitBranch size={12} /> OR
                   </button>
                   <button type="button" onClick={() => {
-                    if (update(() => removeRung(project, rung.id))) { setSelected(null); setSelectedRungId(null); }
+                    if (update(() => removeRung(project, rung.id))) { setSelected(null); setSelectedRungId(null); setSelectedOrBranch(null); }
                   }} title={"Eliminar rung " + rungIndex} aria-label={"Eliminar rung " + rungIndex}
                     className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-slate-500 hover:bg-red-50 hover:text-red-700">
                     <Trash2 size={12} />
@@ -605,19 +610,6 @@ export function PracticeEditor({
                     })}
                     {output && dragButton(output, coilX, y)}
                     {output && tagDragButton(output, coilX, y)}
-                    {(rung.parallelBranches ?? []).map((branch) => {
-                      const group = groups.find((part) => part.anchorId === branch.anchorId);
-                      return group ? (
-                        <button key={"remove-" + branch.id} type="button"
-                          title="Eliminar toda esta rama OR"
-                          onClick={() => {
-                            if (update(() => removeParallelBranch(project, rung.id, branch.anchorId, branch.id))) setSelected(null);
-                          }}
-                          className="absolute z-20 rounded border border-red-200 bg-white px-1 text-[10px] text-red-700 hover:bg-red-50"
-                          style={{ left: group.right + 5,
-                            top: group.branchLanes.find((item) => item.id === branch.id)!.y + 16 }}>× OR</button>
-                      ) : null;
-                    })}
                   </div>
                 </div>
               </article>
@@ -633,108 +625,6 @@ export function PracticeEditor({
               onClose={() => setTagSelector(null)}
             />
           )}
-          {tagFeedback && (
-            <p role="status" className="mx-3 mb-2 flex items-center gap-2 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
-              <Copy size={13} /> {tagFeedback}
-            </p>
-          )}
-          {selectedInstruction && selectedLocation && (
-            <div className="m-3 rounded border border-sky-200 bg-sky-50 p-3 text-xs">
-              <div className="mb-2 flex items-center gap-1 font-semibold text-sky-900">
-                <GripVertical size={14} /> Propiedades · {selectedInstruction.kind}
-                <span className="ml-auto font-normal text-sky-700">Supr: eliminar instrucción</span>
-                <span className="ml-2 text-sky-600">
-                  ({selectedLocation.lane === "parallel" ? "Rama OR" : "Línea principal"})
-                </span>
-              </div>
-              <div className="flex flex-wrap items-end gap-3">
-                <label className="flex min-w-44 flex-col gap-1">
-                  Tag asociado {selectedInstruction.tag ? "" : "· Pendiente de asignar"}
-                  <select value={selectedInstruction.tag}
-                    onChange={(event) => update(() =>
-                      changeInstructionTag(project, selectedInstruction.id, event.target.value))}
-                    className="rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-800">
-                    <option value="">— Sin tag —</option>
-                    {boolTags.map((tag) =>
-                      <option key={tag.name} value={tag.name}>{tag.name}</option>)}
-                  </select>
-                </label>
-
-                {selectedLocation.lane === "main" && selectedInstruction.kind !== "OTE" && (
-                  <button type="button"
-                    className="flex items-center gap-1 rounded border border-sky-300 bg-white px-2 py-1.5 text-sky-800 hover:bg-sky-100"
-                    onClick={() => update(() => createParallelBranch(project, selectedLocation.rungId, selectedInstruction.id))}>
-                    <GitBranch size={14} /> Crear rama OR vacía
-                  </button>
-                )}
-                {selectedBranch && (
-                  <button type="button"
-                    className="flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1.5 text-red-700 hover:bg-red-50"
-                    onClick={() => {
-                      if (update(() => removeParallelBranch(project, selectedLocation.rungId, selectedBranch.anchorId, selectedBranch.id))) {
-                        if (selectedLocation.lane === "parallel") setSelected(null);
-                      }
-                    }}>
-                    <Trash2 size={13} /> Eliminar rama OR
-                  </button>
-                )}
-                {selectedLocation.lane === "main" && selectedInstruction.kind !== "OTE" && (
-                  <>
-                    <button type="button" aria-label="Mover contacto a la izquierda"
-                      className="rounded border border-slate-300 bg-white px-2 py-1.5"
-                      onClick={() => update(() => moveInstruction(project, selectedInstruction.id,
-                        selectedLocation.rungId, selectedLocation.position - 1))}>
-                      <ArrowLeft size={14} />
-                    </button>
-                    <button type="button" aria-label="Mover contacto a la derecha"
-                      className="rounded border border-slate-300 bg-white px-2 py-1.5"
-                      onClick={() => update(() => moveInstruction(project, selectedInstruction.id,
-                        selectedLocation.rungId, selectedLocation.position + 2))}>
-                      <ArrowRight size={14} />
-                    </button>
-                  </>
-                )}
-                {selectedLocation.lane === "parallel" && selectedLocation.anchorId && (
-                  <>
-                    <button type="button" className="rounded border border-slate-300 bg-white px-2 py-1.5"
-                      aria-label="Mover contacto OR a la izquierda"
-                      onClick={() => update(() => moveToParallel(project, selectedInstruction.id,
-                        selectedLocation.rungId, selectedLocation.anchorId!, selectedLocation.position - 1,
-                        selectedLocation.branchId))}>
-                      <ArrowLeft size={14} />
-                    </button>
-                    <button type="button" className="rounded border border-slate-300 bg-white px-2 py-1.5"
-                      aria-label="Mover contacto OR a la derecha"
-                      onClick={() => update(() => moveToParallel(project, selectedInstruction.id,
-                        selectedLocation.rungId, selectedLocation.anchorId!, selectedLocation.position + 2,
-                        selectedLocation.branchId))}>
-                      <ArrowRight size={14} />
-                    </button>
-                  </>
-                )}
-                <label className="flex min-w-36 flex-col gap-1">
-                  Mover a otro rung
-                  <select value={selectedLocation.rungId}
-                    onChange={(event) => update(() =>
-                      moveInstruction(project, selectedInstruction.id, event.target.value, Number.MAX_SAFE_INTEGER))}
-                    className="rounded border border-slate-300 bg-white px-2 py-1.5">
-                    {project.rungs.map((rung, index) =>
-                      <option key={rung.id} value={rung.id}>Rung {index}</option>)}
-                  </select>
-                </label>
-                <button type="button"
-                  className="rounded border border-red-200 bg-white px-2 py-1.5 text-red-700 hover:bg-red-50"
-                  onClick={() => {
-                    if (update(() => removeInstruction(project, selectedInstruction.id))) setSelected(null);
-                  }}>Eliminar instrucción</button>
-              </div>
-              <p className="mt-2 text-[11px] text-slate-500">
-                Puedes crear varias ramas OR bajo un contacto y añadir contactos en serie.
-                Al mover el contacto principal, sus ramas OR viajan con él.
-              </p>
-            </div>
-          )}
-
           {error && (
             <p role="alert" className="m-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700">
               {error}
