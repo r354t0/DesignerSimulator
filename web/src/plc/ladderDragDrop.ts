@@ -3,10 +3,21 @@ import { contactCount, findInstruction, type EditableKind, type PracticeProject,
 export const LADDER_DRAG_MIME = "application/x-designersimulator-ladder-instruction";
 export const LADDER_MOVE_MIME = "application/x-designersimulator-ladder-move";
 export const LADDER_TAG_MIME = "application/x-designersimulator-ladder-tag";
-export const PRACTICE_MAIN_Y = 87;
-export const PRACTICE_BRANCH_Y = 166;
+// Compact rung layout: keep room above symbols for two-line comments and
+// Studio-style selection. Most reclaimed space is BELOW the instructions.
+export const PRACTICE_MAIN_Y = 81;
+export const PRACTICE_BRANCH_Y = 160;
 export const PRACTICE_BRANCH_GAP = 85;
+export const PRACTICE_MAIN_HEIGHT = 98;
+export const PRACTICE_OR_HEIGHT = 178;
 export const branchLaneY = (index: number) => PRACTICE_BRANCH_Y + index * PRACTICE_BRANCH_GAP;
+
+/** Height of the visible rung: expand only for actual OR lanes or a drag preview. */
+export function getPracticeRungHeight(orLaneCount: number, showDropLane = false): number {
+  const laneCount = Math.max(0, Math.floor(orLaneCount) || 0);
+  if (laneCount === 0 && !showDropLane) return PRACTICE_MAIN_HEIGHT;
+  return PRACTICE_OR_HEIGHT + (Math.max(1, laneCount) - 1) * PRACTICE_BRANCH_GAP;
+}
 // Compact cells allow five serial contacts plus an OTE in a 760 px editor.
 export const CONTACT_STEP = 104;
 export const FIRST_CONTACT_X = 136;
