@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Contact, Coil, RungFrame, Wire } from "./LadderSymbols";
 import { PREVIEW_BLOCKS, PREVIEW_BLOCK_WIDTH, LadderFunctionBlock } from "./LadderFunctionBlocks";
 import type { DemoBlockRuntime } from "../../plc/timerCounterDemo";
+import type { PracticeTag } from "../../plc/practiceDocument";
 import {
   demoTagMetadata,
   type DemoInputs,
@@ -16,9 +17,10 @@ interface MonitorProps {
   blocks: DemoBlockRuntime;
   onTagChange: (tag: InputTag, value: boolean) => void;
   onResetCounters: () => void;
+  practiceTags?: PracticeTag[];
 }
 
-export function ProgramTags({ online, values, inputs, blocks, onTagChange, onResetCounters }: MonitorProps) {
+export function ProgramTags({ online, values, inputs, blocks, onTagChange, onResetCounters, practiceTags = [] }: MonitorProps) {
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-slate-800">
       <div className="border-b border-slate-200 bg-[#f7f9fb] px-4 py-3">
@@ -66,6 +68,25 @@ export function ProgramTags({ online, values, inputs, blocks, onTagChange, onRes
             ))}
           </tbody>
         </table>
+        <div className="mt-5">
+          <h3 className="text-xs font-semibold text-slate-700">Tags de PracticeRoutine (solo edición, sin ejecución)</h3>
+          <div className="mt-2 overflow-x-auto rounded border border-slate-200">
+            <table className="w-full min-w-[420px] border-collapse text-left text-xs">
+              <thead className="bg-[#edf1f5] text-slate-600">
+                <tr><th className="px-3 py-2">Nombre</th><th className="px-3 py-2">Tipo</th><th className="px-3 py-2">Descripción</th></tr>
+              </thead>
+              <tbody>
+                {practiceTags.map((tag) => (
+                  <tr key={tag.name} className="border-t border-slate-200">
+                    <td className="px-3 py-2 font-mono">{tag.name}</td>
+                    <td className="px-3 py-2">BOOL</td>
+                    <td className="px-3 py-2 text-slate-500">{tag.description || "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
         <div className="mt-5 flex items-center justify-between gap-2">
           <h3 className="text-xs font-semibold text-slate-700">Instancias de temporizadores y contadores (demo)</h3>
           <button type="button" onClick={onResetCounters}
