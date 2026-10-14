@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { getInstructionSelectionFrame, LADDER_SELECTION_BLUE } from "../../plc/ladderSelection";
 
 export type Instruction = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "TON" | "TOF" | "TONOFF" | "CTU" | "CTD";
 
@@ -115,6 +116,32 @@ function SvgComment({ x, y, comment, maxWidth = COMMENT_WIDTH }: {
   );
 }
 
+/**
+ * Studio-style selection belongs to the instruction (not its surrounding rung).
+ * Only the operand's tag line is blue with white lettering; comment and symbol
+ * stay legible on white within a narrow outline.
+ */
+function SelectedInstructionFrame({ x, y, comment, labelWidth = 96 }: {
+  x: number; y: number; comment?: string; labelWidth?: number;
+}) {
+  const lineCount = comment?.trim() ? wrapSvgComment(comment, labelWidth).length : 0;
+  const frame = getInstructionSelectionFrame(lineCount, labelWidth);
+  return (
+    <g pointerEvents="none" aria-hidden="true">
+      <rect
+        x={x + frame.left} y={y + frame.top}
+        width={frame.width} height={frame.height}
+        fill="none" stroke={LADDER_SELECTION_BLUE} strokeWidth="1.5"
+      />
+      <rect
+        x={x + frame.tagLeft} y={y + frame.tagTop}
+        width={frame.tagWidth} height={frame.tagHeight}
+        fill={LADDER_SELECTION_BLUE}
+      />
+    </g>
+  );
+}
+
 // Compact editor prototype: halve the geometry, without shrinking the tag text.
 // One value controls contacts and coils consistently.
 export const SYMBOL_SCALE = 0.5;
@@ -164,10 +191,10 @@ export function Wire({
 }
 
 export function Contact({
-  x, y, kind, tag, comment, value, online, powerIn, labelWidth,
+  x, y, kind, tag, comment, value, online, powerIn, labelWidth, selected = false,
 }: {
   x: number; y: number; kind: "XIC" | "XIO"; tag: string; comment?: string; labelWidth?: number;
-  value: boolean; online: boolean; powerIn: boolean;
+  value: boolean; online: boolean; powerIn: boolean; selected?: boolean;
 }) {
   // Logix semantics: XIC = bit TRUE; XIO = bit FALSE.
   const condition = kind === "XIC" ? value : !value;
@@ -179,10 +206,11 @@ export function Contact({
   const terminalX = halfBarGap + leadLength;
   return (
     <g>
+      {selected && <SelectedInstructionFrame x={x} y={y} comment={comment} labelWidth={labelWidth} />}
       {/* Tags and wrapped comments always stay above the instruction. No duplicate status text below. */}
       <g fill={BASE} textAnchor="middle" fontFamily="Arial, sans-serif">
         <SvgComment x={x} y={y} comment={comment} maxWidth={labelWidth} />
-        <text x={x} y={y - 23} fontSize="12" fill="#1c354b">
+        <text x={x} y={y - 23} fontSize="12" fill={selected ? "#ffffff" : "#1c354b"}>
           <title>{tag}</title>
           {labelWidth ? ellipsizeSvgLabel(tag, labelWidth) : tag}
         </text>
@@ -205,9 +233,9 @@ export function Contact({
 }
 
 export function Coil({
-  x, y, tag, comment, online, live, labelWidth,
+  x, y, tag, comment, online, live, labelWidth, selected = false,
 }: {
-  x: number; y: number; tag: string; comment?: string; online: boolean; live: boolean; labelWidth?: number;
+x: number; y: number; tag: string; comment?: string; online: boolean; live: boolean; labelWidth?: number; selected?: boolean;
 }) {
   const activeSymbol = online && live;
   const curveEdge = 14 * SYMBOL_SCALE;
@@ -218,10 +246,11 @@ export function Coil({
   const wireEnd = 48 * SYMBOL_SCALE;
   return (
     <g>
+      {selected && <SelectedInstructionFrame x={x} y={y} comment={comment} labelWidth={labelWidth} />}
       {/* Tags and wrapped comments always stay above the instruction. No duplicate status text below. */}
       <g fill={BASE} textAnchor="middle" fontFamily="Arial, sans-serif">
         <SvgComment x={x} y={y} comment={comment} maxWidth={labelWidth} />
-        <text x={x} y={y - 23} fontSize="12" fill="#1c354b">
+        <text x={x} y={y - 23} fontSize="12" fill={selected ? "#ffffff" : "#1c354b"}>
           <title>{tag}</title>
           {labelWidth ? ellipsizeSvgLabel(tag, labelWidth) : tag}
         </text>
