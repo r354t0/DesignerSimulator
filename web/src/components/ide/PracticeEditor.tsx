@@ -79,9 +79,10 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
       return false;
     }
   };
+  const boolTags = project.tags.filter((tag) => tag.type === "BOOL");
   const defaultTag = (kind: EditableKind) => kind === "OTE"
-    ? project.tags.find((tag) => tag.name === "Motor_Run")?.name ?? project.tags[0]?.name
-    : project.tags[0]?.name;
+    ? boolTags.find((tag) => tag.name === "Motor_Run")?.name ?? boolTags[0]?.name
+    : boolTags[0]?.name;
 
   const insertAt = (rungId: string, position: number, kind: EditableKind, anchorId?: string) => {
     const tag = defaultTag(kind);
@@ -582,7 +583,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
                     onChange={(event) => update(() =>
                       changeInstructionTag(project, selectedInstruction.id, event.target.value))}
                     className="rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-800">
-                    {project.tags.map((tag) =>
+                    {boolTags.map((tag) =>
                       <option key={tag.name} value={tag.name}>{tag.name}</option>)}
                   </select>
                 </label>
