@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { ArrowLeft, ArrowRight, Copy, FileCode2, GitBranch, GripVertical, Plus, Tag, Trash2 } from "lucide-react";
 import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymbols";
+import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
 import {
   findVisualLadderDropTarget,
   getRungGeometry,
@@ -49,6 +50,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
   const [tagDragSource, setTagDragSource] = useState<string | null>(null);
   const [tagDropTarget, setTagDropTarget] = useState<string | null>(null);
   const [tagFeedback, setTagFeedback] = useState("");
+  const [tagSelector, setTagSelector] = useState<TagSelectorState | null>(null);
   const [tagName, setTagName] = useState("");
   const [tagDescription, setTagDescription] = useState("");
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -111,6 +113,39 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
     setTagDropTarget(null);
     setDropPreview(null);
     setTagFeedback("");
+    setTagSelector(null);
+  };
+
+  const openTagSelector = (
+    event: ReactMouseEvent<HTMLButtonElement>,
+    instructionId: string,
+    mode: TagSelectorMode,
+  ) => {
+    event.stopPropagation();
+    const location = findInstruction(project, instructionId);
+    if (!location) return;
+    const box = event.currentTarget.getBoundingClientRect();
+    setSelected(instructionId);
+    setTagSelector({
+      instructionId,
+      kind: location.instruction.kind,
+      currentTag: location.instruction.tag,
+      mode,
+      anchor: { left: box.left, top: box.top, bottom: box.bottom },
+    });
+    setTagFeedback("");
+  };
+
+  const assignSelectedTag = (tag: string) => {
+    if (!tagSelector) return;
+    const location = findInstruction(project, tagSelector.instructionId);
+    if (!location) { setTagSelector(null); return; }
+    const done = update(() => changeInstructionTag(project, tagSelector.instructionId, tag));
+    if (done) {
+      setSelected(tagSelector.instructionId);
+      setTagFeedback("Variable " + tag + " asignada a " + location.instruction.kind + ".");
+      setTagSelector(null);
+    }
   };
 
   const dragOverTagTarget = (event: DragEvent<HTMLButtonElement>, targetId: string) => {
@@ -228,7 +263,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
         <div>
           <h2 className="text-xs font-semibold">PracticeRoutine.LAD</h2>
           <p className="mt-1 text-[11px] text-slate-500">
-            Arrastra el nombre de un tag para copiarlo en otra instrucción. Arrastra el símbolo para moverlo.
+            Clic en tag: buscar coincidencias · Doble clic: explorar Program Tags · Arrastrar tag: copiar referencia.
           </p>
         </div>
         <span className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">
@@ -304,9 +339,13 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
             // captures native dragstart reliably on top of the tag text only.
             const tagDragButton = (item: typeof contacts[number], x: number, centerY: number) => (
               <button key={"tag-" + item.id} type="button" draggable
-                title={"Arrastra " + item.tag + " a otra instrucción para copiar la referencia"}
-                aria-label={"Copiar tag " + item.tag + " arrastrándolo a otra instrucción"}
-                onClick={() => setSelected(item.id)}
+                data-practice-tag-label
+                title={"Clic: buscar tag · Doble clic: explorar variables · Arrastrar: copiar " + item.tag}
+                aria-label={"Seleccionar variable de " + item.kind + " " + item.tag}
+                onClick={(event) => {
+                  if (event.detail <= 1) openTagSelector(event, item.id, "suggestions");
+                }}
+                onDoubleClick={(event) => openTagSelector(event, item.id, "dialog")}
                 onDragStart={(event) => beginTagCopy(event, item.id)}
                 onDragEnd={() => { setTagDragSource(null); setTagDropTarget(null); }}
                 onDragOver={(event) => dragOverTagTarget(event, item.id)}
@@ -514,6 +553,15 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
             );
           })}
 
+          {tagSelector && (
+            <PracticeTagSelector
+              key={tagSelector.instructionId + "-" + tagSelector.mode}
+              tags={project.tags}
+              selector={tagSelector}
+              onSelect={assignSelectedTag}
+              onClose={() => setTagSelector(null)}
+            />
+          )}
           {tagFeedback && (
             <p role="status" className="mx-3 mb-2 flex items-center gap-2 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
               <Copy size={13} /> {tagFeedback}
@@ -641,7 +689,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
             </p>
           )}
           <p className="mb-5 flex items-center gap-1 px-4 text-xs text-slate-500">
-            <FileCode2 size={14} /> Arrastra el nombre del tag para copiar su referencia; arrastra el símbolo para moverlo. OR y rungs siguen editables.
+            <FileCode2 size={14} /> Clic en etiqueta: sugerencias; doble clic: tabla de variables; arrastre: copiar tag. El símbolo sigue siendo desplazable.
             Sin OR anidados ni ejecución de PracticeRoutine todavía.
           </p>
         </div>
