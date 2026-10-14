@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
-import { ArrowLeft, ArrowRight, FileCode2, GitBranch, GripVertical, Plus, Tag, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Copy, FileCode2, GitBranch, GripVertical, Plus, Tag, Trash2 } from "lucide-react";
 import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import {
   findVisualLadderDropTarget,
@@ -7,6 +7,7 @@ import {
   isEditableKind,
   LADDER_DRAG_MIME,
   LADDER_MOVE_MIME,
+  LADDER_TAG_MIME,
   PRACTICE_BRANCH_Y,
   PRACTICE_MAIN_Y,
   type VisualLadderDropTarget,
@@ -14,6 +15,7 @@ import {
 import {
   addParallelContact,
   changeInstructionTag,
+  copyInstructionTag,
   createParallelBranch,
   createRung,
   createTag,
@@ -44,6 +46,9 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
   const [error, setError] = useState("");
   const [dropPreview, setDropPreview] = useState<(VisualLadderDropTarget & { rungId: string }) | null>(null);
   const [moving, setMoving] = useState<InternalDrag | null>(null);
+  const [tagDragSource, setTagDragSource] = useState<string | null>(null);
+  const [tagDropTarget, setTagDropTarget] = useState<string | null>(null);
+  const [tagFeedback, setTagFeedback] = useState("");
   const [tagName, setTagName] = useState("");
   const [tagDescription, setTagDescription] = useState("");
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -94,6 +99,48 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
     setDropPreview(null);
   };
 
+  // Dragging a tag label copies a reference. Dragging the symbol body moves
+  // an instruction. Use distinct MIME types so the two actions never mix.
+  const beginTagCopy = (event: DragEvent<HTMLButtonElement>, instructionId: string) => {
+    const source = findInstruction(project, instructionId);
+    if (!source) { event.preventDefault(); return; }
+    event.stopPropagation();
+    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.setData(LADDER_TAG_MIME, instructionId);
+    setTagDragSource(instructionId);
+    setTagDropTarget(null);
+    setDropPreview(null);
+    setTagFeedback("");
+  };
+
+  const dragOverTagTarget = (event: DragEvent<HTMLButtonElement>, targetId: string) => {
+    if (!event.dataTransfer.types.includes(LADDER_TAG_MIME)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const allowed = Boolean(tagDragSource && tagDragSource !== targetId);
+    event.dataTransfer.dropEffect = allowed ? "copy" : "none";
+    setTagDropTarget(allowed ? targetId : null);
+  };
+
+  const finishTagCopy = (event: DragEvent<HTMLButtonElement>, targetId: string) => {
+    if (!event.dataTransfer.types.includes(LADDER_TAG_MIME)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    // The payload carries an instruction ID, never untrusted arbitrary text.
+    const sourceId = event.dataTransfer.getData(LADDER_TAG_MIME);
+    setTagDropTarget(null);
+    setTagDragSource(null);
+    if (!sourceId || sourceId === targetId) return;
+    const source = findInstruction(project, sourceId);
+    const target = findInstruction(project, targetId);
+    if (!source || !target) return;
+    if (update(() => copyInstructionTag(project, sourceId, targetId))) {
+      setSelected(targetId);
+      setTagFeedback("Tag " + source.instruction.tag + " copiado a " + target.instruction.kind +
+        " del rung " + project.rungs.findIndex((rung) => rung.id === target.rungId) + ".");
+    }
+  };
+
   const getTarget = (event: DragEvent<HTMLDivElement>, rungId: string, width: number) => {
     const kind = moving?.kind ?? draggingKind;
     if (!kind) return null;
@@ -103,6 +150,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
     return findVisualLadderDropTarget(project, rungId, kind, x, y, width, moving?.id);
   };
   const onDragOverRung = (event: DragEvent<HTMLDivElement>, rungId: string, width: number) => {
+    if (event.dataTransfer.types.includes(LADDER_TAG_MIME)) return;
     if (!event.dataTransfer.types.includes(LADDER_MOVE_MIME) &&
         !event.dataTransfer.types.includes(LADDER_DRAG_MIME)) return;
     event.preventDefault();
@@ -114,6 +162,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
       previous.x === target?.x ? previous : target ? { ...target, rungId } : null);
   };
   const onDropRung = (event: DragEvent<HTMLDivElement>, rungId: string, width: number) => {
+    if (event.dataTransfer.types.includes(LADDER_TAG_MIME)) return;
     const isMove = event.dataTransfer.types.includes(LADDER_MOVE_MIME);
     const isPalette = event.dataTransfer.types.includes(LADDER_DRAG_MIME);
     if (!isMove && !isPalette) return;
@@ -179,7 +228,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
         <div>
           <h2 className="text-xs font-semibold">PracticeRoutine.LAD</h2>
           <p className="mt-1 text-[11px] text-slate-500">
-            Crea una rama OR vacía, añade varios contactos en serie o arrástralos desde la paleta y otros rungs.
+            Arrastra el nombre de un tag para copiarlo en otra instrucción. Arrastra el símbolo para moverlo.
           </p>
         </div>
         <span className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">
@@ -233,14 +282,46 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
             );
             const dragButton = (item: typeof contacts[number], x: number, centerY: number) => (
               <button key={"drag-" + item.id} type="button" draggable
-                aria-label={"Arrastrar " + item.kind + " " + item.tag}
-                title="Clic para editar · Arrastra para mover"
+                aria-label={"Mover instrucción " + item.kind + " " + item.tag}
+                title="Arrastra el símbolo para mover la instrucción; arrastra el tag para copiarlo"
                 onClick={() => setSelected(item.id)}
                 onDragStart={(event) => beginMove(event, item.id, item.kind)}
                 onDragEnd={() => { setMoving(null); setDropPreview(null); }}
-                className="absolute z-10 cursor-grab rounded border border-transparent bg-transparent hover:border-sky-300 hover:bg-sky-100/20 active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-sky-500"
-                style={{ left: x - 32, top: centerY - 31, width: 64, height: 62 }}>
+                onDragOver={(event) => dragOverTagTarget(event, item.id)}
+                onDrop={(event) => finishTagCopy(event, item.id)}
+                onDragLeave={() => setTagDropTarget((current) => current === item.id ? null : current)}
+                className={
+                  "absolute z-10 cursor-grab rounded border bg-transparent active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-sky-500 " +
+                  (tagDropTarget === item.id
+                    ? "border-sky-500 bg-sky-100/70 ring-2 ring-sky-400"
+                    : "border-transparent hover:border-sky-300 hover:bg-sky-100/20")
+                }
+                style={{ left: x - 32, top: centerY - 13, width: 64, height: 42 }}>
                 <span className="sr-only">Mover {item.tag}</span>
+              </button>
+            );
+            // The SVG keeps rendering the label; this invisible HTML hotspot
+            // captures native dragstart reliably on top of the tag text only.
+            const tagDragButton = (item: typeof contacts[number], x: number, centerY: number) => (
+              <button key={"tag-" + item.id} type="button" draggable
+                title={"Arrastra " + item.tag + " a otra instrucción para copiar la referencia"}
+                aria-label={"Copiar tag " + item.tag + " arrastrándolo a otra instrucción"}
+                onClick={() => setSelected(item.id)}
+                onDragStart={(event) => beginTagCopy(event, item.id)}
+                onDragEnd={() => { setTagDragSource(null); setTagDropTarget(null); }}
+                onDragOver={(event) => dragOverTagTarget(event, item.id)}
+                onDrop={(event) => finishTagCopy(event, item.id)}
+                onDragLeave={() => setTagDropTarget((current) => current === item.id ? null : current)}
+                className={
+                  "absolute z-20 cursor-copy rounded-sm border border-transparent bg-transparent focus-visible:outline-2 focus-visible:outline-sky-500 " +
+                  (tagDropTarget === item.id
+                    ? "border-sky-500 bg-sky-100/70 ring-2 ring-sky-400"
+                    : tagDragSource === item.id
+                      ? "border-sky-400 bg-sky-100/35"
+                      : "hover:border-dashed hover:border-sky-400 hover:bg-sky-100/20")
+                }
+                style={{ left: x - 59, top: centerY - 37, width: 118, height: 21 }}>
+                <span className="sr-only">Copiar referencia de {item.tag}</span>
               </button>
             );
 
@@ -406,11 +487,15 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
                       const branch = rung.parallelBranches?.find((b) => b.anchorId === contact.id);
                       return [
                         dragButton(contact, group.x, y),
-                        ...(branch?.instructions.map((part, branchIndex) =>
-                          dragButton(part, group.branchCenters[branchIndex], branchY)) ?? []),
+                        tagDragButton(contact, group.x, y),
+                        ...(branch?.instructions.flatMap((part, branchIndex) => [
+                          dragButton(part, group.branchCenters[branchIndex], branchY),
+                          tagDragButton(part, group.branchCenters[branchIndex], branchY),
+                        ]) ?? []),
                       ];
                     })}
                     {output && dragButton(output, coilX, y)}
+                    {output && tagDragButton(output, coilX, y)}
                     {(rung.parallelBranches ?? []).map((branch) => {
                       const group = groups.find((part) => part.anchorId === branch.anchorId);
                       return group ? (
@@ -429,6 +514,11 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
             );
           })}
 
+          {tagFeedback && (
+            <p role="status" className="mx-3 mb-2 flex items-center gap-2 rounded border border-sky-200 bg-sky-50 px-3 py-2 text-xs text-sky-900">
+              <Copy size={13} /> {tagFeedback}
+            </p>
+          )}
           {selectedInstruction && selectedLocation && (
             <div className="m-3 rounded border border-sky-200 bg-sky-50 p-3 text-xs">
               <div className="mb-2 flex items-center gap-1 font-semibold text-sky-900">
@@ -551,7 +641,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
             </p>
           )}
           <p className="mb-5 flex items-center gap-1 px-4 text-xs text-slate-500">
-            <FileCode2 size={14} /> Editor Ladder preliminar: rungs, ramas OR independientes, contactos en serie y una OTE.
+            <FileCode2 size={14} /> Arrastra el nombre del tag para copiar su referencia; arrastra el símbolo para moverlo. OR y rungs siguen editables.
             Sin OR anidados ni ejecución de PracticeRoutine todavía.
           </p>
         </div>
