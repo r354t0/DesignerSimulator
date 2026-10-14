@@ -57,7 +57,7 @@ export function InstructionPalette({
   };
 
   return (
-    <div className="flex h-[83px] shrink-0 flex-col border-b border-[#abb8c9] bg-[#dbe2ed] text-[#354357]"
+    <div className="flex h-[69px] shrink-0 flex-col border-b border-[#abb8c9] bg-[#dbe2ed] text-[#354357]"
       aria-label="Paleta de instrucciones Ladder estilo Studio 5000">
       <div className="flex min-h-0 flex-1 items-center gap-0.5 border-b border-[#c0c9d6] px-1.5">
         <button type="button" aria-label="Desplazar símbolos a la izquierda"
@@ -90,7 +90,7 @@ export function InstructionPalette({
                 }}
                 onDragEnd={onDragEnd}
                 className={
-                  "flex h-[48px] min-w-[50px] shrink-0 flex-col items-center justify-center rounded-sm border text-[10px] leading-[12px] transition-colors " +
+                  "flex h-[42px] min-w-[50px] shrink-0 flex-col items-center justify-center rounded-sm border text-[10px] leading-[12px] transition-colors " +
                   (active
                     ? "border-[#7e9ec7] bg-[#f6f9ff] text-[#1c456f] shadow-sm"
                     : tool.editable
@@ -117,7 +117,7 @@ export function InstructionPalette({
           <span>{supported ? "XIC / XIO / OTE: arrastra al rung" : "Funciones pendientes o solo demo"}</span>
         </div>
       </div>
-      <div className="flex h-[27px] shrink-0 items-stretch border-t border-[#f4f7fa] bg-[#d1dae7] px-1">
+      <div className="flex h-[24px] shrink-0 items-stretch border-t border-[#f4f7fa] bg-[#d1dae7] px-1">
         <button type="button" aria-label="Desplazar categorías a la izquierda"
           onClick={() => tabsRef.current?.scrollBy({ left: -240, behavior: "smooth" })}
           className="flex w-5 shrink-0 items-center justify-center text-[#6d7d91] hover:bg-[#becbdb]">
