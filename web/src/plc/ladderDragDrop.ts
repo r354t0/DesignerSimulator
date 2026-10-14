@@ -1,4 +1,4 @@
-import { findInstruction, type EditableKind, type PracticeProject } from "./practiceDocument";
+import { findInstruction, type EditableKind, type PracticeProject } from "./practiceDocument.ts";
 
 /**
  * Find a valid insertion slot in SVG coordinates. Drag/drop and keyboard/click
