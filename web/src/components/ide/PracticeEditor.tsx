@@ -292,8 +292,14 @@ export function PracticeEditor({
     ...project.rungs.map((rung) => getRungGeometry(rung, viewportWidth).width),
   );
   const selectedLocation = selected ? findInstruction(project, selected) : null;
-  const selectedRungForInsert = selectedLocation?.rungId ?? selectedRungId;
-  const parallelTarget = getParallelBranchTarget(project, selected, selectedRungId);
+  const selectedRungForInsert = selectedLocation?.rungId ?? selectedOrBranch?.rungId ?? selectedRungId;
+  const selectedBranchModel = selectedOrBranch
+    ? project.rungs.find((rung) => rung.id === selectedOrBranch.rungId)
+      ?.parallelBranches?.find((branch) => branch.id === selectedOrBranch.branchId)
+    : null;
+  const parallelTarget = selectedOrBranch && selectedBranchModel
+    ? { rungId: selectedOrBranch.rungId, anchorId: selectedBranchModel.anchorId }
+    : getParallelBranchTarget(project, selected, selectedRungId);
 
   const insertSelectedRungBelow = () => {
     const id = nextId("rung");
@@ -318,7 +324,13 @@ export function PracticeEditor({
   };
   const handlePaletteClick = (kind: "XIC" | "XIO" | "OTE") => {
     onSelectPaletteTool(kind);
-    const target = getPaletteInsertionTarget(project, selected, selectedRungId, kind);
+    if (selectedOrBranch && selectedBranchModel && kind !== "OTE") {
+      insertAt(selectedOrBranch.rungId, selectedBranchModel.instructions.length, kind,
+        selectedBranchModel.anchorId, selectedBranchModel.id);
+      setSelectedRungId(selectedOrBranch.rungId);
+      return;
+    }
+    const target = getPaletteInsertionTarget(project, selected, selectedOrBranch?.rungId ?? selectedRungId, kind);
     if (!target) {
       // Without selection, a palette click only arms the tool for drag/drop.
       setError("");
@@ -350,7 +362,7 @@ export function PracticeEditor({
         <div>
           <h2 className="text-xs font-semibold">PracticeRoutine.LAD</h2>
           <p className="mt-1 text-[11px] text-slate-500">
-            Primer ícono: nuevo rung debajo · Segundo: rama OR · Selecciona un rung y pulsa Supr para eliminarlo.
+            Primer ícono: nuevo rung debajo · Segundo: rama OR · Selecciona el conductor de una rama y pulsa Supr para eliminarla.
           </p>
         </div>
         <span className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">
@@ -524,6 +536,14 @@ export function PracticeEditor({
                                   const laneY = lane.y;
                                   return (
                                     <g key={branch.id}>
+                                      {selectedOrBranch?.rungId === rung.id &&
+                                        selectedOrBranch.branchId === branch.id && (
+                                          <rect x={group.left - 7} y={laneY - 17}
+                                            width={group.right - group.left + 14} height="34" rx="5"
+                                            fill="#dbeafe" fillOpacity="0.75"
+                                            stroke="#0284c7" strokeWidth="1.5" strokeDasharray="4 3"
+                                            pointerEvents="none"/>
+                                        )}
                                       {branch.instructions.length === 0 ? (
                                         <Wire x1={group.left} y1={laneY}
                                           x2={group.right} y2={laneY} />
@@ -551,6 +571,34 @@ export function PracticeEditor({
                                           Rama OR {laneIndex + 1} vacía
                                         </text>
                                       )}
+                                      {/* The wire itself selects the OR path; no extra × OR buttons. */}
+                                      <path d={"M" + group.left + " " + laneY +
+                                        "H" + group.right}
+                                        stroke="transparent" strokeWidth="14" fill="none"
+                                        pointerEvents="stroke"
+                                        role="button" tabIndex={0}
+                                        aria-label={"Seleccionar rama OR " + (laneIndex + 1) +
+                                          " del rung " + rungIndex + " para eliminar con Supr"}
+                                        style={{ cursor: "pointer" }}
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          setSelected(null);
+                                          setSelectedRungId(null);
+                                          setSelectedOrBranch({ rungId: rung.id, branchId: branch.id });
+                                          editorRef.current?.focus({ preventScroll: true });
+                                        }}
+                                        onKeyDown={(event) => {
+                                          if (event.key === "Enter" || event.key === " ") {
+                                            event.preventDefault();
+                                            setSelected(null);
+                                            setSelectedRungId(null);
+                                            setSelectedOrBranch({ rungId: rung.id, branchId: branch.id });
+                                            editorRef.current?.focus({ preventScroll: true });
+                                          }
+                                        }}
+                                      >
+                                        <title>Seleccionar rama OR · Supr para eliminarla</title>
+                                      </path>
                                     </g>
                                   );
                                 })}
@@ -631,7 +679,7 @@ export function PracticeEditor({
             </p>
           )}
           <p className="mb-5 flex items-center gap-1 px-4 text-xs text-slate-500">
-            <FileCode2 size={14} /> Clic en etiqueta: sugerencias; doble clic: tabla de variables; arrastre: copiar tag. El símbolo sigue siendo desplazable.
+            <FileCode2 size={14} /> Clic en etiqueta: buscar tag; doble clic: tabla de variables; arrastre: copiar tag. Clic en conductor OR + Supr: borrar rama.
             Sin OR anidados ni ejecución de PracticeRoutine todavía.
           </p>
         </div>
