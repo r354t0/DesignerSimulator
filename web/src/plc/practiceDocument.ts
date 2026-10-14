@@ -1,33 +1,21 @@
 /**
- * Immutable Ladder document model.
- * First editing increment: serial contacts, one OTE, and a single parallel
- * contact per primary contact (no nested or overlapping OR networks yet).
- * PracticeRoutine is NOT connected to the PLC execution engine.
+ * Immutable PLC practice document model. Editable routines are not executed yet.
+ * For this increment, each main contact may own one parallel path containing
+ * zero or more series contacts. Nested OR and parallel coils are not supported.
  */
 export type EditableKind = "XIC" | "XIO" | "OTE";
 
-export interface PracticeTag {
-  name: string;
-  description: string;
-}
-
-export interface PracticeInstruction {
-  id: string;
-  kind: EditableKind;
-  tag: string;
-}
-
-export interface ParallelContact {
+export interface PracticeTag { name: string; description: string }
+export interface PracticeInstruction { id: string; kind: EditableKind; tag: string }
+export interface ParallelBranch {
   anchorId: string;
-  contact: PracticeInstruction;
+  instructions: PracticeInstruction[];
 }
-
 export interface PracticeRung {
   id: string;
   instructions: PracticeInstruction[];
-  parallelBranches?: ParallelContact[];
+  parallelBranches?: ParallelBranch[];
 }
-
 export interface PracticeProject {
   tags: PracticeTag[];
   rungs: PracticeRung[];
@@ -47,25 +35,21 @@ export function initialPracticeProject(): PracticeProject {
 }
 
 function allInstructions(rung: PracticeRung): PracticeInstruction[] {
-  return [...rung.instructions, ...(rung.parallelBranches ?? []).map((branch) => branch.contact)];
+  return [...rung.instructions, ...(rung.parallelBranches ?? []).flatMap((branch) => branch.instructions)];
 }
 
-function instructionExists(project: PracticeProject, id: string): boolean {
-  return project.rungs.some((rung) => allInstructions(rung).some((item) => item.id === id));
-}
-
-function assertUniqueTag(project: PracticeProject, tag: string): void {
+function ensureTag(project: PracticeProject, tag: string): void {
   if (!project.tags.some((item) => item.name === tag)) {
     throw new Error("Selecciona un tag existente.");
   }
 }
 
-function assertNewInstruction(project: PracticeProject, instruction: PracticeInstruction): void {
-  if (!["XIC", "XIO", "OTE"].includes(instruction.kind)) {
+function ensureNewInstruction(project: PracticeProject, item: PracticeInstruction): void {
+  if (!["XIC", "XIO", "OTE"].includes(item.kind)) {
     throw new Error("Esta instrucción aún no está habilitada para edición.");
   }
-  assertUniqueTag(project, instruction.tag);
-  if (instructionExists(project, instruction.id)) {
+  ensureTag(project, item.tag);
+  if (project.rungs.some((rung) => allInstructions(rung).some((part) => part.id === item.id))) {
     throw new Error("El identificador de instrucción ya existe.");
   }
 }
@@ -76,19 +60,16 @@ function getRung(project: PracticeProject, id: string): PracticeRung {
   return rung;
 }
 
-function contactCount(rung: PracticeRung): number {
-  return rung.instructions.filter((item) => item.kind !== "OTE").length
-    + (rung.parallelBranches?.length ?? 0);
+export function contactCount(rung: PracticeRung): number {
+  return rung.instructions.filter((item) => item.kind !== "OTE").length +
+    (rung.parallelBranches ?? []).reduce((sum, branch) => sum + branch.instructions.length, 0);
 }
 
 export function createRung(project: PracticeProject, id: string): PracticeProject {
   if (project.rungs.some((rung) => rung.id === id)) {
     throw new Error("El identificador del rung ya existe.");
   }
-  return {
-    ...project,
-    rungs: [...project.rungs, { id, instructions: [], parallelBranches: [] }],
-  };
+  return { ...project, rungs: [...project.rungs, { id, instructions: [], parallelBranches: [] }] };
 }
 
 export function removeRung(project: PracticeProject, id: string): PracticeProject {
@@ -96,69 +77,85 @@ export function removeRung(project: PracticeProject, id: string): PracticeProjec
 }
 
 export function insertInstruction(
-  project: PracticeProject,
-  rungId: string,
-  position: number,
-  instruction: PracticeInstruction,
+  project: PracticeProject, rungId: string, position: number, item: PracticeInstruction,
 ): PracticeProject {
-  assertNewInstruction(project, instruction);
+  ensureNewInstruction(project, item);
   const rung = getRung(project, rungId);
-  const hasCoil = rung.instructions.some((item) => item.kind === "OTE");
-
   let updated: PracticeInstruction[];
-  if (instruction.kind === "OTE") {
-    if (hasCoil) throw new Error("El rung ya contiene una salida OTE.");
-    updated = [...rung.instructions, instruction];
+
+  if (item.kind === "OTE") {
+    if (rung.instructions.some((existing) => existing.kind === "OTE")) {
+      throw new Error("El rung ya contiene una salida OTE.");
+    }
+    updated = [...rung.instructions, item];
   } else {
     if (contactCount(rung) >= 8) throw new Error("Máximo 8 contactos por rung en esta etapa.");
-    const primaryCount = rung.instructions.filter((item) => item.kind !== "OTE").length;
-    const at = Math.min(Math.max(0, position), primaryCount);
-    updated = [
-      ...rung.instructions.slice(0, at),
-      instruction,
-      ...rung.instructions.slice(at),
-    ];
+    const limit = rung.instructions.filter((part) => part.kind !== "OTE").length;
+    const at = Math.min(Math.max(0, position), limit);
+    updated = [...rung.instructions.slice(0, at), item, ...rung.instructions.slice(at)];
   }
-  return {
-    ...project,
-    rungs: project.rungs.map((item) =>
-      item.id === rungId ? { ...item, instructions: updated } : item,
-    ),
-  };
+
+  return { ...project, rungs: project.rungs.map((part) =>
+    part.id === rungId ? { ...part, instructions: updated } : part,
+  ) };
 }
 
+/** Create an independent, initially empty OR path below an existing contact. */
+export function createParallelBranch(
+  project: PracticeProject, rungId: string, anchorId: string,
+): PracticeProject {
+  const rung = getRung(project, rungId);
+  const anchor = rung.instructions.find((item) => item.id === anchorId && item.kind !== "OTE");
+  if (!anchor) throw new Error("Selecciona un contacto principal válido para crear el OR.");
+  if ((rung.parallelBranches ?? []).some((branch) => branch.anchorId === anchorId)) {
+    throw new Error("Este contacto ya tiene una rama paralela.");
+  }
+  return { ...project, rungs: project.rungs.map((part) => part.id === rungId ? {
+    ...part,
+    parallelBranches: [...(part.parallelBranches ?? []), { anchorId, instructions: [] }],
+  } : part) };
+}
+
+export function removeParallelBranch(
+  project: PracticeProject, rungId: string, anchorId: string,
+): PracticeProject {
+  getRung(project, rungId);
+  return { ...project, rungs: project.rungs.map((part) => part.id === rungId ? {
+    ...part,
+    parallelBranches: (part.parallelBranches ?? []).filter((branch) => branch.anchorId !== anchorId),
+  } : part) };
+}
+
+/** Insert a contact in an OR path. A drop may create that path on demand. */
 export function addParallelContact(
   project: PracticeProject,
   rungId: string,
   anchorId: string,
   instruction: PracticeInstruction,
+  position = Number.MAX_SAFE_INTEGER,
 ): PracticeProject {
-  assertNewInstruction(project, instruction);
-  if (instruction.kind === "OTE") {
-    throw new Error("Las ramas OR solo admiten XIC y XIO en esta etapa.");
-  }
+  ensureNewInstruction(project, instruction);
+  if (instruction.kind === "OTE") throw new Error("Las ramas OR solo admiten XIC y XIO en esta etapa.");
+
   const rung = getRung(project, rungId);
-  const anchor = rung.instructions.find((item) => item.id === anchorId);
-  if (!anchor || anchor.kind === "OTE") {
+  if (!rung.instructions.some((item) => item.id === anchorId && item.kind !== "OTE")) {
     throw new Error("Selecciona un contacto principal válido para crear el OR.");
   }
-  if ((rung.parallelBranches ?? []).some((branch) => branch.anchorId === anchorId)) {
-    throw new Error("Este contacto ya tiene una rama paralela.");
-  }
   if (contactCount(rung) >= 8) throw new Error("Máximo 8 contactos por rung en esta etapa.");
-  return {
-    ...project,
-    rungs: project.rungs.map((item) => item.id === rungId
-      ? {
-          ...item,
-          parallelBranches: [
-            ...(item.parallelBranches ?? []),
-            { anchorId, contact: instruction },
-          ],
-        }
-      : item,
-    ),
-  };
+
+  const branch = rung.parallelBranches?.find((item) => item.anchorId === anchorId);
+  const current = branch?.instructions ?? [];
+  const at = Math.min(Math.max(0, position), current.length);
+  const nextBranch = { anchorId, instructions: [
+    ...current.slice(0, at), instruction, ...current.slice(at),
+  ] };
+  return { ...project, rungs: project.rungs.map((part) => part.id === rungId ? {
+    ...part,
+    parallelBranches: [
+      ...(part.parallelBranches ?? []).filter((item) => item.anchorId !== anchorId),
+      nextBranch,
+    ],
+  } : part) };
 }
 
 export interface InstructionLocation {
@@ -169,178 +166,156 @@ export interface InstructionLocation {
   anchorId?: string;
 }
 
-export function findInstruction(
-  project: PracticeProject,
-  id: string,
-): InstructionLocation | null {
+export function findInstruction(project: PracticeProject, id: string): InstructionLocation | null {
   for (const rung of project.rungs) {
     const position = rung.instructions.findIndex((item) => item.id === id);
     if (position !== -1) {
       return { rungId: rung.id, position, lane: "main", instruction: rung.instructions[position] };
     }
-    const branch = rung.parallelBranches?.find((item) => item.contact.id === id);
-    if (branch) {
-      return {
-        rungId: rung.id,
-        position: rung.instructions.findIndex((item) => item.id === branch.anchorId),
-        lane: "parallel",
-        anchorId: branch.anchorId,
-        instruction: branch.contact,
-      };
+    for (const branch of rung.parallelBranches ?? []) {
+      const index = branch.instructions.findIndex((item) => item.id === id);
+      if (index !== -1) {
+        return { rungId: rung.id, position: index, lane: "parallel",
+          anchorId: branch.anchorId, instruction: branch.instructions[index] };
+      }
     }
   }
   return null;
 }
 
 export function changeInstructionTag(
-  project: PracticeProject,
-  instructionId: string,
-  tag: string,
+  project: PracticeProject, instructionId: string, tag: string,
 ): PracticeProject {
-  assertUniqueTag(project, tag);
-  return {
-    ...project,
-    rungs: project.rungs.map((rung) => ({
-      ...rung,
-      instructions: rung.instructions.map((item) =>
-        item.id === instructionId ? { ...item, tag } : item,
-      ),
-      parallelBranches: rung.parallelBranches?.map((branch) => ({
-        ...branch,
-        contact: branch.contact.id === instructionId ? { ...branch.contact, tag } : branch.contact,
-      })),
+  ensureTag(project, tag);
+  return { ...project, rungs: project.rungs.map((rung) => ({
+    ...rung,
+    instructions: rung.instructions.map((item) => item.id === instructionId ? { ...item, tag } : item),
+    parallelBranches: rung.parallelBranches?.map((branch) => ({
+      ...branch, instructions: branch.instructions.map((item) =>
+        item.id === instructionId ? { ...item, tag } : item),
     })),
-  };
+  })) };
 }
 
 export function removeInstruction(project: PracticeProject, id: string): PracticeProject {
   const source = findInstruction(project, id);
   if (!source) return project;
-  return {
-    ...project,
-    rungs: project.rungs.map((rung) => {
-      if (rung.id !== source.rungId) return rung;
-      if (source.lane === "parallel") {
-        return {
-          ...rung,
-          parallelBranches: (rung.parallelBranches ?? []).filter((branch) => branch.contact.id !== id),
-        };
-      }
-      // Deleting an OR anchor promotes its parallel contact to the main path.
-      const paired = rung.parallelBranches?.find((branch) => branch.anchorId === id);
-      return {
-        ...rung,
-        instructions: rung.instructions.flatMap((item) =>
-          item.id !== id ? [item] : paired ? [paired.contact] : [],
-        ),
-        parallelBranches: (rung.parallelBranches ?? []).filter((branch) => branch.anchorId !== id),
-      };
-    }),
-  };
+  return { ...project, rungs: project.rungs.map((rung) => {
+    if (rung.id !== source.rungId) return rung;
+    if (source.lane === "parallel") return {
+      ...rung,
+      parallelBranches: (rung.parallelBranches ?? []).map((branch) => ({
+        ...branch, instructions: branch.instructions.filter((item) => item.id !== id),
+      })),
+    };
+    // Once a main-path anchor disappears, its former bypass becomes the only
+    // path: promote its serial contacts to main and remove the bypass geometry.
+    const paired = rung.parallelBranches?.find((branch) => branch.anchorId === id);
+    return {
+      ...rung,
+      instructions: rung.instructions.flatMap((item) =>
+        item.id === id ? (paired?.instructions ?? []) : [item]),
+      parallelBranches: (rung.parallelBranches ?? []).filter((branch) => branch.anchorId !== id),
+    };
+  }) };
 }
 
 /**
- * Atomic move, preserving identity, tags and attached OR branch. Invalid moves
- * throw without changing the source document. Position is a slot in the *original*
- * destination rung, so moving right within the same rung adjusts by one.
+ * Move an instruction to a MAIN rung. Main anchors travel together with their
+ * complete OR branches. Invalid transfers never modify the previous document.
+ * Position denotes an original destination slot.
  */
 export function moveInstruction(
-  project: PracticeProject,
-  instructionId: string,
-  targetRungId: string,
-  position: number,
+  project: PracticeProject, instructionId: string, targetRungId: string, position: number,
 ): PracticeProject {
   const source = findInstruction(project, instructionId);
   if (!source) throw new Error("No se encontró la instrucción.");
   const target = getRung(project, targetRungId);
-  const moving = source.instruction;
-  const sourceRung = getRung(project, source.rungId);
-  const paired = source.lane === "main"
-    ? sourceRung.parallelBranches?.find((branch) => branch.anchorId === instructionId)
-    : undefined;
-  const sourceCount = source.lane === "main" ? 1 + Number(Boolean(paired)) : 1;
+  const origin = getRung(project, source.rungId);
+  const attached = source.lane === "main"
+    ? origin.parallelBranches?.find((branch) => branch.anchorId === instructionId) : undefined;
+  const movingCount = 1 + (attached?.instructions.length ?? 0);
   const sameRung = source.rungId === targetRungId;
 
-  if (moving.kind === "OTE") {
-    const occupied = target.instructions.some((item) =>
-      item.kind === "OTE" && item.id !== instructionId,
-    );
-    if (occupied) throw new Error("El rung de destino ya contiene una bobina OTE.");
+  if (source.instruction.kind === "OTE") {
+    if (target.instructions.some((item) => item.kind === "OTE" && item.id !== instructionId)) {
+      throw new Error("El rung de destino ya contiene una bobina OTE.");
+    }
     if (sameRung) return project;
-  } else if (contactCount(target) + (sameRung ? 0 : sourceCount) > 8) {
+  } else if (contactCount(target) + (sameRung ? 0 : movingCount) > 8) {
     throw new Error("Máximo 8 contactos por rung en esta etapa.");
   }
 
-  const stripped: PracticeProject = {
-    ...project,
-    rungs: project.rungs.map((rung) => {
-      if (rung.id !== source.rungId) return rung;
-      return {
-        ...rung,
-        instructions: rung.instructions.filter((item) => item.id !== instructionId),
-        parallelBranches: (rung.parallelBranches ?? []).filter((branch) =>
-          branch.contact.id !== instructionId && branch.anchorId !== instructionId,
-        ),
-      };
-    }),
-  };
+  const stripped: PracticeProject = { ...project, rungs: project.rungs.map((rung) =>
+    rung.id !== source.rungId ? rung : {
+      ...rung,
+      instructions: rung.instructions.filter((item) => item.id !== instructionId),
+      parallelBranches: (rung.parallelBranches ?? [])
+        .filter((branch) => branch.anchorId !== instructionId)
+        .map((branch) => ({ ...branch,
+          instructions: branch.instructions.filter((item) => item.id !== instructionId) })),
+    }) };
 
-  const originalTargetCount = target.instructions.filter((item) => item.kind !== "OTE").length;
-  const originalAt = Math.min(Math.max(0, position), originalTargetCount);
-  const adjustedAt = sameRung && source.lane === "main" &&
-    source.position < originalAt ? originalAt - 1 : originalAt;
-  const inserted = insertInstruction(stripped, targetRungId, adjustedAt, moving);
-  if (!paired) return inserted;
-  // Reattach the parallel contact to the moved anchor, in its destination rung.
-  return addParallelContact(inserted, targetRungId, moving.id, paired.contact);
+  const originalContactCount = target.instructions.filter((item) => item.kind !== "OTE").length;
+  const originalAt = Math.min(Math.max(0, position), originalContactCount);
+  const adjusted = sameRung && source.lane === "main" && source.position < originalAt
+    ? originalAt - 1 : originalAt;
+  let next = insertInstruction(stripped, targetRungId, adjusted, source.instruction);
+  if (attached) {
+    next = createParallelBranch(next, targetRungId, instructionId);
+    for (const item of attached.instructions) {
+      next = addParallelContact(next, targetRungId, instructionId, item);
+    }
+  }
+  return next;
 }
 
-/**
- * Move an existing single contact onto a new lower OR lane under another
- * primary contact. The source is not removed until all validations pass.
- */
+/** Move an existing contact into any (possibly empty) OR branch. */
 export function moveToParallel(
   project: PracticeProject,
   instructionId: string,
   targetRungId: string,
   anchorId: string,
+  position = Number.MAX_SAFE_INTEGER,
 ): PracticeProject {
   const source = findInstruction(project, instructionId);
   if (!source) throw new Error("No se encontró la instrucción.");
-  const target = getRung(project, targetRungId);
   if (source.instruction.kind === "OTE") throw new Error("La OTE no puede entrar en una rama OR.");
-  if (instructionId === anchorId) throw new Error("El contacto no puede ser paralelo a sí mismo.");
+  const target = getRung(project, targetRungId);
   if (!target.instructions.some((item) => item.id === anchorId && item.kind !== "OTE")) {
     throw new Error("El contacto de referencia no existe.");
   }
-  if ((target.parallelBranches ?? []).some((branch) => branch.anchorId === anchorId)) {
-    throw new Error("Este contacto ya tiene una rama OR.");
-  }
+  if (instructionId === anchorId) throw new Error("El contacto no puede ser paralelo a sí mismo.");
+  const origin = getRung(project, source.rungId);
   if (source.lane === "main" &&
-      (getRung(project, source.rungId).parallelBranches ?? []).some((b) => b.anchorId === instructionId)) {
+    origin.parallelBranches?.some((branch) => branch.anchorId === instructionId)) {
     throw new Error("Mueve o elimina primero la rama asociada a este contacto.");
   }
-  if (source.rungId !== targetRungId && contactCount(target) >= 8) {
+  const sameRung = source.rungId === targetRungId;
+  if (!sameRung && contactCount(target) >= 8) {
     throw new Error("Máximo 8 contactos por rung en esta etapa.");
   }
-  const stripped = {
+
+  const previousBranch = target.parallelBranches?.find((branch) => branch.anchorId === anchorId);
+  const slot = Math.min(Math.max(0, position), previousBranch?.instructions.length ?? 0);
+  const at = sameRung && source.lane === "parallel" && source.anchorId === anchorId &&
+    source.position < slot ? slot - 1 : slot;
+
+  const stripped: PracticeProject = {
     ...project,
-    rungs: project.rungs.map((rung) => {
-      if (rung.id !== source.rungId) return rung;
-      return {
-        ...rung,
-        instructions: rung.instructions.filter((item) => item.id !== instructionId),
-        parallelBranches: (rung.parallelBranches ?? []).filter((b) => b.contact.id !== instructionId),
-      };
-    }),
+    rungs: project.rungs.map((rung) => rung.id === source.rungId ? {
+      ...rung,
+      instructions: rung.instructions.filter((item) => item.id !== instructionId),
+      parallelBranches: (rung.parallelBranches ?? []).map((branch) => ({
+        ...branch, instructions: branch.instructions.filter((item) => item.id !== instructionId),
+      })),
+    } : rung),
   };
-  return addParallelContact(stripped, targetRungId, anchorId, source.instruction);
+  return addParallelContact(stripped, targetRungId, anchorId, source.instruction, at);
 }
 
 export function createTag(
-  project: PracticeProject,
-  name: string,
-  description: string,
+  project: PracticeProject, name: string, description: string,
 ): PracticeProject {
   const normalized = name.trim();
   if (!/^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(normalized)) {
@@ -351,6 +326,7 @@ export function createTag(
   }
   return {
     ...project,
-    tags: [...project.tags, { name: normalized, description: description.trim().slice(0, 120) }],
+    tags: [...project.tags,
+      { name: normalized, description: description.trim().slice(0, 120) }],
   };
 }
