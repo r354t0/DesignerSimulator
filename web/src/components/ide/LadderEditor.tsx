@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Contact, Coil, RungFrame, Wire } from "./LadderSymbols";
 import { PREVIEW_BLOCKS, PREVIEW_BLOCK_WIDTH, LadderFunctionBlock } from "./LadderFunctionBlocks";
+import type { DemoBlockRuntime } from "../../plc/timerCounterDemo";
 import {
   demoTagMetadata,
   type DemoInputs,
@@ -12,10 +13,12 @@ interface MonitorProps {
   online: boolean;
   values: DemoValues;
   inputs: DemoInputs;
+  blocks: DemoBlockRuntime;
   onTagChange: (tag: InputTag, value: boolean) => void;
+  onResetCounters: () => void;
 }
 
-export function ProgramTags({ online, values, inputs, onTagChange }: MonitorProps) {
+export function ProgramTags({ online, values, inputs, blocks, onTagChange, onResetCounters }: MonitorProps) {
   return (
     <section className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-slate-800">
       <div className="border-b border-slate-200 bg-[#f7f9fb] px-4 py-3">
@@ -63,15 +66,45 @@ export function ProgramTags({ online, values, inputs, onTagChange }: MonitorProp
             ))}
           </tbody>
         </table>
-        <p className="mt-3 text-xs text-slate-500">
-          Valores de prueba en memoria. No existe conexión con Studio 5000 ni con un PLC físico.
+        <div className="mt-5 flex items-center justify-between gap-2">
+          <h3 className="text-xs font-semibold text-slate-700">Instancias de temporizadores y contadores (demo)</h3>
+          <button type="button" onClick={onResetCounters}
+            className="rounded border border-slate-300 bg-slate-50 px-2 py-1 text-xs text-slate-700 hover:bg-slate-100">
+            Reset CTU / Precargar CTD
+          </button>
+        </div>
+        <div className="mt-2 overflow-x-auto">
+          <table className="w-full min-w-[550px] border-collapse border border-slate-200 text-left text-xs">
+            <thead className="bg-[#edf1f5] text-slate-600">
+              <tr><th className="border border-slate-200 px-2 py-2">Instancia</th><th className="border border-slate-200 px-2 py-2">PRE (ms / pulsos)</th><th className="border border-slate-200 px-2 py-2">ACC</th><th className="border border-slate-200 px-2 py-2">EN/CU/CD</th><th className="border border-slate-200 px-2 py-2">TT</th><th className="border border-slate-200 px-2 py-2">DN</th></tr>
+            </thead>
+            <tbody>
+              {PREVIEW_BLOCKS.map((block) => {
+                const state = blocks[block.kind];
+                return (
+                  <tr key={block.kind}>
+                    <td className="border border-slate-200 px-2 py-2 font-mono">{block.tag}</td>
+                    <td className="border border-slate-200 px-2 py-2">{state.pre}{state.offPre > 0 ? ` / ${state.offPre}` : ""}</td>
+                    <td className="border border-slate-200 px-2 py-2 font-mono">{Math.round(state.acc)}</td>
+                    <td className="border border-slate-200 px-2 py-2">{Number(state.en || state.cu || state.cd)}</td>
+                    <td className="border border-slate-200 px-2 py-2">{Number(state.tt)}</td>
+                    <td className={"border border-slate-200 px-2 py-2 " + (online && state.dn ? "font-bold text-emerald-700" : "")}>{Number(state.dn)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-3 text-xs leading-relaxed text-slate-500">
+          Simulación local, no conectada a un PLC. El CTD se precarga explícitamente con ACC=PRE=8;
+          su bit DN sigue la comparación ACC ≥ PRE, como en Logix. TONOFF es una instrucción personalizada.
         </p>
       </div>
     </section>
   );
 }
 
-export function LadderEditor({ online, inputs, values, onTagChange }: MonitorProps) {
+export function LadderEditor({ online, inputs, values, blocks, onTagChange, onResetCounters }: MonitorProps) {
   const [selectedRung, setSelectedRung] = useState<number | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const [diagramWidth, setDiagramWidth] = useState(712);
@@ -134,6 +167,14 @@ export function LadderEditor({ online, inputs, values, onTagChange }: MonitorPro
             {tag}: {inputs[tag] ? "1" : "0"}
           </button>
         ))}
+        <button
+          type="button"
+          onClick={onResetCounters}
+          className="rounded border border-slate-300 bg-white px-2 py-1 text-slate-700 hover:bg-slate-100"
+          title="Reiniciar CTU a 0 y recargar CTD desde PRE (demo)"
+        >
+          Reset contadores
+        </button>
         <span className="ml-auto text-slate-500">Verde = instrucción verdadera / continuidad activa</span>
       </div>
       <div ref={viewportRef} className="min-h-0 flex-1 overflow-auto bg-white">
@@ -237,7 +278,7 @@ export function LadderEditor({ online, inputs, values, onTagChange }: MonitorPro
                     y={rungY}
                     online={online}
                     energized={inputValue}
-                    values={block.values}
+                    state={blocks[block.kind]}
                     bits={block.bits}
                   />
                   <Wire
@@ -253,12 +294,13 @@ export function LadderEditor({ online, inputs, values, onTagChange }: MonitorPro
           </svg>
         </div>
         <p className="px-4 pb-4 pt-2 text-xs text-slate-500">
-          Rungs 3–7: TON, TOF, TONOFF (personalizado), CTU y CTD. Se muestran valores e indicadores ilustrativos;
-          ACC, DN, TT, CU, CD, OV y UN aún no se calculan. Selecciona cualquier rung para resaltarlo en azul.
+          Rungs 3–7: TON, TOF, TONOFF (personalizado), CTU y CTD se evalúan en un ciclo de demostración de 50 ms.
+          Mantén Start_PB en 1 para observar TON, alterna Start_PB para incrementar CTU y alterna Stop_PB
+          para decrementar CTD. Los campos ACC y los indicadores se actualizan en DEMO · REM RUN; esto no es una conexión PLC real.
         </p>
       </div>
       <div className="flex h-8 shrink-0 items-center justify-between border-t border-slate-200 bg-[#f2f5f8] px-4 text-[11px] text-slate-600">
-        <span>Rungs 0–7 · Diseño compacto · 5 bloques de prueba</span>
+        <span>Rungs 0–7 · Temporizadores y contadores funcionales (demo)</span>
         <span>{online ? "Evaluación visual activa" : "Sin resaltado online"}</span>
       </div>
     </div>
