@@ -331,8 +331,8 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
                         insertSlot(x, y, "Insertar " + selectedTool + " en línea principal",
                           () => insertAt(rung.id, index, selectedTool), "main-" + index))}
 
-                      {(selectedTool === "XIC" || selectedTool === "XIO") &&
-                        (rung.parallelBranches ?? []).map((branch) => {
+                      {/* Every OR path has a permanent "+" slot, even when OTE is selected. */}
+                      {(rung.parallelBranches ?? []).map((branch) => {
                           const group = groups.find((item) => item.anchorId === branch.anchorId);
                           if (!group) return null;
                           const centers = group.branchCenters;
@@ -341,10 +341,11 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
                               ...centers.slice(0, -1).map((cx, i) => (cx + centers[i + 1]) / 2),
                               group.right - 20]
                             : [group.x];
+                          const kind = selectedTool === "XIO" ? "XIO" : "XIC";
                           return <g key={"slots-" + branch.anchorId}>
                             {slots.map((x, index) => insertSlot(x, branchY,
-                              "Insertar " + selectedTool + " en rama OR",
-                              () => insertAt(rung.id, index, selectedTool, branch.anchorId),
+                              "Insertar " + kind + " en rama OR",
+                              () => insertAt(rung.id, index, kind, branch.anchorId),
                               "branch-" + branch.anchorId + "-" + index))}
                           </g>;
                         })}
