@@ -1,22 +1,35 @@
 import { useState } from "react";
-import { ChevronDown, ChevronRight, Cpu, Folder, FileCode2, Tags, Settings2 } from "lucide-react";
+import { ChevronDown, ChevronRight, Cpu, Folder, FileCode2, Tags, Settings2, PanelLeftClose } from "lucide-react";
 
 export type EditorView = "ladder" | "practice" | "tags";
 
 interface Props {
   view: EditorView;
   onSelectView: (view: EditorView) => void;
+  onHide: () => void;
 }
 
-export function ControllerOrganizer({ view, onSelectView }: Props) {
+export function ControllerOrganizer({ view, onSelectView, onHide }: Props) {
   const [tasksOpen, setTasksOpen] = useState(true);
   const [programOpen, setProgramOpen] = useState(true);
 
   return (
     <div className="flex h-full min-h-0 flex-col text-xs">
       <div className="border-b border-slate-700/70 px-3 py-3">
-        <div className="flex items-center gap-2 text-xs font-semibold">
-          <Cpu size={15} className="text-sky-400" /> Controller Organizer
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-2 text-xs font-semibold">
+            <Cpu size={15} className="shrink-0 text-sky-400" />
+            <span className="truncate">Controller Organizer</span>
+          </div>
+          <button
+            type="button"
+            onClick={onHide}
+            aria-label="Ocultar árbol Controller Organizer"
+            title="Ocultar árbol de carpetas para ampliar el editor"
+            className="ide-icon-button !h-7 !w-7"
+          >
+            <PanelLeftClose size={16} />
+          </button>
         </div>
         <p className="mt-1 pl-6 text-[11px] text-slate-400">VirtualPLC</p>
       </div>
