@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Contact, Coil, RungFrame, Wire } from "./LadderSymbols";
+import { PREVIEW_BLOCKS, PREVIEW_BLOCK_WIDTH, LadderFunctionBlock } from "./LadderFunctionBlocks";
 import {
   demoTagMetadata,
   type DemoInputs,
@@ -93,6 +94,8 @@ export function LadderEditor({ online, inputs, values, onTagChange }: MonitorPro
   // Left-side contacts remain compact; the coil and right rail track panel width.
   const rightRailX = diagramWidth - 22;
   const coilX = diagramWidth - 97;
+  const blockX = rightRailX - PREVIEW_BLOCK_WIDTH - 12;
+  const diagramHeight = 1090;
 
   const toggleRung = (index: number) => setSelectedRung((current) => current === index ? null : index);
   const stopCondition = !values.Stop_PB;
@@ -134,22 +137,29 @@ export function LadderEditor({ online, inputs, values, onTagChange }: MonitorPro
       <div ref={viewportRef} className="min-h-0 flex-1 overflow-auto bg-white">
         <div className="bg-white" style={{ width: diagramWidth }}>
           <svg
-            viewBox={`0 0 ${diagramWidth} 344`}
+            viewBox={`0 0 ${diagramWidth} ${diagramHeight}`}
             width={diagramWidth}
-            height={344}
+            height={diagramHeight}
             role="group"
-            aria-label="Tres rungs Ladder compactos. Selecciona un rung para resaltarlo en azul."
+            aria-label="Ocho rungs Ladder compactos, incluyendo temporizadores y contadores de demostración."
             className="block"
           >
-            <rect x="0" y="0" width={diagramWidth} height="344" fill="#ffffff" />
-            <rect x="1" y="23" width="48" height="305" fill="#f4f7fa" />
+            <rect x="0" y="0" width={diagramWidth} height={diagramHeight} fill="#ffffff" />
+            <rect x="1" y="23" width="48" height={diagramHeight - 46} fill="#f4f7fa" />
             <path
-              d={"M60 25V323 M" + rightRailX + " 25V323"}
+              d={"M60 25V1065 M" + rightRailX + " 25V1065"}
               stroke={online ? "#00c83a" : "#bcc5ce"}
               strokeWidth={online ? 2.625 : 1.6}
               fill="none"
             />
-            <path d={"M49 151H" + (diagramWidth - 12) + " M49 242H" + (diagramWidth - 12)} stroke="#e5e9ed" strokeWidth="1" />
+            {[151, 242, 355, 495, 635, 775, 915].map((separatorY) => (
+              <path
+                key={separatorY}
+                d={`M49 ${separatorY}H${diagramWidth - 12}`}
+                stroke="#e5e9ed"
+                strokeWidth="1"
+              />
+            ))}
 
             <RungFrame index={0} y={82} selected={selectedRung === 0} onSelect={() => toggleRung(0)} width={diagramWidth} live={online}>
               <Wire x1={100} y1={82} x2={138} y2={82} live={online} />
@@ -185,15 +195,68 @@ export function LadderEditor({ online, inputs, values, onTagChange }: MonitorPro
               <Coil x={coilX} y={291} tag="Lamp_Run" comment="Indicador de marcha" online={online} live={values.Lamp_Run} />
               <Wire x1={coilX + 24} y1={291} x2={rightRailX} y2={291} live={live(values.Lamp_Run)} />
             </RungFrame>
+
+            {PREVIEW_BLOCKS.map((block, index) => {
+              const rungNumber = index + 3;
+              const rungY = 425 + index * 140;
+              const inputValue = values[block.contact];
+              return (
+                <RungFrame
+                  key={block.kind}
+                  index={rungNumber}
+                  y={rungY}
+                  selected={selectedRung === rungNumber}
+                  onSelect={() => toggleRung(rungNumber)}
+                  width={diagramWidth}
+                  live={online}
+                >
+                  <Wire x1={100} y1={rungY} x2={138} y2={rungY} live={online} />
+                  <Contact
+                    x={160}
+                    y={rungY}
+                    kind="XIC"
+                    tag={block.contact}
+                    comment={block.description}
+                    value={inputValue}
+                    online={online}
+                    powerIn
+                  />
+                  <Wire
+                    x1={182}
+                    y1={rungY}
+                    x2={blockX}
+                    y2={rungY}
+                    live={online && inputValue}
+                  />
+                  <LadderFunctionBlock
+                    kind={block.kind}
+                    tag={block.tag}
+                    x={blockX}
+                    y={rungY}
+                    online={online}
+                    energized={inputValue}
+                    values={block.values}
+                    bits={block.bits}
+                  />
+                  <Wire
+                    x1={blockX + PREVIEW_BLOCK_WIDTH}
+                    y1={rungY}
+                    x2={rightRailX}
+                    y2={rungY}
+                    live={online && inputValue}
+                  />
+                </RungFrame>
+              );
+            })}
           </svg>
         </div>
         <p className="px-4 pb-4 pt-2 text-xs text-slate-500">
-          Vista compacta de prueba: geometría de los símbolos al 50 %, rungs más próximos y ninguna fila seleccionada inicialmente.
-          Haz clic en el número o en cualquier parte del rung para seleccionarlo; un segundo clic lo deselecciona.
+          Rungs 3–7: TON, TOF, TONOFF (personalizado), CTU y CTD. Se muestran valores e indicadores ilustrativos;
+          ACC, DN, TT, CU, CD, OV y UN aún no se calculan. Selecciona cualquier rung para resaltarlo en azul.
         </p>
       </div>
       <div className="flex h-8 shrink-0 items-center justify-between border-t border-slate-200 bg-[#f2f5f8] px-4 text-[11px] text-slate-600">
-        <span>Rung 0–2 · Diseño compacto (50 %)</span>
+        <span>Rungs 0–7 · Diseño compacto · 5 bloques de prueba</span>
         <span>{online ? "Evaluación visual activa" : "Sin resaltado online"}</span>
       </div>
     </div>
