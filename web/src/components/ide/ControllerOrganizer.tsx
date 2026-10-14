@@ -54,7 +54,7 @@ export function ControllerOrganizer({ view, onSelectView }: Props) {
                   onClick={() => onSelectView("tags")}
                   className={`ide-tree-row ml-2 w-[calc(100%-0.5rem)] ${view === "tags" ? "ide-tree-selected" : ""}`}
                 >
-                  <Tags size={14} /> Program Tags
+                  <Tags size={14} /> Controller Tags
                 </button>
               </div>
             )}
