@@ -197,6 +197,29 @@ export function changeInstructionTag(
   })) };
 }
 
+/**
+ * Copy only the BOOL tag reference from one existing Ladder instruction to
+ * another. The source tag must come from this document (not from arbitrary
+ * text dropped by the browser). Works across rungs and in OR branches.
+ *
+ * This does not duplicate or move either instruction, and does not change
+ * the tag's declaration in the project.
+ */
+export function copyInstructionTag(
+  project: PracticeProject,
+  sourceInstructionId: string,
+  targetInstructionId: string,
+): PracticeProject {
+  const source = findInstruction(project, sourceInstructionId);
+  if (!source) throw new Error("No se encontró la instrucción de origen.");
+  const target = findInstruction(project, targetInstructionId);
+  if (!target) throw new Error("No se encontró la instrucción de destino.");
+  if (sourceInstructionId === targetInstructionId ||
+      source.instruction.tag === target.instruction.tag) return project;
+
+  return changeInstructionTag(project, targetInstructionId, source.instruction.tag);
+}
+
 export function removeInstruction(project: PracticeProject, id: string): PracticeProject {
   const source = findInstruction(project, id);
   if (!source) return project;
