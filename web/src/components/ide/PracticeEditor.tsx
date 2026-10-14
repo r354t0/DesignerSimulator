@@ -80,15 +80,11 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
     }
   };
   const boolTags = project.tags.filter((tag) => tag.type === "BOOL");
-  const defaultTag = (kind: EditableKind) => kind === "OTE"
-    ? boolTags.find((tag) => tag.name === "Motor_Run")?.name ?? boolTags[0]?.name
-    : boolTags[0]?.name;
-
   const insertAt = (rungId: string, position: number, kind: EditableKind, anchorId?: string) => {
-    const tag = defaultTag(kind);
-    if (!tag) return;
+    // Newly inserted instructions start without any operand, as in Logix Designer.
+    // The visible "??" is only a placeholder, never the actual tag value.
     const id = nextId("instruction");
-    const instruction = { id, tag, kind };
+    const instruction = { id, tag: "", kind };
     const done = update(() => anchorId
       ? addParallelContact(project, rungId, anchorId, instruction, position)
       : insertInstruction(project, rungId, position, instruction));
@@ -106,7 +102,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
   // an instruction. Use distinct MIME types so the two actions never mix.
   const beginTagCopy = (event: DragEvent<HTMLButtonElement>, instructionId: string) => {
     const source = findInstruction(project, instructionId);
-    if (!source) { event.preventDefault(); return; }
+    if (!source?.instruction.tag) { event.preventDefault(); return; }
     event.stopPropagation();
     event.dataTransfer.effectAllowed = "copy";
     event.dataTransfer.setData(LADDER_TAG_MIME, instructionId);
@@ -169,7 +165,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
     if (!sourceId || sourceId === targetId) return;
     const source = findInstruction(project, sourceId);
     const target = findInstruction(project, targetId);
-    if (!source || !target) return;
+    if (!source?.instruction.tag || !target) return;
     if (update(() => copyInstructionTag(project, sourceId, targetId))) {
       setSelected(targetId);
       setTagFeedback("Tag " + source.instruction.tag + " copiado a " + target.instruction.kind +
@@ -264,7 +260,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
         <div>
           <h2 className="text-xs font-semibold">PracticeRoutine.LAD</h2>
           <p className="mt-1 text-[11px] text-slate-500">
-            Clic en tag: buscar coincidencias · Doble clic: explorar Program Tags · Arrastrar tag: copiar referencia.
+            Nuevas instrucciones sin tag (??) · Clic en ?? para asignar · Doble clic para explorar · Arrastra un tag existente para copiarlo.
           </p>
         </div>
         <span className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">
@@ -312,7 +308,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
                     fill="#eff6ff" stroke="#2563eb" strokeWidth="1.3" />
                 )}
                 <Contact x={x} y={centerY} kind={item.kind as "XIC" | "XIO"}
-                  tag={item.tag} comment={project.tags.find((tag) => tag.name === item.tag)?.description}
+                  tag={item.tag || "??"} comment={project.tags.find((tag) => tag.name === item.tag)?.description}
                   value={false} online={false} powerIn={false} />
               </g>
             );
@@ -339,10 +335,12 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
             // The SVG keeps rendering the label; this invisible HTML hotspot
             // captures native dragstart reliably on top of the tag text only.
             const tagDragButton = (item: typeof contacts[number], x: number, centerY: number) => (
-              <button key={"tag-" + item.id} type="button" draggable
+              <button key={"tag-" + item.id} type="button" draggable={Boolean(item.tag)}
                 data-practice-tag-label
-                title={"Clic: buscar tag · Doble clic: explorar variables · Arrastrar: copiar " + item.tag}
-                aria-label={"Seleccionar variable de " + item.kind + " " + item.tag}
+                title={item.tag
+                  ? "Clic: buscar tag · Doble clic: explorar variables · Arrastrar: copiar " + item.tag
+                  : "Sin tag · Clic para asignar variable · Doble clic para explorar variables"}
+                aria-label={"Seleccionar variable de " + item.kind + " " + (item.tag || "sin asignar")}
                 onClick={(event) => {
                   if (event.detail <= 1) openTagSelector(event, item.id, "suggestions");
                 }}
@@ -353,7 +351,8 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
                 onDrop={(event) => finishTagCopy(event, item.id)}
                 onDragLeave={() => setTagDropTarget((current) => current === item.id ? null : current)}
                 className={
-                  "absolute z-20 cursor-copy rounded-sm border border-transparent bg-transparent focus-visible:outline-2 focus-visible:outline-sky-500 " +
+                  "absolute z-20 rounded-sm border border-transparent bg-transparent focus-visible:outline-2 focus-visible:outline-sky-500 " +
+                  (item.tag ? "cursor-copy " : "cursor-pointer ") +
                   (tagDropTarget === item.id
                     ? "border-sky-500 bg-sky-100/70 ring-2 ring-sky-400"
                     : tagDragSource === item.id
@@ -464,7 +463,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
                             <rect x={coilX - 52} y={y - 64} width="104" height="83" rx="4"
                               fill="#eff6ff" stroke="#2563eb" strokeWidth="1.3" />
                           )}
-                          <Coil x={coilX} y={y} tag={output.tag}
+                          <Coil x={coilX} y={y} tag={output.tag || "??"}
                             comment={project.tags.find((tag) => tag.name === output.tag)?.description}
                             online={false} live={false} />
                           <Wire x1={coilX + 24} y1={y} x2={width - 30} y2={y} />
@@ -578,11 +577,12 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
               </div>
               <div className="flex flex-wrap items-end gap-3">
                 <label className="flex min-w-44 flex-col gap-1">
-                  Tag asociado
+                  Tag asociado {selectedInstruction.tag ? "" : "· Pendiente de asignar"}
                   <select value={selectedInstruction.tag}
                     onChange={(event) => update(() =>
                       changeInstructionTag(project, selectedInstruction.id, event.target.value))}
                     className="rounded border border-slate-300 bg-white px-2 py-1.5 text-slate-800">
+                    <option value="">— Sin tag —</option>
                     {boolTags.map((tag) =>
                       <option key={tag.name} value={tag.name}>{tag.name}</option>)}
                   </select>
