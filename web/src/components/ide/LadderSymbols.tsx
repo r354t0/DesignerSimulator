@@ -21,6 +21,91 @@ const HOT = "#00c83a";
 const ACTIVE_STROKE = 3;
 const SYMBOL_BASE_STROKE = 1.8;
 
+// Comment labels are independent of the rung stroke and use a fixed, compact
+// text column. Native SVG text has no automatic wrapping, so generate tspans.
+const COMMENT_WIDTH = 130;
+const COMMENT_LINE_HEIGHT = 13;
+const COMMENT_MAX_LINES = 2;
+
+function approximateSvgTextWidth(value: string): number {
+  return Array.from(value).reduce((width, char) => {
+    if (char === " ") return width + 3.1;
+    if (/[.,:;!|iIl'´]/.test(char)) return width + 2.8;
+    if (/[MW@%]/.test(char)) return width + 9;
+    if (/[ABCDEFGHJKLMNOPQRSTUVWXYZ]/.test(char)) return width + 7.2;
+    return width + 5.8;
+  }, 0);
+}
+
+function wrapSvgComment(comment: string): string[] {
+  const words = comment.trim().split(/\s+/).filter(Boolean);
+  const chunks: string[] = [];
+
+  // Break an exceptionally long word as well, so nothing escapes the column.
+  for (const word of words) {
+    if (approximateSvgTextWidth(word) <= COMMENT_WIDTH) {
+      chunks.push(word);
+      continue;
+    }
+    let chunk = "";
+    for (const letter of Array.from(word)) {
+      if (chunk && approximateSvgTextWidth(chunk + letter) > COMMENT_WIDTH) {
+        chunks.push(chunk);
+        chunk = "";
+      }
+      chunk += letter;
+    }
+    if (chunk) chunks.push(chunk);
+  }
+
+  const lines: string[] = [];
+  let current = "";
+  for (const chunk of chunks) {
+    const candidate = current ? current + " " + chunk : chunk;
+    if (current && approximateSvgTextWidth(candidate) > COMMENT_WIDTH) {
+      lines.push(current);
+      current = chunk;
+    } else {
+      current = candidate;
+    }
+  }
+  if (current) lines.push(current);
+
+  if (lines.length <= COMMENT_MAX_LINES) return lines;
+
+  const visible = lines.slice(0, COMMENT_MAX_LINES);
+  let last = visible[COMMENT_MAX_LINES - 1];
+  while (last.length > 0 && approximateSvgTextWidth(last + "…") > COMMENT_WIDTH) {
+    last = last.slice(0, -1);
+  }
+  visible[COMMENT_MAX_LINES - 1] = last.trimEnd() + "…";
+  return visible;
+}
+
+function SvgComment({ x, y, comment }: { x: number; y: number; comment?: string }) {
+  if (!comment?.trim()) return null;
+  const lines = wrapSvgComment(comment);
+  return (
+    <g>
+      <title>{comment}</title>
+      <text
+        x={x}
+        y={y - 40 - (lines.length - 1) * COMMENT_LINE_HEIGHT}
+        fontSize="11"
+        textAnchor="middle"
+        fill="#788694"
+        fontFamily="Arial, sans-serif"
+      >
+        {lines.map((line, index) => (
+          <tspan key={index} x={x} dy={index === 0 ? 0 : COMMENT_LINE_HEIGHT}>
+            {line}
+          </tspan>
+        ))}
+      </text>
+    </g>
+  );
+}
+
 // Compact editor prototype: halve the geometry, without shrinking the tag text.
 // One value controls contacts and coils consistently.
 export const SYMBOL_SCALE = 0.5;
@@ -86,7 +171,7 @@ export function Contact({
   return (
     <g>
       <g fill={BASE} textAnchor="middle" fontFamily="Arial, sans-serif">
-        {comment && <text x={x} y={y - 40} fontSize="11" fill="#8b949e">{comment}</text>}
+        <SvgComment x={x} y={y} comment={comment} />
         <text x={x} y={y - 23} fontSize="12" fill="#1c354b">{tag}</text>
       </g>
       <g
@@ -121,7 +206,7 @@ export function Coil({
   return (
     <g>
       <g fill={BASE} textAnchor="middle" fontFamily="Arial, sans-serif">
-        {comment && <text x={x} y={y - 40} fontSize="11" fill="#8b949e">{comment}</text>}
+        <SvgComment x={x} y={y} comment={comment} />
         <text x={x} y={y - 23} fontSize="12" fill="#1c354b">{tag}</text>
       </g>
       <g
