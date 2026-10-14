@@ -11,7 +11,7 @@ import {
   LADDER_DRAG_MIME,
   LADDER_MOVE_MIME,
   LADDER_TAG_MIME,
-  PRACTICE_BRANCH_GAP,
+  getPracticeRungHeight,
   PRACTICE_MAIN_Y,
   type VisualLadderDropTarget,
 } from "../../plc/ladderDragDrop";
@@ -391,8 +391,8 @@ export function PracticeEditor({
             const { width, coilX, groups } = geometry;
             const y = PRACTICE_MAIN_Y;
             const maxLanes = Math.max(0, ...groups.map((group) => group.branchLanes.length));
-            const showLowerLane = Boolean(maxLanes || draggingKind || moving);
-            const svgHeight = showLowerLane ? 204 + Math.max(0, maxLanes - 1) * PRACTICE_BRANCH_GAP : 122;
+            const showDropLane = Boolean(draggingKind || moving);
+            const svgHeight = getPracticeRungHeight(maxLanes, showDropLane);
             const drawContact = (item: typeof contacts[number], x: number, centerY: number) => (
               <g key={item.id}>
                 <Contact x={x} y={centerY} kind={item.kind as "XIC" | "XIO"}
