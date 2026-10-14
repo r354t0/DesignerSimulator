@@ -5,6 +5,8 @@ export const LADDER_MOVE_MIME = "application/x-designersimulator-ladder-move";
 export const LADDER_TAG_MIME = "application/x-designersimulator-ladder-tag";
 export const PRACTICE_MAIN_Y = 87;
 export const PRACTICE_BRANCH_Y = 166;
+export const PRACTICE_BRANCH_GAP = 85;
+export const branchLaneY = (index: number) => PRACTICE_BRANCH_Y + index * PRACTICE_BRANCH_GAP;
 export const CONTACT_STEP = 145;
 
 export function isEditableKind(value: string): value is EditableKind {
@@ -17,6 +19,7 @@ export interface LadderGroupGeometry {
   left: number;
   right: number;
   branchCenters: number[];
+  branchLanes: { id: string; centers: number[]; y: number }[];
 }
 export interface LadderGeometry {
   width: number;
@@ -32,14 +35,14 @@ export interface LadderGeometry {
 export function getRungGeometry(rung: PracticeRung, viewportWidth = 760): LadderGeometry {
   const contacts = rung.instructions.filter((item) => item.kind !== "OTE");
   const totalCells = contacts.reduce((count, contact) => {
-    const branch = rung.parallelBranches?.find((item) => item.anchorId === contact.id);
-    return count + Math.max(1, branch?.instructions.length ?? 0);
+    const branches = (rung.parallelBranches ?? []).filter((item) => item.anchorId === contact.id);
+    return count + Math.max(1, ...branches.map((branch) => branch.instructions.length));
   }, 0);
   const width = Math.max(760, viewportWidth, 450 + totalCells * CONTACT_STEP);
   let consumed = 0;
   const groups = contacts.map((item) => {
-    const branch = rung.parallelBranches?.find((part) => part.anchorId === item.id);
-    const count = Math.max(1, branch?.instructions.length ?? 0);
+    const branches = (rung.parallelBranches ?? []).filter((part) => part.anchorId === item.id);
+    const count = Math.max(1, ...branches.map((branch) => branch.instructions.length));
     const firstX = 175 + consumed;
     consumed += count * CONTACT_STEP;
     return {
@@ -47,7 +50,11 @@ export function getRungGeometry(rung: PracticeRung, viewportWidth = 760): Ladder
       x: firstX + (count - 1) * CONTACT_STEP / 2,
       left: firstX - 58,
       right: firstX + (count - 1) * CONTACT_STEP + 58,
-      branchCenters: (branch?.instructions ?? []).map((_, i) => firstX + i * CONTACT_STEP),
+      branchCenters: (branches[0]?.instructions ?? []).map((_, i) => firstX + i * CONTACT_STEP),
+      branchLanes: branches.map((branch, index) => ({
+        id: branch.id, y: branchLaneY(index),
+        centers: branch.instructions.map((_, i) => firstX + i * CONTACT_STEP),
+      })),
     };
   });
   return {
@@ -67,6 +74,7 @@ export interface VisualLadderDropTarget extends LadderDropTarget {
   lane: "main" | "parallel";
   y: number;
   anchorId?: string;
+  branchId?: string;
 }
 
 function nearestSlot(slots: number[], x: number): number {
@@ -118,22 +126,30 @@ export function findVisualLadderDropTarget(
   const geometry = getRungGeometry(rung, width);
   const moving = movingId ? findInstruction(project, movingId) : null;
 
-  if (y >= 126 && y <= 224 && kind !== "OTE") {
+  if (y >= 126 && kind !== "OTE") {
     const group = geometry.groups.find((item) => x >= item.left - 12 && x <= item.right + 12);
     if (!group || movingId === group.anchorId) return null;
     if (moving?.lane === "main" && project.rungs.some((r) =>
       r.parallelBranches?.some((b) => b.anchorId === movingId))) return null;
     if (contactCount(rung) >= 8 && moving?.rungId !== rungId) return null;
-    const branch = rung.parallelBranches?.find((item) => item.anchorId === group.anchorId);
+
+    // The first lower lane may be created by dropping on it when no branches
+    // exist. When multiple lanes exist, each has its own snapped target.
+    const lane = group.branchLanes.length
+      ? group.branchLanes.find((item) => Math.abs(item.y - y) <= PRACTICE_BRANCH_GAP / 2)
+      : (Math.abs(y - PRACTICE_BRANCH_Y) <= PRACTICE_BRANCH_GAP / 2
+        ? { id: undefined, centers: [] as number[], y: PRACTICE_BRANCH_Y } : undefined);
+    if (!lane) return null;
+    const branch = rung.parallelBranches?.find((item) => item.id === lane.id);
     const slots = branch?.instructions.length
       ? [group.left + 20,
-        ...group.branchCenters.slice(0, -1).map((center, i) =>
-          (center + group.branchCenters[i + 1]) / 2),
+        ...lane.centers.slice(0, -1).map((center, i) =>
+          (center + lane.centers[i + 1]) / 2),
         group.right - 20]
       : [group.x];
     const position = nearestSlot(slots, x);
     return { kind, lane: "parallel", position, x: slots[position],
-      y: PRACTICE_BRANCH_Y, anchorId: group.anchorId };
+      y: lane.y, anchorId: group.anchorId, branchId: lane.id };
   }
 
   if (y < 13 || y > 125) return null;
