@@ -12,6 +12,25 @@ interface Props {
   onSelectDemo: (kind: Instruction) => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>, kind: "XIC" | "XIO" | "OTE") => void;
   onDragEnd: () => void;
+  onInsertRung: () => void;
+  onInsertParallel: () => void;
+  canInsertParallel: boolean;
+}
+
+/** First two commands from the Studio 5000 rung instruction strip. */
+function StructuralGlyph({ parallel }: { parallel: boolean }) {
+  return (
+    <svg width="43" height="27" viewBox="0 0 86 54" aria-hidden="true">
+      <g fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="square">
+        <path d="M8 9V45 M78 9V45" />
+        {parallel ? (
+          <>
+            <path d="M8 20H78 M23 20V39 M63 20V39 M23 39H63" />
+          </>
+        ) : <path d="M8 27H78" />}
+      </g>
+    </svg>
+  );
 }
 
 function PaletteGlyph({ tool }: { tool: PaletteTool }) {
@@ -36,6 +55,7 @@ function PaletteGlyph({ tool }: { tool: PaletteTool }) {
 
 export function InstructionPalette({
   selectedInstruction, onSelectEditable, onSelectDemo, onDragStart, onDragEnd,
+  onInsertRung, onInsertParallel, canInsertParallel,
 }: Props) {
   const [categoryId, setCategoryId] = useState<PaletteCategoryId>("favorites");
   const iconsRef = useRef<HTMLDivElement | null>(null);
@@ -67,6 +87,26 @@ export function InstructionPalette({
           <ChevronLeft size={15}/>
         </button>
         <div ref={iconsRef} className="flex min-w-0 flex-1 items-center gap-0.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <button type="button" onClick={onInsertRung}
+            title="Insertar rung debajo del seleccionado (sin selección, al final)"
+            aria-label="Insertar rung debajo del seleccionado"
+            className="flex h-[42px] min-w-[50px] shrink-0 flex-col items-center justify-center rounded-sm border border-transparent text-[10px] leading-[12px] text-[#37475b] hover:border-[#b0c0d4] hover:bg-[#eef3f9]"
+          >
+            <StructuralGlyph parallel={false} />
+            <span className="font-medium">Rung</span>
+          </button>
+          <button type="button" onClick={onInsertParallel}
+            disabled={!canInsertParallel}
+            title={canInsertParallel
+              ? "Crear una rama OR vacía bajo el contacto seleccionado"
+              : "Selecciona un contacto o un rung con un contacto sin rama OR"}
+            aria-label="Crear rama paralela OR"
+            className="flex h-[42px] min-w-[50px] shrink-0 flex-col items-center justify-center rounded-sm border border-transparent text-[10px] leading-[12px] text-[#37475b] hover:border-[#b0c0d4] hover:bg-[#eef3f9] disabled:cursor-not-allowed disabled:text-[#a0aab8] disabled:hover:border-transparent disabled:hover:bg-transparent"
+          >
+            <StructuralGlyph parallel />
+            <span className="font-medium">OR</span>
+          </button>
+          <div aria-hidden="true" className="mx-1 h-7 w-px shrink-0 bg-[#b5c2d2]" />
           {category.tools.map((tool) => {
             const active = tool.editable && tool.id === selectedInstruction;
             const interactive = tool.editable || tool.previewOnly;
