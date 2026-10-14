@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { ArrowLeft, ArrowRight, Copy, FileCode2, GitBranch, GripVertical, Plus, Tag, Trash2 } from "lucide-react";
 import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymbols";
+import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
 import { shouldDeleteSelectedInstruction } from "../../plc/ladderShortcuts";
 import {
@@ -38,11 +39,18 @@ interface Props {
   draggingKind: EditableKind | null;
   onChange: (next: PracticeProject) => void;
   nextId: (prefix: string) => string;
+  onSelectPaletteTool: (kind: "XIC" | "XIO" | "OTE") => void;
+  onSelectDemoTool: (kind: Instruction) => void;
+  onPaletteDragStart: (event: DragEvent<HTMLButtonElement>, kind: "XIC" | "XIO" | "OTE") => void;
+  onPaletteDragEnd: () => void;
 }
 const EDITABLE = new Set<Instruction>(["XIC", "XIO", "OTE"]);
 interface InternalDrag { id: string; kind: EditableKind }
 
-export function PracticeEditor({ project, selectedTool, draggingKind, onChange, nextId }: Props) {
+export function PracticeEditor({
+  project, selectedTool, draggingKind, onChange, nextId,
+  onSelectPaletteTool, onSelectDemoTool, onPaletteDragStart, onPaletteDragEnd,
+}: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedRungId, setSelectedRungId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -296,6 +304,13 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
       onKeyDown={handleEditorKeyDown}
       className="flex h-full min-h-0 flex-col bg-white text-slate-800 outline-none"
     >
+      <InstructionPalette
+        selectedInstruction={selectedTool}
+        onSelectEditable={onSelectPaletteTool}
+        onSelectDemo={onSelectDemoTool}
+        onDragStart={onPaletteDragStart}
+        onDragEnd={onPaletteDragEnd}
+      />
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-[#f4f6f8] px-4 py-2">
         <div>
           <h2 className="text-xs font-semibold">PracticeRoutine.LAD</h2>
