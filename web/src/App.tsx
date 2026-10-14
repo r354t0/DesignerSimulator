@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { Actions, DockLocation, Layout, Model, type IJsonModel, type TabNode, type TabSetNode } from "flexlayout-react";
 import { Cpu, Menu, PanelLeftClose, PanelLeftOpen, CircleHelp, BookOpen } from "lucide-react";
 import { ControllerOrganizer, type EditorView } from "./components/ide/ControllerOrganizer";
 import { LadderEditor, ProgramTags } from "./components/ide/LadderEditor";
 import { PracticeEditor } from "./components/ide/PracticeEditor";
-import { initialPracticeProject, type PracticeProject } from "./plc/practiceDocument";
+import { initialPracticeProject, type EditableKind, type PracticeProject } from "./plc/practiceDocument";
+import { isEditableKind, LADDER_DRAG_MIME } from "./plc/ladderDragDrop";
 import { INSTRUCTIONS, ToolbarSymbol, type Instruction } from "./components/ide/LadderSymbols";
 import { evaluateDemo, initialDemoInputs, type DemoInputs, type InputTag } from "./plc/demoModel";
 import { initialDemoBlocks, resetDemoCounters, stepDemoBlocks, type DemoBlockRuntime } from "./plc/timerCounterDemo";
@@ -67,6 +68,7 @@ export default function App() {
   const [organizerOpen, setOrganizerOpen] = useState(true);
   const [editorView, setEditorView] = useState<EditorView>("ladder");
   const [instruction, setInstruction] = useState<Instruction>("XIC");
+  const [draggingKind, setDraggingKind] = useState<EditableKind | null>(null);
   const [practice, setPractice] = useState<PracticeProject>(initialPracticeProject);
   const practiceIdCounter = useRef(1);
   const nextPracticeId = useCallback((prefix: string) => `${prefix}-${++practiceIdCounter.current}`, []);
@@ -115,7 +117,7 @@ export default function App() {
     (node: TabNode) => {
       switch (node.getComponent()) {
         case "practice":
-          return <PracticeEditor project={practice} selectedTool={instruction} onChange={setPractice} nextId={nextPracticeId} />;
+          return <PracticeEditor project={practice} selectedTool={instruction} draggingKind={draggingKind} onChange={setPractice} nextId={nextPracticeId} />;
         case "ladder":
           return <LadderEditor online={online} inputs={inputs} values={values} blocks={blocks} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
         case "tags":
@@ -126,7 +128,7 @@ export default function App() {
           return <div className="p-4">Panel no disponible</div>;
       }
     },
-    [online, inputs, values, blocks, practice, instruction, nextPracticeId, handleTagChange, handleResetCounters],
+    [online, inputs, values, blocks, practice, instruction, draggingKind, nextPracticeId, handleTagChange, handleResetCounters],
   );
 
   const openEditorView = useCallback((view: EditorView) => {
@@ -152,6 +154,19 @@ export default function App() {
     }
     setEditorView(view);
   }, [model]);
+
+  const onToolbarDragStart = useCallback((event: DragEvent<HTMLButtonElement>, kind: Instruction) => {
+    if (!isEditableKind(kind)) {
+      event.preventDefault();
+      return;
+    }
+    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.setData(LADDER_DRAG_MIME, kind);
+    setInstruction(kind);
+    setDraggingKind(kind);
+    // Opening the practice tab makes a drop possible even if another tab was active.
+    openEditorView("practice");
+  }, [openEditorView]);
 
   const syncTabSelection = useCallback((updatedModel: Model) => {
     const activeTabset = updatedModel.getNodeById("workspace-editor");
@@ -208,19 +223,22 @@ export default function App() {
           <button
             key={id}
             type="button"
+            draggable={isEditableKind(id)}
+            onDragStart={(event) => onToolbarDragStart(event, id)}
+            onDragEnd={() => setDraggingKind(null)}
             onClick={() => {
               setInstruction(id);
               openEditorView(id === "XIC" || id === "XIO" || id === "OTE" ? "practice" : "ladder");
             }}
             aria-pressed={instruction === id}
             title={label}
-            className={`flex min-w-13 shrink-0 flex-col items-center justify-center rounded border px-2 py-1 text-[10px] leading-4 transition-colors ${instruction === id ? "border-sky-500 bg-sky-700/30 text-white" : "border-transparent text-slate-300 hover:border-slate-600 hover:bg-slate-700/50"}`}
+            className={`flex min-w-13 shrink-0 flex-col items-center justify-center rounded border px-2 py-1 text-[10px] leading-4 transition-colors ${isEditableKind(id) ? "cursor-grab active:cursor-grabbing" : ""} ${instruction === id ? "border-sky-500 bg-sky-700/30 text-white" : "border-transparent text-slate-300 hover:border-slate-600 hover:bg-slate-700/50"}`}
           >
             <ToolbarSymbol kind={id} />
             <span>{id}</span>
           </button>
         ))}
-        <span className="ml-auto hidden shrink-0 text-[11px] text-slate-400 lg:block">Selección de herramientas · Vista preliminar</span>
+        <span className="ml-auto hidden shrink-0 text-[11px] text-slate-400 lg:block">XIC / XIO / OTE: clic o arrastra hasta PracticeRoutine</span>
       </div>
 
       <div className="flex min-h-0 flex-1">
