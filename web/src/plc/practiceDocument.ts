@@ -119,6 +119,59 @@ export function createRung(project: PracticeProject, id: string): PracticeProjec
   return { ...project, rungs: [...project.rungs, { id, instructions: [], parallelBranches: [] }] };
 }
 
+/**
+ * Insert a new rung immediately after the selected rung. With no selection,
+ * append at the end. IDs are stable; the visible rung numbers are derived
+ * from the array order. Never mutate the original project.
+ */
+export function insertRungBelow(
+  project: PracticeProject,
+  id: string,
+  selectedRungId: string | null = null,
+): PracticeProject {
+  const created = createRung(project, id);
+  if (!selectedRungId) return created;
+
+  const index = project.rungs.findIndex((rung) => rung.id === selectedRungId);
+  if (index === -1) throw new Error("No se encontró el rung seleccionado.");
+  const newRung = created.rungs[created.rungs.length - 1];
+  return {
+    ...created,
+    rungs: [
+      ...project.rungs.slice(0, index + 1),
+      newRung,
+      ...project.rungs.slice(index + 1),
+    ],
+  };
+}
+
+/**
+ * Pick a valid main-line contact for a parallel branch. A selected
+ * instruction wins over a gutter-selected rung; when just the rung is
+ * selected, choose its first contact that has no branch yet.
+ */
+export function getParallelBranchTarget(
+  project: PracticeProject,
+  selectedInstructionId: string | null,
+  selectedRungId: string | null,
+): { rungId: string; anchorId: string } | null {
+  const location = selectedInstructionId
+    ? findInstruction(project, selectedInstructionId)
+    : null;
+  if (selectedInstructionId) {
+    if (!location || location.lane !== "main" || location.instruction.kind === "OTE") return null;
+    const rung = project.rungs.find((item) => item.id === location.rungId);
+    if (rung?.parallelBranches?.some((branch) => branch.anchorId === location.instruction.id)) return null;
+    return { rungId: location.rungId, anchorId: location.instruction.id };
+  }
+
+  const rung = project.rungs.find((item) => item.id === selectedRungId);
+  if (!rung) return null;
+  const anchor = rung.instructions.find((item) =>
+    item.kind !== "OTE" && !rung.parallelBranches?.some((branch) => branch.anchorId === item.id));
+  return anchor ? { rungId: rung.id, anchorId: anchor.id } : null;
+}
+
 export function removeRung(project: PracticeProject, id: string): PracticeProject {
   return { ...project, rungs: project.rungs.filter((rung) => rung.id !== id) };
 }
