@@ -167,7 +167,7 @@ export function getParallelBranchTarget(
   const rung = project.rungs.find((item) => item.id === selectedRungId);
   if (!rung) return null;
   const anchor = rung.instructions.find((item) => item.kind !== "OTE");
-  return anchor ? { rungId: rung.id, anchorId: anchor.id };
+  return anchor ? { rungId: rung.id, anchorId: anchor.id } : null;
 }
 
 export function removeRung(project: PracticeProject, id: string): PracticeProject {
