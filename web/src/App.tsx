@@ -7,7 +7,8 @@ import { ControllerTags } from "./components/ide/ControllerTags";
 import { PracticeEditor } from "./components/ide/PracticeEditor";
 import { initialPracticeProject, type EditableKind, type PracticeProject } from "./plc/practiceDocument";
 import { isEditableKind, LADDER_DRAG_MIME } from "./plc/ladderDragDrop";
-import { INSTRUCTIONS, ToolbarSymbol, type Instruction } from "./components/ide/LadderSymbols";
+import { type Instruction } from "./components/ide/LadderSymbols";
+import { InstructionPalette } from "./components/ide/InstructionPalette";
 import { evaluateDemo, initialDemoInputs, type DemoInputs, type InputTag } from "./plc/demoModel";
 import { initialDemoBlocks, resetDemoCounters, stepDemoBlocks, type DemoBlockRuntime } from "./plc/timerCounterDemo";
 import { SimulationScene } from "./components/ide/SimulationScene";
@@ -137,7 +138,7 @@ export default function App() {
       ? { id: "editor-mainroutine", name: "MainRoutine.LAD", component: "ladder" }
       : view === "practice"
         ? { id: "editor-practice", name: "PracticeRoutine.LAD", component: "practice" }
-        : { id: "editor-tags", name: "Program Tags", component: "tags" };
+        : { id: "editor-tags", name: "Controller Tags", component: "tags" };
 
     // Select an existing document, instead of replacing the content of another tab.
     if (model.getNodeById(tab.id)) {
@@ -218,29 +219,19 @@ export default function App() {
         </div>
       </header>
 
-      <div className="flex h-13 shrink-0 items-center gap-1.5 overflow-x-auto border-b border-slate-700/70 bg-[#1b252f] px-3">
-        <span className="mr-2 shrink-0 text-[10px] font-bold tracking-widest text-slate-400">LADDER</span>
-        {INSTRUCTIONS.map(({ id, label }) => (
-          <button
-            key={id}
-            type="button"
-            draggable={isEditableKind(id)}
-            onDragStart={(event) => onToolbarDragStart(event, id)}
-            onDragEnd={() => setDraggingKind(null)}
-            onClick={() => {
-              setInstruction(id);
-              openEditorView(id === "XIC" || id === "XIO" || id === "OTE" ? "practice" : "ladder");
-            }}
-            aria-pressed={instruction === id}
-            title={label}
-            className={`flex min-w-13 shrink-0 flex-col items-center justify-center rounded border px-2 py-1 text-[10px] leading-4 transition-colors ${isEditableKind(id) ? "cursor-grab active:cursor-grabbing" : ""} ${instruction === id ? "border-sky-500 bg-sky-700/30 text-white" : "border-transparent text-slate-300 hover:border-slate-600 hover:bg-slate-700/50"}`}
-          >
-            <ToolbarSymbol kind={id} />
-            <span>{id}</span>
-          </button>
-        ))}
-        <span className="ml-auto hidden shrink-0 text-[11px] text-slate-400 lg:block">XIC / XIO / OTE: clic o arrastra hasta PracticeRoutine</span>
-      </div>
+      <InstructionPalette
+        selectedInstruction={instruction}
+        onSelectEditable={(kind) => {
+          setInstruction(kind);
+          openEditorView("practice");
+        }}
+        onSelectDemo={(kind) => {
+          setInstruction(kind);
+          openEditorView("ladder");
+        }}
+        onDragStart={onToolbarDragStart}
+        onDragEnd={() => setDraggingKind(null)}
+      />
 
       <div className="flex min-h-0 flex-1">
         {organizerOpen && (
