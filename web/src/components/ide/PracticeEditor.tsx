@@ -20,7 +20,6 @@ import {
   changeInstructionTag,
   copyInstructionTag,
   createParallelBranch,
-  createRung,
   getParallelBranchTarget,
   insertRungBelow,
   createTag,
