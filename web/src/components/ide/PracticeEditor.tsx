@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
-import { FileCode2, GitBranch, Trash2 } from "lucide-react";
+import { FileCode2 } from "lucide-react";
 import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
@@ -393,10 +393,6 @@ export function PracticeEditor({
             const maxLanes = Math.max(0, ...groups.map((group) => group.branchLanes.length));
             const showLowerLane = Boolean(maxLanes || draggingKind || moving);
             const svgHeight = showLowerLane ? 204 + Math.max(0, maxLanes - 1) * PRACTICE_BRANCH_GAP : 122;
-            const preferredAnchor = selectedLocation?.rungId === rung.id &&
-              selectedLocation.lane === "main" && selectedLocation.instruction.kind !== "OTE"
-              ? selected : contacts[0]?.id;
-
             const drawContact = (item: typeof contacts[number], x: number, centerY: number) => (
               <g key={item.id}>
                 <Contact x={x} y={centerY} kind={item.kind as "XIC" | "XIO"}
@@ -483,21 +479,6 @@ export function PracticeEditor({
                 >
                   {rungIndex}
                 </button>
-                <div className="absolute left-[77px] top-1 z-30 flex items-center gap-1 opacity-60 transition-opacity group-hover/practice-rung:opacity-100 focus-within:opacity-100">
-                  <button type="button" disabled={!preferredAnchor}
-                    onClick={() => { if (preferredAnchor) update(() => createParallelBranch(project, rung.id, preferredAnchor)); }}
-                    title={preferredAnchor ? "Crear una rama OR vacía bajo un contacto" : "Inserta primero un contacto en la línea principal"}
-                    aria-label={"Añadir rama OR al rung " + rungIndex}
-                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-sky-700 hover:bg-sky-50 disabled:text-slate-300">
-                    <GitBranch size={12} /> OR
-                  </button>
-                  <button type="button" onClick={() => {
-                    if (update(() => removeRung(project, rung.id))) { setSelected(null); setSelectedRungId(null); setSelectedOrBranch(null); }
-                  }} title={"Eliminar rung " + rungIndex} aria-label={"Eliminar rung " + rungIndex}
-                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-slate-500 hover:bg-red-50 hover:text-red-700">
-                    <Trash2 size={12} />
-                  </button>
-                </div>
                 <div>
                   <div className="relative" style={{ width, height: svgHeight }}
                     onDragOver={(event) => onDragOverRung(event, rung.id, width)}
