@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
-import { ArrowLeft, ArrowRight, Copy, FileCode2, GitBranch, GripVertical, Plus, Tag, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
+import { ArrowLeft, ArrowRight, Copy, FileCode2, GitBranch, GripVertical, Trash2 } from "lucide-react";
 import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
@@ -23,7 +23,6 @@ import {
   getParallelBranchTarget,
   getPaletteInsertionTarget,
   insertRungBelow,
-  createTag,
   findInstruction,
   insertInstruction,
   moveInstruction,
@@ -62,8 +61,6 @@ export function PracticeEditor({
   const [tagDropTarget, setTagDropTarget] = useState<string | null>(null);
   const [tagFeedback, setTagFeedback] = useState("");
   const [tagSelector, setTagSelector] = useState<TagSelectorState | null>(null);
-  const [tagName, setTagName] = useState("");
-  const [tagDescription, setTagDescription] = useState("");
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLElement | null>(null);
   const [viewportWidth, setViewportWidth] = useState(760);
@@ -278,13 +275,6 @@ export function PracticeEditor({
     setMoving(null);
   };
 
-  const addNewTag = (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (update(() => createTag(project, tagName, tagDescription))) {
-      setTagName("");
-      setTagDescription("");
-    }
-  };
   // All rows share one horizontal coordinate system so the right rail remains
   // aligned when the editor is docked/maximized or a long OR branch is added.
   const canvasWidth = Math.max(
@@ -745,29 +735,6 @@ export function PracticeEditor({
             </div>
           )}
 
-          <details className="m-3 rounded border border-slate-200 bg-[#f8fafc] p-3">
-            <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold">
-              <Tag size={14} /> Crear tag BOOL
-            </summary>
-            <form onSubmit={addNewTag} className="mt-3 flex flex-wrap items-end gap-2 text-xs">
-              <label className="flex flex-col gap-1">
-                Nombre
-                <input value={tagName} onChange={(event) => setTagName(event.target.value)}
-                  className="rounded border border-slate-300 bg-white px-2 py-1.5"
-                  placeholder="Sensor_01" required maxLength={40} />
-              </label>
-              <label className="flex flex-1 flex-col gap-1">
-                Comentario
-                <input value={tagDescription} onChange={(event) => setTagDescription(event.target.value)}
-                  className="rounded border border-slate-300 bg-white px-2 py-1.5"
-                  placeholder="Descripción opcional" maxLength={120} />
-              </label>
-              <button type="submit"
-                className="flex items-center gap-1 rounded bg-sky-700 px-3 py-1.5 text-white hover:bg-sky-800">
-                <Plus size={13} /> Crear
-              </button>
-            </form>
-          </details>
           {error && (
             <p role="alert" className="m-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700">
               {error}
