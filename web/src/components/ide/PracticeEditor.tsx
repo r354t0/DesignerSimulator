@@ -321,7 +321,8 @@ export function PracticeEditor({
     onSelectPaletteTool(kind);
     const target = getPaletteInsertionTarget(project, selected, selectedRungId, kind);
     if (!target) {
-      setError("Selecciona primero un rung o una instrucción para insertar el elemento.");
+      // Without selection, a palette click only arms the tool for drag/drop.
+      setError("");
       return;
     }
     insertAt(target.rungId, target.position, kind, target.anchorId, target.branchId);
@@ -363,13 +364,9 @@ export function PracticeEditor({
         </span>
       </header>
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-[#f8fafc] px-3 py-2 text-xs">
-        <button type="button" onClick={insertSelectedRungBelow}
-          className="flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1.5 font-medium hover:bg-slate-100">
-          <Plus size={14} /> Insertar rung debajo
-        </button>
         <span className="text-slate-500">
           Herramienta: <strong className="text-sky-800">{selectedTool}</strong>
-          {EDITABLE.has(selectedTool) ? " · Arrastrar o pulsar +" : " · Solo demo visual"}
+          {EDITABLE.has(selectedTool) ? " · Clic para insertar según selección o arrastrar" : " · Solo demo visual"}
         </span>
         <span className="ml-auto text-slate-500">{project.rungs.length} rungs · {project.tags.length} tags</span>
       </div>
@@ -742,8 +739,8 @@ export function PracticeEditor({
                   }}>Eliminar instrucción</button>
               </div>
               <p className="mt-2 text-[11px] text-slate-500">
-                Las ramas OR pueden quedar vacías y contener varios contactos en serie.
-                Al mover un contacto principal, su rama OR viaja con él.
+                Puedes crear varias ramas OR bajo un contacto y añadir contactos en serie.
+                Al mover el contacto principal, sus ramas OR viajan con él.
               </p>
             </div>
           )}
