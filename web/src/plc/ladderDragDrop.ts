@@ -125,7 +125,10 @@ export function findVisualLadderDropTarget(
     if (contactCount(rung) >= 8 && moving?.rungId !== rungId) return null;
     const branch = rung.parallelBranches?.find((item) => item.anchorId === group.anchorId);
     const slots = branch?.instructions.length
-      ? [group.left + 20, ...group.branchCenters.map((center) => center + 69)]
+      ? [group.left + 20,
+        ...group.branchCenters.slice(0, -1).map((center, i) =>
+          (center + group.branchCenters[i + 1]) / 2),
+        group.right - 20]
       : [group.x];
     const position = nearestSlot(slots, x);
     return { kind, lane: "parallel", position, x: slots[position],
