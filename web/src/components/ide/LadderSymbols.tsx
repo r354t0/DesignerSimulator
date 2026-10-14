@@ -232,6 +232,26 @@ export function Coil({
   );
 }
 
+/**
+ * Shared Ladder rail primitives for both editable and monitor-only routines.
+ * A continuous column can be rendered over an entire routine or one row.
+ */
+export function LadderRails({
+  leftX, rightX, top, bottom, live = false,
+}: {
+  leftX: number; rightX: number; top: number; bottom: number; live?: boolean;
+}) {
+  return (
+    <path
+      d={"M" + leftX + " " + top + "V" + bottom +
+        " M" + rightX + " " + top + "V" + bottom}
+      fill="none"
+      stroke={live ? HOT : "#bcc5ce"}
+      strokeWidth={live ? 2.625 : 1.6}
+    />
+  );
+}
+
 export function RungFrame({
   index, y, selected = false, live, children, onSelect, width = 712,
 }: {
