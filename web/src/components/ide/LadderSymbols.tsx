@@ -37,19 +37,19 @@ function approximateSvgTextWidth(value: string): number {
   }, 0);
 }
 
-function wrapSvgComment(comment: string): string[] {
+function wrapSvgComment(comment: string, maxWidth = COMMENT_WIDTH): string[] {
   const words = comment.trim().split(/\s+/).filter(Boolean);
   const chunks: string[] = [];
 
   // Break an exceptionally long word as well, so nothing escapes the column.
   for (const word of words) {
-    if (approximateSvgTextWidth(word) <= COMMENT_WIDTH) {
+    if (approximateSvgTextWidth(word) <= maxWidth) {
       chunks.push(word);
       continue;
     }
     let chunk = "";
     for (const letter of Array.from(word)) {
-      if (chunk && approximateSvgTextWidth(chunk + letter) > COMMENT_WIDTH) {
+      if (chunk && approximateSvgTextWidth(chunk + letter) > maxWidth) {
         chunks.push(chunk);
         chunk = "";
       }
@@ -62,7 +62,7 @@ function wrapSvgComment(comment: string): string[] {
   let current = "";
   for (const chunk of chunks) {
     const candidate = current ? current + " " + chunk : chunk;
-    if (current && approximateSvgTextWidth(candidate) > COMMENT_WIDTH) {
+    if (current && approximateSvgTextWidth(candidate) > maxWidth) {
       lines.push(current);
       current = chunk;
     } else {
@@ -75,16 +75,25 @@ function wrapSvgComment(comment: string): string[] {
 
   const visible = lines.slice(0, COMMENT_MAX_LINES);
   let last = visible[COMMENT_MAX_LINES - 1];
-  while (last.length > 0 && approximateSvgTextWidth(last + "…") > COMMENT_WIDTH) {
+  while (last.length > 0 && approximateSvgTextWidth(last + "…") > maxWidth) {
     last = last.slice(0, -1);
   }
   visible[COMMENT_MAX_LINES - 1] = last.trimEnd() + "…";
   return visible;
 }
 
-function SvgComment({ x, y, comment }: { x: number; y: number; comment?: string }) {
+function ellipsizeSvgLabel(text: string, maxWidth: number): string {
+  if (approximateSvgTextWidth(text) <= maxWidth) return text;
+  let label = text;
+  while (label && approximateSvgTextWidth(label + "…") > maxWidth) label = label.slice(0, -1);
+  return label + "…";
+}
+
+function SvgComment({ x, y, comment, maxWidth = COMMENT_WIDTH }: {
+  x: number; y: number; comment?: string; maxWidth?: number;
+}) {
   if (!comment?.trim()) return null;
-  const lines = wrapSvgComment(comment);
+  const lines = wrapSvgComment(comment, maxWidth);
   return (
     <g>
       <title>{comment}</title>
@@ -155,9 +164,9 @@ export function Wire({
 }
 
 export function Contact({
-  x, y, kind, tag, comment, value, online, powerIn,
+  x, y, kind, tag, comment, value, online, powerIn, labelWidth,
 }: {
-  x: number; y: number; kind: "XIC" | "XIO"; tag: string; comment?: string;
+  x: number; y: number; kind: "XIC" | "XIO"; tag: string; comment?: string; labelWidth?: number;
   value: boolean; online: boolean; powerIn: boolean;
 }) {
   // Logix semantics: XIC = bit TRUE; XIO = bit FALSE.
@@ -172,8 +181,11 @@ export function Contact({
     <g>
       {/* Tags and wrapped comments always stay above the instruction. No duplicate status text below. */}
       <g fill={BASE} textAnchor="middle" fontFamily="Arial, sans-serif">
-        <SvgComment x={x} y={y} comment={comment} />
-        <text x={x} y={y - 23} fontSize="12" fill="#1c354b">{tag}</text>
+        <SvgComment x={x} y={y} comment={comment} maxWidth={labelWidth} />
+        <text x={x} y={y - 23} fontSize="12" fill="#1c354b">
+          <title>{tag}</title>
+          {labelWidth ? ellipsizeSvgLabel(tag, labelWidth) : tag}
+        </text>
       </g>
       <g
         fill="none"
@@ -193,9 +205,9 @@ export function Contact({
 }
 
 export function Coil({
-  x, y, tag, comment, online, live,
+  x, y, tag, comment, online, live, labelWidth,
 }: {
-  x: number; y: number; tag: string; comment?: string; online: boolean; live: boolean;
+  x: number; y: number; tag: string; comment?: string; online: boolean; live: boolean; labelWidth?: number;
 }) {
   const activeSymbol = online && live;
   const curveEdge = 14 * SYMBOL_SCALE;
@@ -208,8 +220,11 @@ export function Coil({
     <g>
       {/* Tags and wrapped comments always stay above the instruction. No duplicate status text below. */}
       <g fill={BASE} textAnchor="middle" fontFamily="Arial, sans-serif">
-        <SvgComment x={x} y={y} comment={comment} />
-        <text x={x} y={y - 23} fontSize="12" fill="#1c354b">{tag}</text>
+        <SvgComment x={x} y={y} comment={comment} maxWidth={labelWidth} />
+        <text x={x} y={y - 23} fontSize="12" fill="#1c354b">
+          <title>{tag}</title>
+          {labelWidth ? ellipsizeSvgLabel(tag, labelWidth) : tag}
+        </text>
       </g>
       <g
         fill="none"
