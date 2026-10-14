@@ -170,6 +170,7 @@ export function Contact({
   const terminalX = halfBarGap + leadLength;
   return (
     <g>
+      {/* Tags and wrapped comments always stay above the instruction. No duplicate status text below. */}
       <g fill={BASE} textAnchor="middle" fontFamily="Arial, sans-serif">
         <SvgComment x={x} y={y} comment={comment} />
         <text x={x} y={y - 23} fontSize="12" fill="#1c354b">{tag}</text>
@@ -205,6 +206,7 @@ export function Coil({
   const wireEnd = 48 * SYMBOL_SCALE;
   return (
     <g>
+      {/* Tags and wrapped comments always stay above the instruction. No duplicate status text below. */}
       <g fill={BASE} textAnchor="middle" fontFamily="Arial, sans-serif">
         <SvgComment x={x} y={y} comment={comment} />
         <text x={x} y={y - 23} fontSize="12" fill="#1c354b">{tag}</text>
@@ -243,7 +245,8 @@ export function RungFrame({
 }) {
   const blockRow = index >= 3;
   const top = blockRow ? 70 : 47;
-  const bottom = blockRow ? 70 : index === 0 ? 68 : 40;
+  // The first rung has a lower OR branch, so its selection gutter spans both paths.
+  const bottom = blockRow ? 70 : index === 0 ? 143 : 40;
   return (
     <g
       role="button"
