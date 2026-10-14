@@ -105,7 +105,6 @@ export function ControllerTags({
   const [newAccess, setNewAccess] = useState<TagExternalAccess>("Read/Write");
   const [newConstant, setNewConstant] = useState(false);
   const [newStyle, setNewStyle] = useState<TagStyle>("Decimal");
-  const [newSelected, setNewSelected] = useState(false);
 
   const update = (operation: () => PracticeProject, message?: string): boolean => {
     try {
@@ -153,7 +152,6 @@ export function ControllerTags({
       setNewAccess("Read/Write");
       setNewConstant(false);
       setNewStyle("Decimal");
-      setNewSelected(false);
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "No se pudo crear el tag.");
     }
