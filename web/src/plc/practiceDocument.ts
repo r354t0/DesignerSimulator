@@ -51,6 +51,7 @@ function tagInUse(project: PracticeProject, name: string): boolean {
   return project.rungs.some((rung) => allInstructions(rung).some((item) => item.tag === name));
 }
 
+/** An empty tag means that the symbol exists but has not been assigned an operand yet. */
 export interface PracticeInstruction { id: string; kind: EditableKind; tag: string }
 export interface ParallelBranch {
   anchorId: string;
@@ -93,7 +94,8 @@ function ensureNewInstruction(project: PracticeProject, item: PracticeInstructio
   if (!["XIC", "XIO", "OTE"].includes(item.kind)) {
     throw new Error("Esta instrucción aún no está habilitada para edición.");
   }
-  ensureTag(project, item.tag);
+  // A new XIC/XIO/OTE may be inserted before the user assigns a BOOL operand.
+  if (item.tag !== "") ensureTag(project, item.tag);
   if (project.rungs.some((rung) => allInstructions(rung).some((part) => part.id === item.id))) {
     throw new Error("El identificador de instrucción ya existe.");
   }
@@ -231,7 +233,8 @@ export function findInstruction(project: PracticeProject, id: string): Instructi
 export function changeInstructionTag(
   project: PracticeProject, instructionId: string, tag: string,
 ): PracticeProject {
-  ensureTag(project, tag);
+  // Empty tag is the intentional "sin asignar" state in the editor.
+  if (tag !== "") ensureTag(project, tag);
   return { ...project, rungs: project.rungs.map((rung) => ({
     ...rung,
     instructions: rung.instructions.map((item) => item.id === instructionId ? { ...item, tag } : item),
@@ -259,6 +262,9 @@ export function copyInstructionTag(
   if (!source) throw new Error("No se encontró la instrucción de origen.");
   const target = findInstruction(project, targetInstructionId);
   if (!target) throw new Error("No se encontró la instrucción de destino.");
+  if (!source.instruction.tag) {
+    throw new Error("La instrucción de origen no tiene un tag asignado.");
+  }
   if (sourceInstructionId === targetInstructionId ||
       source.instruction.tag === target.instruction.tag) return project;
 
