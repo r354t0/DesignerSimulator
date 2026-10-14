@@ -8,6 +8,8 @@ export function filterPracticeTags(
   tags: readonly PracticeTag[],
   query: string,
 ): PracticeTag[] {
+  // XIC/XIO/OTE are BOOL-only; numeric and structured tags appear in Controller Tags but not here.
+  tags = tags.filter((tag) => !tag.type || tag.type === "BOOL");
   const normalized = query.trim().toLocaleLowerCase();
   if (!normalized) return [...tags].sort((a, b) => a.name.localeCompare(b.name));
 
