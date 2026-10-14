@@ -349,6 +349,12 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
                           <Wire x1={coilX + 24} y1={y} x2={width - 30} y2={y} />
                         </g>
                       )}
+                      {/* Insertion hotspots appear on hover/selection/drag, not permanently. */}
+                      <g className={
+                        selectedRungId === rung.id || draggingKind || moving
+                          ? "opacity-100"
+                          : "opacity-0 transition-opacity group-hover/practice-rung:opacity-100 group-focus-within:opacity-100"
+                      }>
                       {!output && selectedTool === "OTE" && insertSlot(coilX, y, "Insertar OTE",
                         () => insertAt(rung.id, contacts.length, "OTE"), "out-" + rung.id)}
 
@@ -374,6 +380,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
                               "branch-" + branch.anchorId + "-" + index))}
                           </g>;
                         })}
+                      </g>
 
                       {dropPreview?.rungId === rung.id && (
                         <g pointerEvents="none">
