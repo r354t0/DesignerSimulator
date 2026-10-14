@@ -295,6 +295,48 @@ export function moveInstruction(
   return addParallelContact(inserted, targetRungId, moving.id, paired.contact);
 }
 
+/**
+ * Move an existing single contact onto a new lower OR lane under another
+ * primary contact. The source is not removed until all validations pass.
+ */
+export function moveToParallel(
+  project: PracticeProject,
+  instructionId: string,
+  targetRungId: string,
+  anchorId: string,
+): PracticeProject {
+  const source = findInstruction(project, instructionId);
+  if (!source) throw new Error("No se encontró la instrucción.");
+  const target = getRung(project, targetRungId);
+  if (source.instruction.kind === "OTE") throw new Error("La OTE no puede entrar en una rama OR.");
+  if (instructionId === anchorId) throw new Error("El contacto no puede ser paralelo a sí mismo.");
+  if (!target.instructions.some((item) => item.id === anchorId && item.kind !== "OTE")) {
+    throw new Error("El contacto de referencia no existe.");
+  }
+  if ((target.parallelBranches ?? []).some((branch) => branch.anchorId === anchorId)) {
+    throw new Error("Este contacto ya tiene una rama OR.");
+  }
+  if (source.lane === "main" &&
+      (getRung(project, source.rungId).parallelBranches ?? []).some((b) => b.anchorId === instructionId)) {
+    throw new Error("Mueve o elimina primero la rama asociada a este contacto.");
+  }
+  if (source.rungId !== targetRungId && contactCount(target) >= 8) {
+    throw new Error("Máximo 8 contactos por rung en esta etapa.");
+  }
+  const stripped = {
+    ...project,
+    rungs: project.rungs.map((rung) => {
+      if (rung.id !== source.rungId) return rung;
+      return {
+        ...rung,
+        instructions: rung.instructions.filter((item) => item.id !== instructionId),
+        parallelBranches: (rung.parallelBranches ?? []).filter((b) => b.contact.id !== instructionId),
+      };
+    }),
+  };
+  return addParallelContact(stripped, targetRungId, anchorId, source.instruction);
+}
+
 export function createTag(
   project: PracticeProject,
   name: string,
