@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { Plus, Trash2, FileCode2, Tag } from "lucide-react";
 import { Coil, Contact, Wire, type Instruction } from "./LadderSymbols";
+import { findLadderDropTarget, isEditableKind, LADDER_DRAG_MIME, type LadderDropTarget } from "../../plc/ladderDragDrop";
 import {
   changeInstructionTag,
   createRung,
@@ -15,15 +16,17 @@ import {
 interface Props {
   project: PracticeProject;
   selectedTool: Instruction;
+  draggingKind: EditableKind | null;
   onChange: (next: PracticeProject) => void;
   nextId: (prefix: string) => string;
 }
 
 const EDITABLE = new Set<Instruction>(["XIC", "XIO", "OTE"]);
 
-export function PracticeEditor({ project, selectedTool, onChange, nextId }: Props) {
+export function PracticeEditor({ project, selectedTool, draggingKind, onChange, nextId }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [error, setError] = useState("");
+  const [dropPreview, setDropPreview] = useState<(LadderDropTarget & { rungId: string }) | null>(null);
   const [tagName, setTagName] = useState("");
   const [tagDescription, setTagDescription] = useState("");
   const viewportRef = useRef<HTMLDivElement | null>(null);
@@ -38,6 +41,10 @@ export function PracticeEditor({ project, selectedTool, onChange, nextId }: Prop
     observer.observe(root);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (!draggingKind) setDropPreview(null);
+  }, [draggingKind]);
 
   const update = (operation: () => PracticeProject) => {
     try {
@@ -64,6 +71,44 @@ export function PracticeEditor({ project, selectedTool, onChange, nextId }: Prop
     setSelected(instructionId);
   };
 
+  // Translate browser coordinates to SVG space so docking/maximizing stays accurate.
+  const targetForPointer = (
+    event: DragEvent<SVGSVGElement>,
+    rungId: string,
+    width: number,
+    kind: EditableKind,
+  ): LadderDropTarget | null => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const x = (event.clientX - bounds.left) * width / bounds.width;
+    const y = (event.clientY - bounds.top) * 138 / bounds.height;
+    if (y < 13 || y > 130) return null;
+    return findLadderDropTarget(project, rungId, kind, x, width);
+  };
+
+  const dragOverRung = (event: DragEvent<SVGSVGElement>, rungId: string, width: number) => {
+    if (!event.dataTransfer.types.includes(LADDER_DRAG_MIME) || !draggingKind) return;
+    event.preventDefault();
+    const target = targetForPointer(event, rungId, width, draggingKind);
+    event.dataTransfer.dropEffect = target ? "copy" : "none";
+    setDropPreview((previous) => {
+      if (!target) return null;
+      if (previous?.rungId === rungId && previous.kind === target.kind &&
+          previous.position === target.position && previous.x === target.x) return previous;
+      return { ...target, rungId };
+    });
+  };
+
+  const dropOnRung = (event: DragEvent<SVGSVGElement>, rungId: string, width: number) => {
+    if (!event.dataTransfer.types.includes(LADDER_DRAG_MIME)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const kind = event.dataTransfer.getData(LADDER_DRAG_MIME);
+    setDropPreview(null);
+    if (!isEditableKind(kind)) return;
+    const target = targetForPointer(event, rungId, width, kind);
+    if (target) insertAt(rungId, target.position, kind);
+  };
+
   const addNewTag = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     try {
@@ -86,7 +131,7 @@ export function PracticeEditor({ project, selectedTool, onChange, nextId }: Prop
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-[#f4f6f8] px-4 py-2">
         <div>
           <h2 className="text-xs font-semibold">PracticeRoutine.LAD</h2>
-          <p className="mt-1 text-[11px] text-slate-500">Editor de práctica · Instrucciones editables XIC, XIO y OTE</p>
+          <p className="mt-1 text-[11px] text-slate-500">Arrastra XIC, XIO u OTE desde la barra superior y suéltala en el rung</p>
         </div>
         <span className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">
           EDICIÓN · SIN EJECUCIÓN
@@ -100,7 +145,7 @@ export function PracticeEditor({ project, selectedTool, onChange, nextId }: Prop
         </button>
         <span className="text-slate-500">
           Herramienta: <strong className="text-sky-800">{selectedTool}</strong>
-          {EDITABLE.has(selectedTool) ? " · Haz clic en + para insertar" : " · Solo disponible en la demo visual"}
+          {EDITABLE.has(selectedTool) ? " · Arrastra al rung o haz clic en +" : " · Solo disponible en la demo visual"}
         </span>
         <span className="ml-auto text-slate-500">{project.rungs.length} rungs · {project.tags.length} tags</span>
       </div>
@@ -141,7 +186,14 @@ export function PracticeEditor({ project, selectedTool, onChange, nextId }: Prop
                 </div>
                 <div className="overflow-x-auto">
                   <svg width={width} height="138" viewBox={"0 0 " + width + " 138"} role="group"
-                    aria-label={"Rung editable " + rungIndex} className="block">
+                    onDragOver={(event) => dragOverRung(event, rung.id, width)}
+                    onDrop={(event) => dropOnRung(event, rung.id, width)}
+                    onDragLeave={(event) => {
+                      if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+                        setDropPreview((previous) => previous?.rungId === rung.id ? null : previous);
+                      }
+                    }}
+                    aria-label={"Rung editable " + rungIndex + ". Arrastra instrucciones aquí."} className="block">
                     <path d={"M63 15V122 M" + (width - 30) + " 15V122"}
                       stroke="#8898a5" strokeWidth="1.5" fill="none" />
                     {wireSegments.map(([from, to], index) => (
@@ -211,6 +263,28 @@ export function PracticeEditor({ project, selectedTool, onChange, nextId }: Prop
                           </g>
                         );
                       })}
+                    {dropPreview?.rungId === rung.id && (
+                      <g pointerEvents="none" aria-hidden="true">
+                        <rect
+                          x={dropPreview.kind === "OTE" ? coilX - 42 : dropPreview.x - 30}
+                          y={y - 28}
+                          width={dropPreview.kind === "OTE" ? 84 : 60}
+                          height="54"
+                          rx="5"
+                          fill="#dbeafe"
+                          fillOpacity="0.9"
+                          stroke="#2563eb"
+                          strokeWidth="1.5"
+                          strokeDasharray="4 3"
+                        />
+                        <path d={"M" + dropPreview.x + " " + (y - 33) + "v66"}
+                          stroke="#0284c7" strokeWidth="2" strokeDasharray="5 3" />
+                        <text x={dropPreview.x} y={y + 5} textAnchor="middle"
+                          fontSize="11" fontFamily="Arial, sans-serif" fontWeight="700" fill="#1d4ed8">
+                          {dropPreview.kind}
+                        </text>
+                      </g>
+                    )}
                   </svg>
                 </div>
               </article>
@@ -265,7 +339,7 @@ export function PracticeEditor({ project, selectedTool, onChange, nextId }: Prop
         </details>
         {error && <p role="alert" className="mx-3 mb-3 text-xs text-red-700">{error}</p>}
         <p className="mx-3 mb-5 flex items-center gap-1 text-xs text-slate-500">
-          <FileCode2 size={14} /> Editor preliminar: contactos en serie, una bobina OTE por rung y tags BOOL.
+          <FileCode2 size={14} /> Editor preliminar con arrastre desde la paleta: contactos en serie, una bobina OTE por rung y tags BOOL.
           Las ramas OR y el motor de ejecución editable se incorporarán después.
         </p>
       </div>
