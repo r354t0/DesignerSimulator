@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState, type DragEvent, type FormEvent, type MouseEvent as ReactMouseEvent } from "react";
+import { useEffect, useRef, useState, type DragEvent, type FormEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { ArrowLeft, ArrowRight, Copy, FileCode2, GitBranch, GripVertical, Plus, Tag, Trash2 } from "lucide-react";
 import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
+import { shouldDeleteSelectedInstruction } from "../../plc/ladderShortcuts";
 import {
   findVisualLadderDropTarget,
   getRungGeometry,
@@ -54,6 +55,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
   const [tagName, setTagName] = useState("");
   const [tagDescription, setTagDescription] = useState("");
   const viewportRef = useRef<HTMLDivElement | null>(null);
+  const editorRef = useRef<HTMLElement | null>(null);
   const [viewportWidth, setViewportWidth] = useState(760);
 
   useEffect(() => {
@@ -79,6 +81,32 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
       return false;
     }
   };
+  const handleEditorKeyDown = (event: KeyboardEvent<HTMLElement>) => {
+    // A focused input or pop-up must keep the native Delete key behavior.
+    const target = event.target;
+    const isTextEditing = target instanceof Element && Boolean(
+      target.closest('input, textarea, select, [contenteditable], [role="textbox"], [role="combobox"]'),
+    );
+    if (!shouldDeleteSelectedInstruction({
+      key: event.key,
+      hasSelectedInstruction: Boolean(selected && findInstruction(project, selected)),
+      isTextEditing,
+      isTagSelectorOpen: Boolean(tagSelector),
+      isDragging: Boolean(moving || tagDragSource || draggingKind),
+      ctrlKey: event.ctrlKey,
+      altKey: event.altKey,
+      metaKey: event.metaKey,
+    })) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    if (selected && update(() => removeInstruction(project, selected))) {
+      setSelected(null);
+      setTagFeedback("");
+      setTagDropTarget(null);
+    }
+  };
+
   const boolTags = project.tags.filter((tag) => tag.type === "BOOL");
   const insertAt = (rungId: string, position: number, kind: EditableKind, anchorId?: string) => {
     // Newly inserted instructions start without any operand, as in Logix Designer.
@@ -88,7 +116,11 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
     const done = update(() => anchorId
       ? addParallelContact(project, rungId, anchorId, instruction, position)
       : insertInstruction(project, rungId, position, instruction));
-    if (done) setSelected(id);
+    if (done) {
+      setSelected(id);
+      // After dropping from the toolbar, give the editable routine keyboard focus.
+      editorRef.current?.focus({ preventScroll: true });
+    }
   };
   const beginMove = (event: DragEvent<HTMLButtonElement>, id: string, kind: EditableKind) => {
     event.dataTransfer.effectAllowed = "move";
@@ -209,7 +241,10 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
         const done = update(() => target.lane === "parallel" && target.anchorId
           ? moveToParallel(project, sourceId, rungId, target.anchorId, target.position)
           : moveInstruction(project, sourceId, rungId, target.position));
-        if (done) setSelected(sourceId);
+        if (done) {
+          setSelected(sourceId);
+          editorRef.current?.focus({ preventScroll: true });
+        }
       } else if (isPalette && isEditableKind(paletteKind)) {
         insertAt(rungId, target.position, paletteKind,
           target.lane === "parallel" ? target.anchorId : undefined);
@@ -255,7 +290,12 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
   );
 
   return (
-    <section className="flex h-full min-h-0 flex-col bg-white text-slate-800">
+    <section
+      ref={editorRef}
+      tabIndex={-1}
+      onKeyDown={handleEditorKeyDown}
+      className="flex h-full min-h-0 flex-col bg-white text-slate-800 outline-none"
+    >
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-[#f4f6f8] px-4 py-2">
         <div>
           <h2 className="text-xs font-semibold">PracticeRoutine.LAD</h2>
@@ -375,7 +415,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
                   type="button"
                   aria-label={"Seleccionar rung " + rungIndex}
                   aria-pressed={selectedRungId === rung.id}
-                  onClick={() => setSelectedRungId((current) => current === rung.id ? null : rung.id)}
+                  onClick={() => { setSelected(null); setSelectedRungId((current) => current === rung.id ? null : rung.id); }}
                   className={
                     "absolute inset-y-0 left-0 z-20 flex w-[49px] items-center justify-center border-r border-slate-200 font-mono text-xs " +
                     (selectedRungId === rung.id
@@ -571,6 +611,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
             <div className="m-3 rounded border border-sky-200 bg-sky-50 p-3 text-xs">
               <div className="mb-2 flex items-center gap-1 font-semibold text-sky-900">
                 <GripVertical size={14} /> Propiedades · {selectedInstruction.kind}
+                <span className="ml-auto font-normal text-sky-700">Supr: eliminar instrucción</span>
                 <span className="ml-2 text-sky-600">
                   ({selectedLocation.lane === "parallel" ? "Rama OR" : "Línea principal"})
                 </span>
