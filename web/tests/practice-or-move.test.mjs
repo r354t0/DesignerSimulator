@@ -33,7 +33,11 @@ test("create empty OR branch independently; insert multiple serial contacts late
   assert.equal(findInstruction(p, "manual")?.lane, "parallel");
   p = changeInstructionTag(p, "manual", "Auto_Mode");
   assert.equal(p.rungs[0].parallelBranches?.[0].instructions[1].tag, "Auto_Mode");
-  assert.throws(() => createParallelBranch(p, "rung-1", "start"), /ya tiene una rama/);
+  p = createParallelBranch(p, "rung-1", "start");
+  assert.equal(p.rungs[0].parallelBranches?.length, 2);
+  assert.deepEqual(p.rungs[0].parallelBranches?.[1].instructions, []);
+  // Preserve the legacy delete-all overload when branch ID is omitted.
+  p = removeParallelBranch(p, "rung-1", "start", p.rungs[0].parallelBranches[1].id);
   assert.throws(() => addParallelContact(p, "rung-1", "start", ote("wrong")), /solo admiten/);
   p = removeInstruction(p, "manual");
   assert.deepEqual(p.rungs[0].parallelBranches?.[0].instructions.map((i) => i.id), ["stop", "auto"]);
