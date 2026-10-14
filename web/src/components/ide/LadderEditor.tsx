@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Contact, Coil, RungFrame, Wire } from "./LadderSymbols";
+import { Contact, Coil, LadderRails, RungFrame, Wire } from "./LadderSymbols";
 import { PREVIEW_BLOCKS, PREVIEW_BLOCK_WIDTH, LadderFunctionBlock } from "./LadderFunctionBlocks";
 import type { DemoBlockRuntime } from "../../plc/timerCounterDemo";
 import type { PracticeTag } from "../../plc/practiceDocument";
@@ -210,12 +210,7 @@ export function LadderEditor({ online, inputs, values, blocks, onTagChange, onRe
           >
             <rect x="0" y="0" width={diagramWidth} height={diagramHeight} fill="#ffffff" />
             <rect x="1" y="23" width="48" height={diagramHeight - 46} fill="#f4f7fa" />
-            <path
-              d={"M60 25V1005 M" + rightRailX + " 25V1005"}
-              stroke={online ? "#00c83a" : "#bcc5ce"}
-              strokeWidth={online ? 2.625 : 1.6}
-              fill="none"
-            />
+            <LadderRails leftX={60} rightX={rightRailX} top={25} bottom={1005} live={online} />
             {[184, 270, 370, 501, 627, 753, 879].map((separatorY) => (
               <path
                 key={separatorY}
