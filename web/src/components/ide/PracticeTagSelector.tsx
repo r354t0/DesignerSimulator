@@ -166,7 +166,7 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
         <header className="flex items-center justify-between border-b border-slate-200 bg-[#f4f6f8] px-4 py-3">
           <div>
             <h3 className="text-sm font-semibold">Seleccionar variable · {selector.kind}</h3>
-            <p className="mt-1 text-xs text-slate-500">Tags de PracticeRoutine · Tipo BOOL · Actual: {selector.currentTag}</p>
+            <p className="mt-1 text-xs text-slate-500">Tags de PracticeRoutine · Tipo BOOL · Actual: {selector.currentTag || "Sin asignar"}</p>
           </div>
           <button type="button" aria-label="Cerrar selector de tags" onClick={onClose}
             className="rounded p-2 text-slate-500 hover:bg-slate-200"><X size={17}/></button>
