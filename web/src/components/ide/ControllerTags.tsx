@@ -358,12 +358,18 @@ export function ControllerTags({
 
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="min-h-0 flex-1 overflow-auto bg-[#fafafa]" role="region" aria-label="Tabla de Controller Tags" tabIndex={0}>
-          <table className="w-max min-w-full table-fixed border-collapse text-slate-800">
-            <thead><tr>{tab === "monitor" ? monitorHeaders : editHeaders}</tr></thead>
-            <tbody>{tableRows}</tbody>
-            {footer}
-          </table>
-          {rows.length === 0 && <p className="p-5 text-xs text-slate-500">No hay tags que coincidan con el filtro.</p>}
+          <div className="flex min-h-full w-max min-w-full flex-col">
+            <table className="w-max min-w-full table-fixed border-collapse text-slate-800">
+              <thead><tr>{tab === "monitor" ? monitorHeaders : editHeaders}</tr></thead>
+              <tbody>{tableRows}</tbody>
+            </table>
+            {rows.length === 0 && <p className="p-5 text-xs text-slate-500">No hay tags que coincidan con el filtro.</p>}
+            {footer && (
+              <table className="sticky bottom-0 z-20 mt-auto w-max min-w-full table-fixed border-collapse">
+                {footer}
+              </table>
+            )}
+          </div>
         </div>
         {error && <p role="alert" className="shrink-0 border-t border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-700">{error}</p>}
         {notice && !error && <p role="status" className="shrink-0 bg-sky-50 px-3 py-1 text-[11px] text-sky-800">{notice}</p>}
