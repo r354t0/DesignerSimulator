@@ -5,7 +5,52 @@
  */
 export type EditableKind = "XIC" | "XIO" | "OTE";
 
-export interface PracticeTag { name: string; description: string }
+export type TagType = "BOOL" | "DINT" | "REAL" | "TIMER" | "COUNTER";
+export type TagExternalAccess = "Read/Write" | "Read Only" | "None";
+export type TagStyle = "Decimal" | "Binary" | "Hex";
+export type TagMemberValue = number | boolean;
+export type TagValue = boolean | number | Record<string, TagMemberValue>;
+export interface PracticeTag {
+  name: string;
+  description: string;
+  type: TagType;
+  value: TagValue;
+  externalAccess: TagExternalAccess;
+  constant: boolean;
+  style: TagStyle;
+}
+export const TAG_TYPES: TagType[] = ["BOOL", "DINT", "REAL", "TIMER", "COUNTER"];
+export const TAG_EXTERNAL_ACCESS: TagExternalAccess[] = ["Read/Write", "Read Only", "None"];
+export const TAG_STYLES: TagStyle[] = ["Decimal", "Binary", "Hex"];
+
+export function defaultTagValue(type: TagType): TagValue {
+  if (type === "BOOL") return false;
+  if (type === "DINT" || type === "REAL") return 0;
+  if (type === "TIMER") return { PRE: 0, ACC: 0, EN: false, TT: false, DN: false };
+  return { PRE: 0, ACC: 0, CU: false, CD: false, DN: false, OV: false, UN: false };
+}
+
+function buildTag(name: string, description: string, type: TagType): PracticeTag {
+  return { name, description, type, value: defaultTagValue(type), externalAccess: "Read/Write",
+    constant: false, style: "Decimal" };
+}
+
+function validateTagName(project: PracticeProject, name: string, excludeName?: string): string {
+  const normalized = name.trim();
+  if (!/^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(normalized)) {
+    throw new Error("El tag debe iniciar con letra o _ y usar máximo 40 caracteres alfanuméricos o _.");
+  }
+  if (project.tags.some((tag) => tag.name.toLowerCase() === normalized.toLowerCase() &&
+    tag.name !== excludeName)) {
+    throw new Error("Ya existe un tag con ese nombre.");
+  }
+  return normalized;
+}
+
+function tagInUse(project: PracticeProject, name: string): boolean {
+  return project.rungs.some((rung) => allInstructions(rung).some((item) => item.tag === name));
+}
+
 export interface PracticeInstruction { id: string; kind: EditableKind; tag: string }
 export interface ParallelBranch {
   anchorId: string;
@@ -24,11 +69,11 @@ export interface PracticeProject {
 export function initialPracticeProject(): PracticeProject {
   return {
     tags: [
-      { name: "Start_PB", description: "Pulsador de arranque" },
-      { name: "Stop_PB", description: "Pulsador de parada" },
-      { name: "Motor_Run", description: "Motor habilitado" },
-      { name: "Auto_Mode", description: "Modo automático" },
-      { name: "Lamp_Run", description: "Indicador de marcha" },
+      buildTag("Start_PB", "Pulsador de arranque", "BOOL"),
+      buildTag("Stop_PB", "Pulsador de parada", "BOOL"),
+      buildTag("Motor_Run", "Motor habilitado", "BOOL"),
+      buildTag("Auto_Mode", "Modo automático", "BOOL"),
+      buildTag("Lamp_Run", "Indicador de marcha", "BOOL"),
     ],
     rungs: [{ id: "rung-1", instructions: [], parallelBranches: [] }],
   };
@@ -39,9 +84,9 @@ function allInstructions(rung: PracticeRung): PracticeInstruction[] {
 }
 
 function ensureTag(project: PracticeProject, tag: string): void {
-  if (!project.tags.some((item) => item.name === tag)) {
-    throw new Error("Selecciona un tag existente.");
-  }
+  const item = project.tags.find((entry) => entry.name === tag);
+  if (!item) throw new Error("Selecciona un tag existente.");
+  if (item.type !== "BOOL") throw new Error("XIC, XIO y OTE solo admiten tags BOOL.");
 }
 
 function ensureNewInstruction(project: PracticeProject, item: PracticeInstruction): void {
@@ -338,18 +383,94 @@ export function moveToParallel(
 }
 
 export function createTag(
-  project: PracticeProject, name: string, description: string,
+  project: PracticeProject,
+  name: string,
+  description: string,
+  type: TagType = "BOOL",
 ): PracticeProject {
-  const normalized = name.trim();
-  if (!/^[A-Za-z_][A-Za-z0-9_]{0,39}$/.test(normalized)) {
-    throw new Error("El tag debe iniciar con letra o _ y usar máximo 40 caracteres alfanuméricos o _.");
+  const normalized = validateTagName(project, name);
+  if (!TAG_TYPES.includes(type)) throw new Error("Tipo de dato no válido.");
+  return { ...project, tags: [...project.tags, buildTag(normalized, description.trim().slice(0, 120), type)] };
+}
+
+/** Changing the declaration name atomically updates all contact/coil references. */
+export function editTag(
+  project: PracticeProject,
+  previousName: string,
+  patch: Partial<Pick<PracticeTag, "name" | "description" | "type" | "externalAccess" | "constant" | "style">>,
+): PracticeProject {
+  const original = project.tags.find((tag) => tag.name === previousName);
+  if (!original) throw new Error("No se encontró el tag.");
+  const nextName = patch.name === undefined ? previousName : validateTagName(project, patch.name, previousName);
+  const nextType = patch.type ?? original.type;
+  if (!TAG_TYPES.includes(nextType)) throw new Error("Tipo de dato no válido.");
+  if (nextType !== "BOOL" && tagInUse(project, previousName)) {
+    throw new Error("No se puede cambiar el tipo de un tag BOOL utilizado en Ladder.");
   }
-  if (project.tags.some((tag) => tag.name.toLowerCase() === normalized.toLowerCase())) {
-    throw new Error("Ya existe un tag con ese nombre.");
+  if (patch.externalAccess && !TAG_EXTERNAL_ACCESS.includes(patch.externalAccess)) {
+    throw new Error("Acceso externo no válido.");
   }
+  if (patch.style && !TAG_STYLES.includes(patch.style)) throw new Error("Estilo no válido.");
+  const next: PracticeTag = {
+    ...original, ...patch,
+    name: nextName,
+    type: nextType,
+    description: (patch.description ?? original.description).trim().slice(0, 120),
+    value: nextType === original.type ? original.value : defaultTagValue(nextType),
+  };
   return {
     ...project,
-    tags: [...project.tags,
-      { name: normalized, description: description.trim().slice(0, 120) }],
+    tags: project.tags.map((tag) => tag.name === previousName ? next : tag),
+    rungs: nextName === previousName ? project.rungs : project.rungs.map((rung) => ({
+      ...rung,
+      instructions: rung.instructions.map((item) =>
+        item.tag === previousName ? { ...item, tag: nextName } : item),
+      parallelBranches: rung.parallelBranches?.map((branch) => ({
+        ...branch, instructions: branch.instructions.map((item) =>
+          item.tag === previousName ? { ...item, tag: nextName } : item),
+      })),
+    })),
   };
+}
+
+function assertValidTagValue(type: TagType, value: TagMemberValue): void {
+  if (type === "BOOL") {
+    if (typeof value !== "boolean") throw new Error("BOOL solo admite valores booleanos.");
+    return;
+  }
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error("Introduce un valor numérico válido.");
+  }
+  if (type === "DINT" && (!Number.isInteger(value) || value < -2147483648 || value > 2147483647)) {
+    throw new Error("DINT requiere un entero de 32 bits.");
+  }
+}
+
+export function setTagValue(
+  project: PracticeProject,
+  name: string,
+  value: TagMemberValue,
+  member?: string,
+): PracticeProject {
+  const tag = project.tags.find((item) => item.name === name);
+  if (!tag) throw new Error("No se encontró el tag.");
+  if (tag.constant) throw new Error("El tag es constante y no admite modificar su valor.");
+  if (tag.type === "TIMER" || tag.type === "COUNTER") {
+    if (!member || typeof tag.value !== "object" || !Object.hasOwn(tag.value, member)) {
+      throw new Error("Selecciona un miembro válido del tag estructurado.");
+    }
+    const oldValue = tag.value[member];
+    assertValidTagValue(typeof oldValue === "boolean" ? "BOOL" : "DINT", value);
+    const next = { ...tag.value, [member]: value };
+    return { ...project, tags: project.tags.map((item) =>
+      item.name === name ? { ...item, value: next } : item) };
+  }
+  assertValidTagValue(tag.type, value);
+  return { ...project, tags: project.tags.map((item) =>
+    item.name === name ? { ...item, value } : item) };
+}
+
+export function deleteTag(project: PracticeProject, name: string): PracticeProject {
+  if (tagInUse(project, name)) throw new Error("No se puede eliminar un tag utilizado en Ladder.");
+  return { ...project, tags: project.tags.filter((tag) => tag.name !== name) };
 }
