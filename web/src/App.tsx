@@ -1,8 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Actions, DockLocation, Layout, Model, type IJsonModel, type TabNode, type TabSetNode } from "flexlayout-react";
 import { Cpu, Menu, PanelLeftClose, PanelLeftOpen, CircleHelp, BookOpen } from "lucide-react";
 import { ControllerOrganizer, type EditorView } from "./components/ide/ControllerOrganizer";
 import { LadderEditor, ProgramTags } from "./components/ide/LadderEditor";
+import { PracticeEditor } from "./components/ide/PracticeEditor";
+import { initialPracticeProject, type PracticeProject } from "./plc/practiceDocument";
 import { INSTRUCTIONS, ToolbarSymbol, type Instruction } from "./components/ide/LadderSymbols";
 import { evaluateDemo, initialDemoInputs, type DemoInputs, type InputTag } from "./plc/demoModel";
 import { initialDemoBlocks, resetDemoCounters, stepDemoBlocks, type DemoBlockRuntime } from "./plc/timerCounterDemo";
@@ -29,6 +31,7 @@ const layoutConfig: IJsonModel = {
         selected: 0,
         children: [
           { type: "tab", id: "editor-mainroutine", name: "MainRoutine.LAD", component: "ladder" },
+          { type: "tab", id: "editor-practice", name: "PracticeRoutine.LAD", component: "practice" },
           { type: "tab", id: "editor-tags", name: "Program Tags", component: "tags" },
         ],
       },
@@ -64,6 +67,9 @@ export default function App() {
   const [organizerOpen, setOrganizerOpen] = useState(true);
   const [editorView, setEditorView] = useState<EditorView>("ladder");
   const [instruction, setInstruction] = useState<Instruction>("XIC");
+  const [practice, setPractice] = useState<PracticeProject>(initialPracticeProject);
+  const practiceIdCounter = useRef(1);
+  const nextPracticeId = useCallback((prefix: string) => `${prefix}-${++practiceIdCounter.current}`, []);
   const [online, setOnline] = useState(false);
   const [demo, setDemo] = useState<DemoMachineState>(() => ({
     inputs: { ...initialDemoInputs },
@@ -108,23 +114,27 @@ export default function App() {
   const factory = useCallback(
     (node: TabNode) => {
       switch (node.getComponent()) {
+        case "practice":
+          return <PracticeEditor project={practice} selectedTool={instruction} onChange={setPractice} nextId={nextPracticeId} />;
         case "ladder":
           return <LadderEditor online={online} inputs={inputs} values={values} blocks={blocks} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
         case "tags":
-          return <ProgramTags online={online} inputs={inputs} values={values} blocks={blocks} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
+          return <ProgramTags online={online} inputs={inputs} values={values} blocks={blocks} onTagChange={handleTagChange} onResetCounters={handleResetCounters} practiceTags={practice.tags} />;
         case "simulation":
           return <SimulationScene online={online} inputs={inputs} values={values} onTagChange={handleTagChange} />;
         default:
           return <div className="p-4">Panel no disponible</div>;
       }
     },
-    [online, inputs, values, blocks, handleTagChange, handleResetCounters],
+    [online, inputs, values, blocks, practice, instruction, nextPracticeId, handleTagChange, handleResetCounters],
   );
 
   const openEditorView = useCallback((view: EditorView) => {
     const tab = view === "ladder"
       ? { id: "editor-mainroutine", name: "MainRoutine.LAD", component: "ladder" }
-      : { id: "editor-tags", name: "Program Tags", component: "tags" };
+      : view === "practice"
+        ? { id: "editor-practice", name: "PracticeRoutine.LAD", component: "practice" }
+        : { id: "editor-tags", name: "Program Tags", component: "tags" };
 
     // Select an existing document, instead of replacing the content of another tab.
     if (model.getNodeById(tab.id)) {
@@ -144,14 +154,11 @@ export default function App() {
   }, [model]);
 
   const syncTabSelection = useCallback((updatedModel: Model) => {
-    const editor = updatedModel.getNodeById("editor-mainroutine");
-    const tags = updatedModel.getNodeById("editor-tags");
-    // While both documents share a tabset, reflect clicks on the actual tabs in the tree.
-    if (!editor || !tags || editor.getParent() !== tags.getParent()) return;
-    const parent = editor.getParent();
-    if (parent?.getType() !== "tabset") return;
-    const selectedId = (parent as TabSetNode).getSelectedNode()?.getId();
+    const activeTabset = updatedModel.getNodeById("workspace-editor");
+    if (!activeTabset || activeTabset.getType() !== "tabset") return;
+    const selectedId = (activeTabset as TabSetNode).getSelectedNode()?.getId();
     if (selectedId === "editor-mainroutine") setEditorView("ladder");
+    if (selectedId === "editor-practice") setEditorView("practice");
     if (selectedId === "editor-tags") setEditorView("tags");
   }, []);
 
@@ -203,7 +210,7 @@ export default function App() {
             type="button"
             onClick={() => {
               setInstruction(id);
-              openEditorView("ladder");
+              openEditorView(id === "XIC" || id === "XIO" || id === "OTE" ? "practice" : "ladder");
             }}
             aria-pressed={instruction === id}
             title={label}
@@ -232,7 +239,7 @@ export default function App() {
         <span>VirtualPLC</span>
         <span className="text-slate-600">|</span>
         <span>{online ? "Monitoreo DEMO · Sin controlador físico" : "Sin conexión a controlador"}</span>
-        <span className="ml-auto">Etapa 1 · Interfaz</span>
+        <span className="ml-auto">Etapa 1 · Editor interactivo (preliminar)</span>
       </footer>
     </div>
   );
