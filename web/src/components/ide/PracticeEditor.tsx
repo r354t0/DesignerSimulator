@@ -194,6 +194,8 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
                       }
                     }}
                     aria-label={"Rung editable " + rungIndex + ". Arrastra instrucciones aquí."} className="block">
+                    {/* A transparent hit area ensures native desktop drag-over works on empty wire space. */}
+                    <rect x="0" y="0" width={width} height="138" fill="transparent" pointerEvents="all" />
                     <path d={"M63 15V122 M" + (width - 30) + " 15V122"}
                       stroke="#8898a5" strokeWidth="1.5" fill="none" />
                     {wireSegments.map(([from, to], index) => (
