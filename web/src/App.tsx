@@ -5,6 +5,7 @@ import { ControllerOrganizer, type EditorView } from "./components/ide/Controlle
 import { LadderEditor, ProgramTags } from "./components/ide/LadderEditor";
 import { INSTRUCTIONS, ToolbarSymbol, type Instruction } from "./components/ide/LadderSymbols";
 import { evaluateDemo, initialDemoInputs, type DemoInputs, type InputTag } from "./plc/demoModel";
+import { initialDemoBlocks, resetDemoCounters, stepDemoBlocks, type DemoBlockRuntime } from "./plc/timerCounterDemo";
 import { SimulationScene } from "./components/ide/SimulationScene";
 import "flexlayout-react/style/dark.css";
 import "./workspace.css";
@@ -42,39 +43,82 @@ const layoutConfig: IJsonModel = {
   },
 };
 
+interface DemoMachineState {
+  inputs: DemoInputs;
+  motorLatched: boolean;
+  blocks: DemoBlockRuntime;
+}
+
+function scanDemo(previous: DemoMachineState, elapsedMs: number): DemoMachineState {
+  const motorLatched = !previous.inputs.Stop_PB && (previous.inputs.Start_PB || previous.motorLatched);
+  const values = evaluateDemo(previous.inputs, motorLatched);
+  return {
+    ...previous,
+    motorLatched,
+    blocks: stepDemoBlocks(previous.blocks, values, elapsedMs),
+  };
+}
+
 export default function App() {
   const [model] = useState(() => Model.fromJson(layoutConfig));
   const [organizerOpen, setOrganizerOpen] = useState(true);
   const [editorView, setEditorView] = useState<EditorView>("ladder");
   const [instruction, setInstruction] = useState<Instruction>("XIC");
   const [online, setOnline] = useState(false);
-  const [inputs, setInputs] = useState<DemoInputs>(initialDemoInputs);
-  const [motorLatched, setMotorLatched] = useState(false);
+  const [demo, setDemo] = useState<DemoMachineState>(() => ({
+    inputs: { ...initialDemoInputs },
+    motorLatched: false,
+    blocks: initialDemoBlocks(),
+  }));
+  const { inputs, motorLatched, blocks } = demo;
 
-  // Small fixed-rung evaluator for the visual demo, NOT the final PLC scan engine.
+  // Advance the five fixed demo rungs with elapsed milliseconds, independent of
+  // React render frequency. This is NOT a controller-quality real-time scan.
   useEffect(() => {
-    setMotorLatched((previous) => online && !inputs.Stop_PB && (inputs.Start_PB || previous));
-  }, [inputs.Start_PB, inputs.Stop_PB, online]);
+    if (!online) {
+      setDemo((previous) => ({
+        ...previous,
+        motorLatched: false,
+        blocks: initialDemoBlocks(),
+      }));
+      return;
+    }
+    let previousTick = performance.now();
+    const id = window.setInterval(() => {
+      const now = performance.now();
+      const dt = Math.max(0, Math.min(250, now - previousTick));
+      previousTick = now;
+      setDemo((previous) => scanDemo(previous, dt));
+    }, 50);
+    return () => window.clearInterval(id);
+  }, [online]);
 
   const values = useMemo(() => evaluateDemo(inputs, motorLatched), [inputs, motorLatched]);
   const handleTagChange = useCallback((tag: InputTag, value: boolean) => {
-    setInputs((current) => ({ ...current, [tag]: value }));
+    setDemo((previous) => {
+      const next = { ...previous, inputs: { ...previous.inputs, [tag]: value } };
+      return online ? scanDemo(next, 0) : next;
+    });
+  }, [online]);
+
+  const handleResetCounters = useCallback(() => {
+    setDemo((previous) => ({ ...previous, blocks: resetDemoCounters(previous.blocks) }));
   }, []);
 
   const factory = useCallback(
     (node: TabNode) => {
       switch (node.getComponent()) {
         case "ladder":
-          return <LadderEditor online={online} inputs={inputs} values={values} onTagChange={handleTagChange} />;
+          return <LadderEditor online={online} inputs={inputs} values={values} blocks={blocks} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
         case "tags":
-          return <ProgramTags online={online} inputs={inputs} values={values} onTagChange={handleTagChange} />;
+          return <ProgramTags online={online} inputs={inputs} values={values} blocks={blocks} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
         case "simulation":
           return <SimulationScene online={online} inputs={inputs} values={values} onTagChange={handleTagChange} />;
         default:
           return <div className="p-4">Panel no disponible</div>;
       }
     },
-    [online, inputs, values, handleTagChange],
+    [online, inputs, values, blocks, handleTagChange, handleResetCounters],
   );
 
   const openEditorView = useCallback((view: EditorView) => {
