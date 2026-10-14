@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } fro
 import { Actions, DockLocation, Layout, Model, type IJsonModel, type TabNode, type TabSetNode } from "flexlayout-react";
 import { Cpu, Menu, PanelLeftClose, PanelLeftOpen, CircleHelp, BookOpen } from "lucide-react";
 import { ControllerOrganizer, type EditorView } from "./components/ide/ControllerOrganizer";
-import { LadderEditor, ProgramTags } from "./components/ide/LadderEditor";
+import { LadderEditor } from "./components/ide/LadderEditor";
+import { ControllerTags } from "./components/ide/ControllerTags";
 import { PracticeEditor } from "./components/ide/PracticeEditor";
 import { initialPracticeProject, type EditableKind, type PracticeProject } from "./plc/practiceDocument";
 import { isEditableKind, LADDER_DRAG_MIME } from "./plc/ladderDragDrop";
@@ -33,7 +34,7 @@ const layoutConfig: IJsonModel = {
         children: [
           { type: "tab", id: "editor-mainroutine", name: "MainRoutine.LAD", component: "ladder" },
           { type: "tab", id: "editor-practice", name: "PracticeRoutine.LAD", component: "practice" },
-          { type: "tab", id: "editor-tags", name: "Program Tags", component: "tags" },
+          { type: "tab", id: "editor-tags", name: "Controller Tags", component: "tags" },
         ],
       },
       {
@@ -121,7 +122,7 @@ export default function App() {
         case "ladder":
           return <LadderEditor online={online} inputs={inputs} values={values} blocks={blocks} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
         case "tags":
-          return <ProgramTags online={online} inputs={inputs} values={values} blocks={blocks} onTagChange={handleTagChange} onResetCounters={handleResetCounters} practiceTags={practice.tags} />;
+          return <ControllerTags project={practice} onChange={setPractice} online={online} inputs={inputs} values={values} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
         case "simulation":
           return <SimulationScene online={online} inputs={inputs} values={values} onTagChange={handleTagChange} />;
         default:
