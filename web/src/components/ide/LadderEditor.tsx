@@ -97,7 +97,7 @@ export function LadderEditor({ online, inputs, values, onTagChange }: MonitorPro
   const blockX = rightRailX - PREVIEW_BLOCK_WIDTH - 12;
   // Extra vertical room is reserved for the lower OR branch and for labels.
   // Adjacent rungs must not intrude on the parallel contact's text area.
-  const diagramHeight = 1280;
+  const diagramHeight = 1118;
 
   const toggleRung = (index: number) => setSelectedRung((current) => current === index ? null : index);
   const stopCondition = !values.Stop_PB;
@@ -149,12 +149,12 @@ export function LadderEditor({ online, inputs, values, onTagChange }: MonitorPro
             <rect x="0" y="0" width={diagramWidth} height={diagramHeight} fill="#ffffff" />
             <rect x="1" y="23" width="48" height={diagramHeight - 46} fill="#f4f7fa" />
             <path
-              d={"M60 25V1255 M" + rightRailX + " 25V1255"}
+              d={"M60 25V1093 M" + rightRailX + " 25V1093"}
               stroke={online ? "#00c83a" : "#bcc5ce"}
               strokeWidth={online ? 2.625 : 1.6}
               fill="none"
             />
-            {[239, 354, 482, 640, 790, 940, 1090].map((separatorY) => (
+            {[201, 294, 397, 544, 678, 812, 946].map((separatorY) => (
               <path
                 key={separatorY}
                 d={`M49 ${separatorY}H${diagramWidth - 12}`}
@@ -168,39 +168,39 @@ export function LadderEditor({ online, inputs, values, onTagChange }: MonitorPro
               <Contact x={160} y={82} kind="XIO" tag="Stop_PB" comment="Parada simulada" value={values.Stop_PB} online={online} powerIn />
               <Wire x1={182} y1={82} x2={244} y2={82} live={live(stopCondition)} />
               <Wire x1={244} y1={82} x2={296} y2={82} live={live(stopCondition)} />
-              <Wire x1={244} y1={82} x2={244} y2={168} live={live(stopCondition)} />
-              <Wire x1={244} y1={168} x2={296} y2={168} live={live(stopCondition)} />
+              <Wire x1={244} y1={82} x2={244} y2={157} live={live(stopCondition)} />
+              <Wire x1={244} y1={157} x2={296} y2={157} live={live(stopCondition)} />
               <Contact x={318} y={82} kind="XIC" tag="Start_PB" comment="Arranque" value={values.Start_PB} online={online} powerIn={stopCondition} />
-              <Contact x={318} y={168} kind="XIC" tag="Motor_Run" value={values.Motor_Run} online={online} powerIn={stopCondition} />
+              <Contact x={318} y={157} kind="XIC" tag="Motor_Run" comment="Enclavamiento" value={values.Motor_Run} online={online} powerIn={stopCondition} />
               <Wire x1={340} y1={82} x2={412} y2={82} live={live(stopCondition && startCondition)} />
-              <Wire x1={340} y1={168} x2={412} y2={168} live={live(stopCondition && sealCondition)} />
-              <Wire x1={412} y1={168} x2={412} y2={82} live={live(stopCondition && sealCondition)} />
+              <Wire x1={340} y1={157} x2={412} y2={157} live={live(stopCondition && sealCondition)} />
+              <Wire x1={412} y1={157} x2={412} y2={82} live={live(stopCondition && sealCondition)} />
               <Wire x1={412} y1={82} x2={coilX - 24} y2={82} live={live(mainRung)} />
               <Coil x={coilX} y={82} tag="Motor_Run" comment="Marcha del motor" online={online} live={values.Motor_Run} />
               <Wire x1={coilX + 24} y1={82} x2={rightRailX} y2={82} live={live(values.Motor_Run)} />
             </RungFrame>
 
-            <RungFrame index={1} y={298} selected={selectedRung === 1} onSelect={() => toggleRung(1)} width={diagramWidth} live={online}>
-              <Wire x1={100} y1={298} x2={138} y2={298} live={online} />
-              <Contact x={160} y={298} kind="XIO" tag="Stop_PB" comment="Parada libre" value={values.Stop_PB} online={online} powerIn />
-              <Wire x1={182} y1={298} x2={coilX - 24} y2={298} live={live(stopCondition)} />
-              <Coil x={coilX} y={298} tag="Stop_OK" comment="Permisivo" online={online} live={values.Stop_OK} />
-              <Wire x1={coilX + 24} y1={298} x2={rightRailX} y2={298} live={live(values.Stop_OK)} />
+            <RungFrame index={1} y={250} selected={selectedRung === 1} onSelect={() => toggleRung(1)} width={diagramWidth} live={online}>
+              <Wire x1={100} y1={250} x2={138} y2={250} live={online} />
+              <Contact x={160} y={250} kind="XIO" tag="Stop_PB" comment="Parada libre" value={values.Stop_PB} online={online} powerIn />
+              <Wire x1={182} y1={250} x2={coilX - 24} y2={250} live={live(stopCondition)} />
+              <Coil x={coilX} y={250} tag="Stop_OK" comment="Permisivo" online={online} live={values.Stop_OK} />
+              <Wire x1={coilX + 24} y1={250} x2={rightRailX} y2={250} live={live(values.Stop_OK)} />
             </RungFrame>
 
-            <RungFrame index={2} y={410} selected={selectedRung === 2} onSelect={() => toggleRung(2)} width={diagramWidth} live={online}>
-              <Wire x1={100} y1={410} x2={138} y2={410} live={online} />
-              <Contact x={160} y={410} kind="XIC" tag="Motor_Run" comment="Marcha" value={values.Motor_Run} online={online} powerIn />
-              <Wire x1={182} y1={410} x2={296} y2={410} live={live(values.Motor_Run)} />
-              <Contact x={318} y={410} kind="XIC" tag="Auto_Mode" comment="Automático" value={values.Auto_Mode} online={online} powerIn={values.Motor_Run} />
-              <Wire x1={340} y1={410} x2={coilX - 24} y2={410} live={live(lampRung)} />
-              <Coil x={coilX} y={410} tag="Lamp_Run" comment="Indicador de marcha" online={online} live={values.Lamp_Run} />
-              <Wire x1={coilX + 24} y1={410} x2={rightRailX} y2={410} live={live(values.Lamp_Run)} />
+            <RungFrame index={2} y={344} selected={selectedRung === 2} onSelect={() => toggleRung(2)} width={diagramWidth} live={online}>
+              <Wire x1={100} y1={344} x2={138} y2={344} live={online} />
+              <Contact x={160} y={344} kind="XIC" tag="Motor_Run" comment="Marcha" value={values.Motor_Run} online={online} powerIn />
+              <Wire x1={182} y1={344} x2={296} y2={344} live={live(values.Motor_Run)} />
+              <Contact x={318} y={344} kind="XIC" tag="Auto_Mode" comment="Automático" value={values.Auto_Mode} online={online} powerIn={values.Motor_Run} />
+              <Wire x1={340} y1={344} x2={coilX - 24} y2={344} live={live(lampRung)} />
+              <Coil x={coilX} y={344} tag="Lamp_Run" comment="Indicador de marcha" online={online} live={values.Lamp_Run} />
+              <Wire x1={coilX + 24} y1={344} x2={rightRailX} y2={344} live={live(values.Lamp_Run)} />
             </RungFrame>
 
             {PREVIEW_BLOCKS.map((block, index) => {
               const rungNumber = index + 3;
-              const rungY = 565 + index * 150;
+              const rungY = 478 + index * 134;
               const inputValue = values[block.contact];
               return (
                 <RungFrame
