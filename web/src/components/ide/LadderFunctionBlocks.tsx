@@ -1,4 +1,5 @@
 import { Wire } from "./LadderSymbols";
+import type { DemoValues } from "../../plc/demoModel";
 
 /**
  * Studio-inspired VISUAL preview. Values are examples only: no timer clock or
@@ -9,7 +10,7 @@ export type PreviewBlockKind = "TON" | "TOF" | "TONOFF" | "CTU" | "CTD";
 export const PREVIEW_BLOCKS: {
   kind: PreviewBlockKind;
   tag: string;
-  contact: string;
+  contact: keyof DemoValues;
   description: string;
   values: ReadonlyArray<readonly [string, string]>;
   bits: ReadonlyArray<string>;
