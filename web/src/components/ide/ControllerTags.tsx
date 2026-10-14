@@ -60,8 +60,7 @@ function NumberCell({ value, label, onCommit, disabled = false, style = "Decimal
   const commit = () => {
     if (draft === shown) return;
     const raw = draft.trim();
-    const parsed = raw.startsWith("0x") || raw.startsWith("0X") || raw.startsWith("0b") || raw.startsWith("0B")
-      ? Number(raw) : Number(raw);
+    const parsed = Number(raw);
     if (!raw || !Number.isFinite(parsed) || !onCommit(parsed)) setDraft(shown);
   };
   return (
@@ -384,7 +383,7 @@ export function ControllerTags({
           <span className="truncate text-[10px] text-slate-600">
             {rows.length} de {allRows.length} tags · {scope === "practice"
               ? "Valores locales de práctica (sin ejecución PLC)"
-              : "Monitoreo del programa DEMO"}
+              : online ? "DEMO · REM RUN" : "DEMO · OFFLINE"}
           </span>
           {scope === "demo" && tab === "monitor" && <button type="button" onClick={onResetCounters}
             className="flex shrink-0 items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1 text-[10px] hover:bg-slate-50">
