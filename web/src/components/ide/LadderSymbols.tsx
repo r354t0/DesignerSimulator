@@ -244,10 +244,10 @@ export function RungFrame({
   width?: number;
 }) {
   const blockRow = index >= 3;
-  // Match the tighter row pitch without allowing selection rectangles to overlap.
-  const top = blockRow ? 68 : 47;
-  // Rung 0 includes an OR branch at y=157; the blue gutter ends before rung 1.
-  const bottom = blockRow ? 66 : index === 0 ? 118 : 40;
+  // Keep full room for the OR branch while trimming the *bottom* of each rung.
+  // Selection bands stop before the next rung, including in the compact block section.
+  const top = blockRow ? 60 : 47;
+  const bottom = blockRow ? 60 : index === 0 ? 101 : 37;
   return (
     <g
       role="button"
