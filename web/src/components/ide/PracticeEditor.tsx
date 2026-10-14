@@ -3,7 +3,7 @@ import { ArrowLeft, ArrowRight, Copy, FileCode2, GitBranch, GripVertical, Plus, 
 import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
-import { shouldDeleteSelectedInstruction } from "../../plc/ladderShortcuts";
+import { resolveLadderDeleteAction } from "../../plc/ladderShortcuts";
 import {
   findVisualLadderDropTarget,
   getRungGeometry,
@@ -21,6 +21,8 @@ import {
   copyInstructionTag,
   createParallelBranch,
   createRung,
+  getParallelBranchTarget,
+  insertRungBelow,
   createTag,
   findInstruction,
   insertInstruction,
@@ -95,23 +97,36 @@ export function PracticeEditor({
     const isTextEditing = target instanceof Element && Boolean(
       target.closest('input, textarea, select, [contenteditable], [role="textbox"], [role="combobox"]'),
     );
-    if (!shouldDeleteSelectedInstruction({
+    const action = resolveLadderDeleteAction({
       key: event.key,
       hasSelectedInstruction: Boolean(selected && findInstruction(project, selected)),
+      hasSelectedRung: Boolean(selectedRungId && project.rungs.some((rung) => rung.id === selectedRungId)),
       isTextEditing,
       isTagSelectorOpen: Boolean(tagSelector),
       isDragging: Boolean(moving || tagDragSource || draggingKind),
       ctrlKey: event.ctrlKey,
       altKey: event.altKey,
       metaKey: event.metaKey,
-    })) return;
+    });
+    if (!action) return;
 
     event.preventDefault();
     event.stopPropagation();
-    if (selected && update(() => removeInstruction(project, selected))) {
-      setSelected(null);
-      setTagFeedback("");
-      setTagDropTarget(null);
+    if (action === "instruction" && selected) {
+      if (update(() => removeInstruction(project, selected))) {
+        setSelected(null);
+        setTagFeedback("");
+        setTagDropTarget(null);
+      }
+    } else if (action === "rung" && selectedRungId) {
+      // Removing the rung also removes its contacts, coil and all OR branches.
+      if (update(() => removeRung(project, selectedRungId))) {
+        setSelected(null);
+        setSelectedRungId(null);
+        setTagFeedback("");
+        setTagDropTarget(null);
+        setDropPreview(null);
+      }
     }
   };
 
@@ -277,6 +292,29 @@ export function PracticeEditor({
   );
   const selectedLocation = selected ? findInstruction(project, selected) : null;
   const selectedInstruction = selectedLocation?.instruction;
+  const selectedRungForInsert = selectedLocation?.rungId ?? selectedRungId;
+  const parallelTarget = getParallelBranchTarget(project, selected, selectedRungId);
+
+  const insertSelectedRungBelow = () => {
+    const id = nextId("rung");
+    if (update(() => insertRungBelow(project, id, selectedRungForInsert))) {
+      setSelected(null);
+      setSelectedRungId(id);
+      setTagFeedback("");
+      editorRef.current?.focus({ preventScroll: true });
+    }
+  };
+
+  const insertSelectedParallelBranch = () => {
+    if (!parallelTarget) {
+      setError("Selecciona un contacto principal o un rung con un contacto disponible para crear una rama OR.");
+      return;
+    }
+    if (update(() => createParallelBranch(project, parallelTarget.rungId, parallelTarget.anchorId))) {
+      setSelectedRungId(parallelTarget.rungId);
+      editorRef.current?.focus({ preventScroll: true });
+    }
+  };
   const selectedBranch = selectedLocation ? project.rungs
     .find((rung) => rung.id === selectedLocation.rungId)?.parallelBranches
     ?.find((branch) => branch.anchorId === (
@@ -310,12 +348,15 @@ export function PracticeEditor({
         onSelectDemo={onSelectDemoTool}
         onDragStart={onPaletteDragStart}
         onDragEnd={onPaletteDragEnd}
+        onInsertRung={insertSelectedRungBelow}
+        onInsertParallel={insertSelectedParallelBranch}
+        canInsertParallel={Boolean(parallelTarget)}
       />
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-[#f4f6f8] px-4 py-2">
         <div>
           <h2 className="text-xs font-semibold">PracticeRoutine.LAD</h2>
           <p className="mt-1 text-[11px] text-slate-500">
-            Nuevas instrucciones sin tag (??) · Clic en ?? para asignar · Doble clic para explorar · Arrastra un tag existente para copiarlo.
+            Primer ícono: nuevo rung debajo · Segundo: rama OR · Selecciona un rung y pulsa Supr para eliminarlo.
           </p>
         </div>
         <span className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">
@@ -323,9 +364,9 @@ export function PracticeEditor({
         </span>
       </header>
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-[#f8fafc] px-3 py-2 text-xs">
-        <button type="button" onClick={() => update(() => createRung(project, nextId("rung")))}
+        <button type="button" onClick={insertSelectedRungBelow}
           className="flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1.5 font-medium hover:bg-slate-100">
-          <Plus size={14} /> Añadir rung
+          <Plus size={14} /> Insertar rung debajo
         </button>
         <span className="text-slate-500">
           Herramienta: <strong className="text-sky-800">{selectedTool}</strong>
@@ -338,7 +379,7 @@ export function PracticeEditor({
         <div className="min-h-full bg-white" style={{ width: canvasWidth }}>
           {project.rungs.length === 0 && (
             <p className="m-4 rounded border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
-              No hay rungs. Pulsa «Añadir rung» para comenzar.
+              No hay rungs. Usa el primer ícono de la paleta para crear uno.
             </p>
           )}
           {project.rungs.map((rung, rungIndex) => {
@@ -430,7 +471,11 @@ export function PracticeEditor({
                   type="button"
                   aria-label={"Seleccionar rung " + rungIndex}
                   aria-pressed={selectedRungId === rung.id}
-                  onClick={() => { setSelected(null); setSelectedRungId((current) => current === rung.id ? null : rung.id); }}
+                  onClick={() => {
+                    setSelected(null);
+                    setSelectedRungId((current) => current === rung.id ? null : rung.id);
+                    editorRef.current?.focus({ preventScroll: true });
+                  }}
                   className={
                     "absolute inset-y-0 left-0 z-20 flex w-[49px] items-center justify-center border-r border-slate-200 font-mono text-xs " +
                     (selectedRungId === rung.id
