@@ -3,6 +3,7 @@ export interface LadderShortcutContext {
   key: string;
   hasSelectedInstruction: boolean;
   hasSelectedRung?: boolean;
+  hasSelectedBranch?: boolean;
   isTextEditing: boolean;
   isTagSelectorOpen: boolean;
   isDragging: boolean;
@@ -11,10 +12,10 @@ export interface LadderShortcutContext {
   metaKey?: boolean;
 }
 
-export type LadderDeleteAction = "instruction" | "rung" | null;
+export type LadderDeleteAction = "instruction" | "branch" | "rung" | null;
 
 /**
- * A selected instruction wins over a selected rung. No Delete action may
+ * An instruction wins over a parallel branch, which wins over its parent rung. No Delete action may
  * steal keystrokes from text controls, popups, or an active drag.
  */
 export function resolveLadderDeleteAction(context: LadderShortcutContext): LadderDeleteAction {
@@ -23,6 +24,7 @@ export function resolveLadderDeleteAction(context: LadderShortcutContext): Ladde
       context.ctrlKey || context.altKey || context.metaKey) return null;
 
   if (context.hasSelectedInstruction) return "instruction";
+  if (context.hasSelectedBranch) return "branch";
   if (context.hasSelectedRung) return "rung";
   return null;
 }
@@ -33,4 +35,8 @@ export function shouldDeleteSelectedInstruction(context: LadderShortcutContext):
 
 export function shouldDeleteSelectedRung(context: LadderShortcutContext): boolean {
   return resolveLadderDeleteAction(context) === "rung";
+}
+
+export function shouldDeleteSelectedBranch(context: LadderShortcutContext): boolean {
+  return resolveLadderDeleteAction(context) === "branch";
 }
