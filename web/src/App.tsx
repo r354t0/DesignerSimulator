@@ -8,7 +8,6 @@ import { PracticeEditor } from "./components/ide/PracticeEditor";
 import { initialPracticeProject, type EditableKind, type PracticeProject } from "./plc/practiceDocument";
 import { isEditableKind, LADDER_DRAG_MIME } from "./plc/ladderDragDrop";
 import { type Instruction } from "./components/ide/LadderSymbols";
-import { InstructionPalette } from "./components/ide/InstructionPalette";
 import { evaluateDemo, initialDemoInputs, type DemoInputs, type InputTag } from "./plc/demoModel";
 import { initialDemoBlocks, resetDemoCounters, stepDemoBlocks, type DemoBlockRuntime } from "./plc/timerCounterDemo";
 import { SimulationScene } from "./components/ide/SimulationScene";
@@ -115,24 +114,6 @@ export default function App() {
     setDemo((previous) => ({ ...previous, blocks: resetDemoCounters(previous.blocks) }));
   }, []);
 
-  const factory = useCallback(
-    (node: TabNode) => {
-      switch (node.getComponent()) {
-        case "practice":
-          return <PracticeEditor project={practice} selectedTool={instruction} draggingKind={draggingKind} onChange={setPractice} nextId={nextPracticeId} />;
-        case "ladder":
-          return <LadderEditor online={online} inputs={inputs} values={values} blocks={blocks} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
-        case "tags":
-          return <ControllerTags project={practice} onChange={setPractice} online={online} inputs={inputs} values={values} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
-        case "simulation":
-          return <SimulationScene online={online} inputs={inputs} values={values} onTagChange={handleTagChange} />;
-        default:
-          return <div className="p-4">Panel no disponible</div>;
-      }
-    },
-    [online, inputs, values, blocks, practice, instruction, draggingKind, nextPracticeId, handleTagChange, handleResetCounters],
-  );
-
   const openEditorView = useCallback((view: EditorView) => {
     const tab = view === "ladder"
       ? { id: "editor-mainroutine", name: "MainRoutine.LAD", component: "ladder" }
@@ -166,9 +147,41 @@ export default function App() {
     event.dataTransfer.setData(LADDER_DRAG_MIME, kind);
     setInstruction(kind);
     setDraggingKind(kind);
-    // Opening the practice tab makes a drop possible even if another tab was active.
-    openEditorView("practice");
-  }, [openEditorView]);
+    // Palette now lives inside PracticeRoutine; keep the same tab and drag surface mounted.
+  }, []);
+
+  const factory = useCallback(
+    (node: TabNode) => {
+      switch (node.getComponent()) {
+        case "practice":
+          return (
+            <PracticeEditor
+              project={practice}
+              selectedTool={instruction}
+              draggingKind={draggingKind}
+              onChange={setPractice}
+              nextId={nextPracticeId}
+              onSelectPaletteTool={setInstruction}
+              onSelectDemoTool={(kind) => {
+                setInstruction(kind);
+                openEditorView("ladder");
+              }}
+              onPaletteDragStart={onToolbarDragStart}
+              onPaletteDragEnd={() => setDraggingKind(null)}
+            />
+          );
+        case "ladder":
+          return <LadderEditor online={online} inputs={inputs} values={values} blocks={blocks} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
+        case "tags":
+          return <ControllerTags project={practice} onChange={setPractice} online={online} inputs={inputs} values={values} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
+        case "simulation":
+          return <SimulationScene online={online} inputs={inputs} values={values} onTagChange={handleTagChange} />;
+        default:
+          return <div className="p-4">Panel no disponible</div>;
+      }
+    },
+    [online, inputs, values, blocks, practice, instruction, draggingKind, nextPracticeId, handleTagChange, handleResetCounters, openEditorView, onToolbarDragStart],
+  );
 
   const syncTabSelection = useCallback((updatedModel: Model) => {
     const activeTabset = updatedModel.getNodeById("workspace-editor");
@@ -219,24 +232,10 @@ export default function App() {
         </div>
       </header>
 
-      <InstructionPalette
-        selectedInstruction={instruction}
-        onSelectEditable={(kind) => {
-          setInstruction(kind);
-          openEditorView("practice");
-        }}
-        onSelectDemo={(kind) => {
-          setInstruction(kind);
-          openEditorView("ladder");
-        }}
-        onDragStart={onToolbarDragStart}
-        onDragEnd={() => setDraggingKind(null)}
-      />
-
       <div className="flex min-h-0 flex-1">
         {organizerOpen && (
           <aside className="w-56 shrink-0 overflow-hidden border-r border-slate-700/70 bg-[#17212b] xl:w-64">
-            <ControllerOrganizer view={editorView} onSelectView={openEditorView} />
+            <ControllerOrganizer view={editorView} onSelectView={openEditorView} onHide={() => setOrganizerOpen(false)} />
           </aside>
         )}
         <main className="relative min-w-0 flex-1" aria-label="Área de trabajo acoplable">
