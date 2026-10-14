@@ -2,6 +2,7 @@ import { contactCount, findInstruction, type EditableKind, type PracticeProject,
 
 export const LADDER_DRAG_MIME = "application/x-designersimulator-ladder-instruction";
 export const LADDER_MOVE_MIME = "application/x-designersimulator-ladder-move";
+export const LADDER_TAG_MIME = "application/x-designersimulator-ladder-tag";
 export const PRACTICE_MAIN_Y = 87;
 export const PRACTICE_BRANCH_Y = 166;
 export const CONTACT_STEP = 145;
