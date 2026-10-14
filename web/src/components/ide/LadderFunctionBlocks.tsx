@@ -1,4 +1,3 @@
-import { Wire } from "./LadderSymbols";
 import type { DemoValues } from "../../plc/demoModel";
 
 /**
@@ -156,41 +155,3 @@ export function LadderFunctionBlock({
   );
 }
 
-export function PreviewBlockRung({
-  kind, tag, contact, values, bits, x, y, rightRailX, inputValue, online,
-}: {
-  kind: PreviewBlockKind;
-  tag: string;
-  contact: string;
-  values: ReadonlyArray<readonly [string, string]>;
-  bits: ReadonlyArray<string>;
-  x: number;
-  y: number;
-  rightRailX: number;
-  inputValue: boolean;
-  online: boolean;
-}) {
-  // Left lead must stop at the block boundary; no line crosses the block.
-  return (
-    <>
-      <Wire x1={182} y1={y} x2={x} y2={y} live={online && inputValue} />
-      <LadderFunctionBlock
-        kind={kind}
-        tag={tag}
-        x={x}
-        y={y}
-        online={online}
-        energized={inputValue}
-        values={values}
-        bits={bits}
-      />
-      <Wire
-        x1={x + PREVIEW_BLOCK_WIDTH}
-        y1={y}
-        x2={rightRailX}
-        y2={y}
-        live={online && inputValue}
-      />
-    </>
-  );
-}
