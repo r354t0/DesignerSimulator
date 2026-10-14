@@ -399,13 +399,10 @@ export function PracticeEditor({
 
             const drawContact = (item: typeof contacts[number], x: number, centerY: number) => (
               <g key={item.id}>
-                {selected === item.id && (
-                  <rect x={x - 50} y={centerY - 64} width="100" height="82" rx="4"
-                    fill="#eff6ff" stroke="#2563eb" strokeWidth="1.3" />
-                )}
                 <Contact x={x} y={centerY} kind={item.kind as "XIC" | "XIO"}
                   tag={item.tag || "??"} comment={project.tags.find((tag) => tag.name === item.tag)?.description}
-                  labelWidth={96} value={false} online={false} powerIn={false} />
+                  labelWidth={96} selected={selected === item.id}
+                  value={false} online={false} powerIn={false} />
               </g>
             );
             const dragButton = (item: typeof contacts[number], x: number, centerY: number) => (
@@ -611,13 +608,10 @@ export function PracticeEditor({
                         x2={output ? coilX - 24 : width - 30} y2={y} />
                       {output && (
                         <g>
-                          {selected === output.id && (
-                            <rect x={coilX - 52} y={y - 64} width="104" height="83" rx="4"
-                              fill="#eff6ff" stroke="#2563eb" strokeWidth="1.3" />
-                          )}
                           <Coil x={coilX} y={y} tag={output.tag || "??"}
                             comment={project.tags.find((tag) => tag.name === output.tag)?.description}
-                            labelWidth={96} online={false} live={false} />
+                            labelWidth={96} selected={selected === output.id}
+                            online={false} live={false} />
                           <Wire x1={coilX + 24} y1={y} x2={width - 30} y2={y} />
                         </g>
                       )}
