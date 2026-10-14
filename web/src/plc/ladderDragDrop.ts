@@ -7,7 +7,13 @@ export const PRACTICE_MAIN_Y = 87;
 export const PRACTICE_BRANCH_Y = 166;
 export const PRACTICE_BRANCH_GAP = 85;
 export const branchLaneY = (index: number) => PRACTICE_BRANCH_Y + index * PRACTICE_BRANCH_GAP;
-export const CONTACT_STEP = 145;
+// Compact cells allow five serial contacts plus an OTE in a 760 px editor.
+export const CONTACT_STEP = 104;
+export const FIRST_CONTACT_X = 136;
+export const GROUP_HALF_WIDTH = 43;
+export const MIN_RUNG_WIDTH = 480;
+export const COIL_RIGHT_INSET = 89;
+export const LAST_CONTACT_TO_COIL = 117;
 
 export function isEditableKind(value: string): value is EditableKind {
   return value === "XIC" || value === "XIO" || value === "OTE";
@@ -38,18 +44,26 @@ export function getRungGeometry(rung: PracticeRung, viewportWidth = 760): Ladder
     const branches = (rung.parallelBranches ?? []).filter((item) => item.anchorId === contact.id);
     return count + Math.max(1, ...branches.map((branch) => branch.instructions.length));
   }, 0);
-  const width = Math.max(760, viewportWidth, 450 + totalCells * CONTACT_STEP);
+  const lastContactX = totalCells > 0
+    ? FIRST_CONTACT_X + (totalCells - 1) * CONTACT_STEP
+    : FIRST_CONTACT_X;
+  // Reserve room around the coil, growing only when the total contact
+  // count (including the longest OR branch) actually needs more space.
+  const minWidth = totalCells > 0
+    ? lastContactX + LAST_CONTACT_TO_COIL + COIL_RIGHT_INSET
+    : MIN_RUNG_WIDTH;
+  const width = Math.max(MIN_RUNG_WIDTH, viewportWidth, minWidth);
   let consumed = 0;
   const groups = contacts.map((item) => {
     const branches = (rung.parallelBranches ?? []).filter((part) => part.anchorId === item.id);
     const count = Math.max(1, ...branches.map((branch) => branch.instructions.length));
-    const firstX = 175 + consumed;
+    const firstX = FIRST_CONTACT_X + consumed;
     consumed += count * CONTACT_STEP;
     return {
       anchorId: item.id,
       x: firstX + (count - 1) * CONTACT_STEP / 2,
-      left: firstX - 58,
-      right: firstX + (count - 1) * CONTACT_STEP + 58,
+      left: firstX - GROUP_HALF_WIDTH,
+      right: firstX + (count - 1) * CONTACT_STEP + GROUP_HALF_WIDTH,
       branchCenters: (branches[0]?.instructions ?? []).map((_, i) => firstX + i * CONTACT_STEP),
       branchLanes: branches.map((branch, index) => ({
         id: branch.id, y: branchLaneY(index),
@@ -59,9 +73,9 @@ export function getRungGeometry(rung: PracticeRung, viewportWidth = 760): Ladder
   });
   return {
     width,
-    coilX: width - 115,
+    coilX: width - COIL_RIGHT_INSET,
     groups,
-    mainSlots: [107, ...groups.map((group) => group.right + 11)],
+    mainSlots: [98, ...groups.map((group) => group.right + 9)],
   };
 }
 
