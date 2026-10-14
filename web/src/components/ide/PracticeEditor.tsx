@@ -288,7 +288,7 @@ export function PracticeEditor({
   // All rows share one horizontal coordinate system so the right rail remains
   // aligned when the editor is docked/maximized or a long OR branch is added.
   const canvasWidth = Math.max(
-    760,
+    480,
     viewportWidth,
     ...project.rungs.map((rung) => getRungGeometry(rung, viewportWidth).width),
   );
@@ -399,7 +399,7 @@ export function PracticeEditor({
                 )}
                 <Contact x={x} y={centerY} kind={item.kind as "XIC" | "XIO"}
                   tag={item.tag || "??"} comment={project.tags.find((tag) => tag.name === item.tag)?.description}
-                  value={false} online={false} powerIn={false} />
+                  labelWidth={96} value={false} online={false} powerIn={false} />
               </g>
             );
             const dragButton = (item: typeof contacts[number], x: number, centerY: number) => (
@@ -449,7 +449,7 @@ export function PracticeEditor({
                       ? "border-sky-400 bg-sky-100/35"
                       : "hover:border-dashed hover:border-sky-400 hover:bg-sky-100/20")
                 }
-                style={{ left: x - 59, top: centerY - 37, width: 118, height: 21 }}>
+                style={{ left: x - 48, top: centerY - 37, width: 96, height: 21 }}>
                 <span className="sr-only">Copiar referencia de {item.tag}</span>
               </button>
             );
@@ -574,7 +574,7 @@ export function PracticeEditor({
                           )}
                           <Coil x={coilX} y={y} tag={output.tag || "??"}
                             comment={project.tags.find((tag) => tag.name === output.tag)?.description}
-                            online={false} live={false} />
+                            labelWidth={96} online={false} live={false} />
                           <Wire x1={coilX + 24} y1={y} x2={width - 30} y2={y} />
                         </g>
                       )}
