@@ -11,7 +11,7 @@ import {
   LADDER_DRAG_MIME,
   LADDER_MOVE_MIME,
   LADDER_TAG_MIME,
-  PRACTICE_BRANCH_Y,
+  PRACTICE_BRANCH_GAP,
   PRACTICE_MAIN_Y,
   type VisualLadderDropTarget,
 } from "../../plc/ladderDragDrop";
@@ -21,6 +21,7 @@ import {
   copyInstructionTag,
   createParallelBranch,
   getParallelBranchTarget,
+  getPaletteInsertionTarget,
   insertRungBelow,
   createTag,
   findInstruction,
@@ -130,13 +131,14 @@ export function PracticeEditor({
   };
 
   const boolTags = project.tags.filter((tag) => tag.type === "BOOL");
-  const insertAt = (rungId: string, position: number, kind: EditableKind, anchorId?: string) => {
+  const insertAt = (rungId: string, position: number, kind: EditableKind,
+    anchorId?: string, branchId?: string) => {
     // Newly inserted instructions start without any operand, as in Logix Designer.
     // The visible "??" is only a placeholder, never the actual tag value.
     const id = nextId("instruction");
     const instruction = { id, tag: "", kind };
     const done = update(() => anchorId
-      ? addParallelContact(project, rungId, anchorId, instruction, position)
+      ? addParallelContact(project, rungId, anchorId, instruction, position, branchId)
       : insertInstruction(project, rungId, position, instruction));
     if (done) {
       setSelected(id);
@@ -245,6 +247,7 @@ export function PracticeEditor({
     setDropPreview((previous) =>
       previous?.rungId === rungId && previous.lane === target?.lane &&
       previous.position === target?.position && previous.anchorId === target?.anchorId &&
+      previous.branchId === target?.branchId &&
       previous.x === target?.x ? previous : target ? { ...target, rungId } : null);
   };
   const onDropRung = (event: DragEvent<HTMLDivElement>, rungId: string, width: number) => {
@@ -261,7 +264,7 @@ export function PracticeEditor({
     if (target) {
       if (isMove && sourceId && findInstruction(project, sourceId)) {
         const done = update(() => target.lane === "parallel" && target.anchorId
-          ? moveToParallel(project, sourceId, rungId, target.anchorId, target.position)
+          ? moveToParallel(project, sourceId, rungId, target.anchorId, target.position, target.branchId)
           : moveInstruction(project, sourceId, rungId, target.position));
         if (done) {
           setSelected(sourceId);
@@ -269,7 +272,7 @@ export function PracticeEditor({
         }
       } else if (isPalette && isEditableKind(paletteKind)) {
         insertAt(rungId, target.position, paletteKind,
-          target.lane === "parallel" ? target.anchorId : undefined);
+          target.lane === "parallel" ? target.anchorId : undefined, target.branchId);
       }
     }
     setMoving(null);
@@ -314,25 +317,22 @@ export function PracticeEditor({
       editorRef.current?.focus({ preventScroll: true });
     }
   };
+  const handlePaletteClick = (kind: "XIC" | "XIO" | "OTE") => {
+    onSelectPaletteTool(kind);
+    const target = getPaletteInsertionTarget(project, selected, selectedRungId, kind);
+    if (!target) {
+      setError("Selecciona primero un rung o una instrucción para insertar el elemento.");
+      return;
+    }
+    insertAt(target.rungId, target.position, kind, target.anchorId, target.branchId);
+    setSelectedRungId(target.rungId);
+  };
   const selectedBranch = selectedLocation ? project.rungs
     .find((rung) => rung.id === selectedLocation.rungId)?.parallelBranches
-    ?.find((branch) => branch.anchorId === (
-      selectedLocation.lane === "parallel" ? selectedLocation.anchorId : selected)) : undefined;
+    ?.find((branch) => selectedLocation.lane === "parallel"
+      ? branch.id === selectedLocation.branchId
+      : branch.anchorId === selected) : undefined;
 
-  const insertSlot = (x: number, y: number, label: string, action: () => void, key: string) => (
-    <g key={key} role="button" tabIndex={0} style={{ cursor: "pointer" }}
-      aria-label={label}
-      onClick={action}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault(); action();
-        }
-      }}>
-      <circle cx={x} cy={y} r="12" fill="#eff6ff" stroke="#93c5fd" strokeWidth="1.3" />
-      <path d={"M" + (x - 5) + " " + y + "h10 M" + x + " " + (y - 5) + "v10"}
-        stroke="#2563eb" strokeWidth="1.6" />
-    </g>
-  );
 
   return (
     <section
@@ -343,7 +343,7 @@ export function PracticeEditor({
     >
       <InstructionPalette
         selectedInstruction={selectedTool}
-        onSelectEditable={onSelectPaletteTool}
+        onSelectEditable={handlePaletteClick}
         onSelectDemo={onSelectDemoTool}
         onDragStart={onPaletteDragStart}
         onDragEnd={onPaletteDragEnd}
@@ -385,16 +385,14 @@ export function PracticeEditor({
             const contacts = rung.instructions.filter((part) => part.kind !== "OTE");
             const output = rung.instructions.find((part) => part.kind === "OTE");
             const geometry = getRungGeometry(rung, canvasWidth);
-            const { width, coilX, groups, mainSlots } = geometry;
-            const y = PRACTICE_MAIN_Y, branchY = PRACTICE_BRANCH_Y;
-            const showLowerLane = Boolean(rung.parallelBranches?.length || draggingKind || moving);
-            const svgHeight = showLowerLane ? 204 : 122;
-            const unusedAnchor = contacts.find((part) => !rung.parallelBranches
-              ?.some((branch) => branch.anchorId === part.id));
+            const { width, coilX, groups } = geometry;
+            const y = PRACTICE_MAIN_Y;
+            const maxLanes = Math.max(0, ...groups.map((group) => group.branchLanes.length));
+            const showLowerLane = Boolean(maxLanes || draggingKind || moving);
+            const svgHeight = showLowerLane ? 204 + Math.max(0, maxLanes - 1) * PRACTICE_BRANCH_GAP : 122;
             const preferredAnchor = selectedLocation?.rungId === rung.id &&
-              selectedLocation.lane === "main" && selectedInstruction?.kind !== "OTE" &&
-              !rung.parallelBranches?.some((branch) => branch.anchorId === selected)
-              ? selected : unusedAnchor?.id;
+              selectedLocation.lane === "main" && selectedInstruction?.kind !== "OTE"
+              ? selected : contacts[0]?.id;
 
             const drawContact = (item: typeof contacts[number], x: number, centerY: number) => (
               <g key={item.id}>
@@ -515,40 +513,55 @@ export function PracticeEditor({
 
                       {groups.map((group, index) => {
                         const item = contacts[index];
-                        const branch = rung.parallelBranches?.find((b) => b.anchorId === item.id);
+                        const branches = (rung.parallelBranches ?? [])
+                          .filter((branch) => branch.anchorId === item.id);
                         const from = index === 0 ? 64 : groups[index - 1].right;
                         return (
                           <g key={item.id}>
                             <Wire x1={from} y1={y} x2={group.x - 22} y2={y} />
                             <Wire x1={group.x + 22} y1={y} x2={group.right} y2={y} />
                             {drawContact(item, group.x, y)}
-                            {branch && (
+                            {branches.length > 0 && (
                               <g>
-                                <Wire x1={group.left} y1={y} x2={group.left} y2={branchY} />
-                                <Wire x1={group.right} y1={branchY} x2={group.right} y2={y} />
-                                {branch.instructions.length === 0 ? (
-                                  <Wire x1={group.left} y1={branchY} x2={group.right} y2={branchY} />
-                                ) : (
-                                  <>
-                                    {branch.instructions.map((part, branchIndex) => {
-                                      const center = group.branchCenters[branchIndex];
-                                      const previousX = branchIndex === 0
-                                        ? group.left : group.branchCenters[branchIndex - 1] + 22;
-                                      return (
-                                        <g key={part.id}>
-                                          <Wire x1={previousX} y1={branchY} x2={center - 22} y2={branchY} />
-                                          {drawContact(part, center, branchY)}
-                                        </g>
-                                      );
-                                    })}
-                                    <Wire x1={group.branchCenters.at(-1)! + 22} y1={branchY}
-                                      x2={group.right} y2={branchY} />
-                                  </>
-                                )}
-                                {branch.instructions.length === 0 && (
-                                  <text x={group.x} y={branchY + 29} fontSize="10"
-                                    textAnchor="middle" fill="#64748b">Rama OR vacía</text>
-                                )}
+                                <Wire x1={group.left} y1={y} x2={group.left}
+                                  y2={group.branchLanes.at(-1)!.y} />
+                                <Wire x1={group.right} y1={y} x2={group.right}
+                                  y2={group.branchLanes.at(-1)!.y} />
+                                {branches.map((branch, laneIndex) => {
+                                  const lane = group.branchLanes[laneIndex];
+                                  const laneY = lane.y;
+                                  return (
+                                    <g key={branch.id}>
+                                      {branch.instructions.length === 0 ? (
+                                        <Wire x1={group.left} y1={laneY}
+                                          x2={group.right} y2={laneY} />
+                                      ) : (
+                                        <>
+                                          {branch.instructions.map((part, partIndex) => {
+                                            const center = lane.centers[partIndex];
+                                            const previous = partIndex === 0
+                                              ? group.left : lane.centers[partIndex - 1] + 22;
+                                            return (
+                                              <g key={part.id}>
+                                                <Wire x1={previous} y1={laneY}
+                                                  x2={center - 22} y2={laneY} />
+                                                {drawContact(part, center, laneY)}
+                                              </g>
+                                            );
+                                          })}
+                                          <Wire x1={lane.centers.at(-1)! + 22} y1={laneY}
+                                            x2={group.right} y2={laneY} />
+                                        </>
+                                      )}
+                                      {branch.instructions.length === 0 && (
+                                        <text x={group.x} y={laneY + 29} fontSize="10"
+                                          textAnchor="middle" fill="#64748b">
+                                          Rama OR {laneIndex + 1} vacía
+                                        </text>
+                                      )}
+                                    </g>
+                                  );
+                                })}
                               </g>
                             )}
                           </g>
@@ -568,39 +581,6 @@ export function PracticeEditor({
                           <Wire x1={coilX + 24} y1={y} x2={width - 30} y2={y} />
                         </g>
                       )}
-                      {/* Insertion hotspots appear on hover/selection/drag, not permanently. */}
-                      <g className={
-                        selectedRungId === rung.id || draggingKind || moving
-                          ? "opacity-100"
-                          : "opacity-0 transition-opacity group-hover/practice-rung:opacity-100 group-focus-within:opacity-100"
-                      }>
-                      {!output && selectedTool === "OTE" && insertSlot(coilX, y, "Insertar OTE",
-                        () => insertAt(rung.id, contacts.length, "OTE"), "out-" + rung.id)}
-
-                      {(selectedTool === "XIC" || selectedTool === "XIO") && mainSlots.map((x, index) =>
-                        insertSlot(x, y, "Insertar " + selectedTool + " en línea principal",
-                          () => insertAt(rung.id, index, selectedTool), "main-" + index))}
-
-                      {/* Every OR path has a permanent "+" slot, even when OTE is selected. */}
-                      {(rung.parallelBranches ?? []).map((branch) => {
-                          const group = groups.find((item) => item.anchorId === branch.anchorId);
-                          if (!group) return null;
-                          const centers = group.branchCenters;
-                          const slots = centers.length
-                            ? [group.left + 20,
-                              ...centers.slice(0, -1).map((cx, i) => (cx + centers[i + 1]) / 2),
-                              group.right - 20]
-                            : [group.x];
-                          const kind = selectedTool === "XIO" ? "XIO" : "XIC";
-                          return <g key={"slots-" + branch.anchorId}>
-                            {slots.map((x, index) => insertSlot(x, branchY,
-                              "Insertar " + kind + " en rama OR",
-                              () => insertAt(rung.id, index, kind, branch.anchorId),
-                              "branch-" + branch.anchorId + "-" + index))}
-                          </g>;
-                        })}
-                      </g>
-
                       {dropPreview?.rungId === rung.id && (
                         <g pointerEvents="none">
                           <rect x={dropPreview.x - (dropPreview.kind === "OTE" ? 42 : 32)}
@@ -622,14 +602,18 @@ export function PracticeEditor({
                     {/* Native HTML buttons enable dragstart consistently across browsers. */}
                     {groups.flatMap((group, index) => {
                       const contact = contacts[index];
-                      const branch = rung.parallelBranches?.find((b) => b.anchorId === contact.id);
+                      const branches = (rung.parallelBranches ?? [])
+                        .filter((branch) => branch.anchorId === contact.id);
                       return [
                         dragButton(contact, group.x, y),
                         tagDragButton(contact, group.x, y),
-                        ...(branch?.instructions.flatMap((part, branchIndex) => [
-                          dragButton(part, group.branchCenters[branchIndex], branchY),
-                          tagDragButton(part, group.branchCenters[branchIndex], branchY),
-                        ]) ?? []),
+                        ...branches.flatMap((branch, laneIndex) => {
+                          const lane = group.branchLanes[laneIndex];
+                          return branch.instructions.flatMap((part, partIndex) => [
+                            dragButton(part, lane.centers[partIndex], lane.y),
+                            tagDragButton(part, lane.centers[partIndex], lane.y),
+                          ]);
+                        }),
                       ];
                     })}
                     {output && dragButton(output, coilX, y)}
@@ -637,13 +621,14 @@ export function PracticeEditor({
                     {(rung.parallelBranches ?? []).map((branch) => {
                       const group = groups.find((part) => part.anchorId === branch.anchorId);
                       return group ? (
-                        <button key={"remove-" + branch.anchorId} type="button"
+                        <button key={"remove-" + branch.id} type="button"
                           title="Eliminar toda esta rama OR"
                           onClick={() => {
-                            if (update(() => removeParallelBranch(project, rung.id, branch.anchorId))) setSelected(null);
+                            if (update(() => removeParallelBranch(project, rung.id, branch.anchorId, branch.id))) setSelected(null);
                           }}
                           className="absolute z-20 rounded border border-red-200 bg-white px-1 text-[10px] text-red-700 hover:bg-red-50"
-                          style={{ left: group.right + 5, top: branchY + 16 }}>× OR</button>
+                          style={{ left: group.right + 5,
+                            top: group.branchLanes.find((item) => item.id === branch.id)!.y + 16 }}>× OR</button>
                       ) : null;
                     })}
                   </div>
@@ -688,7 +673,7 @@ export function PracticeEditor({
                   </select>
                 </label>
 
-                {selectedLocation.lane === "main" && selectedInstruction.kind !== "OTE" && !selectedBranch && (
+                {selectedLocation.lane === "main" && selectedInstruction.kind !== "OTE" && (
                   <button type="button"
                     className="flex items-center gap-1 rounded border border-sky-300 bg-white px-2 py-1.5 text-sky-800 hover:bg-sky-100"
                     onClick={() => update(() => createParallelBranch(project, selectedLocation.rungId, selectedInstruction.id))}>
@@ -699,7 +684,7 @@ export function PracticeEditor({
                   <button type="button"
                     className="flex items-center gap-1 rounded border border-red-200 bg-white px-2 py-1.5 text-red-700 hover:bg-red-50"
                     onClick={() => {
-                      if (update(() => removeParallelBranch(project, selectedLocation.rungId, selectedBranch.anchorId))) {
+                      if (update(() => removeParallelBranch(project, selectedLocation.rungId, selectedBranch.anchorId, selectedBranch.id))) {
                         if (selectedLocation.lane === "parallel") setSelected(null);
                       }
                     }}>
@@ -727,13 +712,15 @@ export function PracticeEditor({
                     <button type="button" className="rounded border border-slate-300 bg-white px-2 py-1.5"
                       aria-label="Mover contacto OR a la izquierda"
                       onClick={() => update(() => moveToParallel(project, selectedInstruction.id,
-                        selectedLocation.rungId, selectedLocation.anchorId!, selectedLocation.position - 1))}>
+                        selectedLocation.rungId, selectedLocation.anchorId!, selectedLocation.position - 1,
+                        selectedLocation.branchId))}>
                       <ArrowLeft size={14} />
                     </button>
                     <button type="button" className="rounded border border-slate-300 bg-white px-2 py-1.5"
                       aria-label="Mover contacto OR a la derecha"
                       onClick={() => update(() => moveToParallel(project, selectedInstruction.id,
-                        selectedLocation.rungId, selectedLocation.anchorId!, selectedLocation.position + 2))}>
+                        selectedLocation.rungId, selectedLocation.anchorId!, selectedLocation.position + 2,
+                        selectedLocation.branchId))}>
                       <ArrowRight size={14} />
                     </button>
                   </>
