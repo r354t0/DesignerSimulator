@@ -64,12 +64,14 @@ test("second toolbar action resolves selected contact or first unused contact in
 
   p = createParallelBranch(p, "rung-1", "start");
   assert.deepEqual(getParallelBranchTarget(p, null, "rung-1"),
-    { rungId: "rung-1", anchorId: "stop" });
-  assert.equal(getParallelBranchTarget(p, "start", "rung-1"), null);
+    { rungId: "rung-1", anchorId: "start" });
+  assert.deepEqual(getParallelBranchTarget(p, "start", "rung-1"),
+    { rungId: "rung-1", anchorId: "start" });
   p = addParallelContact(p, "rung-1", "start", xic("parallel"));
   assert.equal(getParallelBranchTarget(p, "parallel", "rung-1"), null);
   p = createParallelBranch(p, "rung-1", "stop");
-  assert.equal(getParallelBranchTarget(p, null, "rung-1"), null);
+  assert.deepEqual(getParallelBranchTarget(p, null, "rung-1"),
+    { rungId: "rung-1", anchorId: "start" });
 });
 
 test("Delete prioritizes selected instruction; selected rung deletes full network", () => {
