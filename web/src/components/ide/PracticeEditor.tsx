@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 import { ArrowLeft, ArrowRight, FileCode2, GitBranch, GripVertical, Plus, Tag, Trash2 } from "lucide-react";
-import { Coil, Contact, Wire, type Instruction } from "./LadderSymbols";
+import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import {
   findVisualLadderDropTarget,
   getRungGeometry,
@@ -40,6 +40,7 @@ interface InternalDrag { id: string; kind: EditableKind }
 
 export function PracticeEditor({ project, selectedTool, draggingKind, onChange, nextId }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
+  const [selectedRungId, setSelectedRungId] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [dropPreview, setDropPreview] = useState<(VisualLadderDropTarget & { rungId: string }) | null>(null);
   const [moving, setMoving] = useState<InternalDrag | null>(null);
@@ -143,6 +144,13 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
       setTagDescription("");
     }
   };
+  // All rows share one horizontal coordinate system so the right rail remains
+  // aligned when the editor is docked/maximized or a long OR branch is added.
+  const canvasWidth = Math.max(
+    760,
+    viewportWidth,
+    ...project.rungs.map((rung) => getRungGeometry(rung, viewportWidth).width),
+  );
   const selectedLocation = selected ? findInstruction(project, selected) : null;
   const selectedInstruction = selectedLocation?.instruction;
   const selectedBranch = selectedLocation ? project.rungs
@@ -190,21 +198,21 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
         <span className="ml-auto text-slate-500">{project.rungs.length} rungs · {project.tags.length} tags</span>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto" ref={viewportRef}>
-        <div className="px-3 py-3">
+      <div className="min-h-0 flex-1 overflow-auto bg-white" ref={viewportRef}>
+        <div className="min-h-full bg-white" style={{ width: canvasWidth }}>
           {project.rungs.length === 0 && (
-            <p className="rounded border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
+            <p className="m-4 rounded border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">
               No hay rungs. Pulsa «Añadir rung» para comenzar.
             </p>
           )}
           {project.rungs.map((rung, rungIndex) => {
             const contacts = rung.instructions.filter((part) => part.kind !== "OTE");
             const output = rung.instructions.find((part) => part.kind === "OTE");
-            const geometry = getRungGeometry(rung, viewportWidth - 28);
+            const geometry = getRungGeometry(rung, canvasWidth);
             const { width, coilX, groups, mainSlots } = geometry;
             const y = PRACTICE_MAIN_Y, branchY = PRACTICE_BRANCH_Y;
             const showLowerLane = Boolean(rung.parallelBranches?.length || draggingKind || moving);
-            const svgHeight = showLowerLane ? 226 : 138;
+            const svgHeight = showLowerLane ? 204 : 122;
             const unusedAnchor = contacts.find((part) => !rung.parallelBranches
               ?.some((branch) => branch.anchorId === part.id));
             const preferredAnchor = selectedLocation?.rungId === rung.id &&
@@ -237,24 +245,42 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
             );
 
             return (
-              <article key={rung.id} className="mb-2 overflow-hidden rounded border border-slate-200 bg-white">
-                <div className="flex min-h-8 items-center justify-between gap-2 border-b border-slate-200 bg-[#f6f8fa] px-3 py-1">
-                  <span className="font-mono text-xs font-semibold text-slate-600">Rung {rungIndex}</span>
-                  <div className="flex items-center gap-3">
-                    <button type="button" disabled={!preferredAnchor}
-                      onClick={() => { if (preferredAnchor) update(() => createParallelBranch(project, rung.id, preferredAnchor)); }}
-                      title={preferredAnchor ? "Crear una rama OR vacía bajo un contacto" : "Inserta primero un contacto en la línea principal"}
-                      className="flex items-center gap-1 text-[11px] text-sky-700 hover:text-sky-900 disabled:text-slate-400">
-                      <GitBranch size={13} /> Añadir rama OR
-                    </button>
-                    <button type="button" onClick={() => {
-                      if (update(() => removeRung(project, rung.id))) setSelected(null);
-                    }} className="flex items-center gap-1 text-[11px] text-slate-500 hover:text-red-700">
-                      <Trash2 size={12} /> Eliminar rung
-                    </button>
-                  </div>
+              <article
+                key={rung.id}
+                className="group/practice-rung relative border-b border-slate-100 bg-white"
+                style={{ width: canvasWidth }}
+                aria-label={"Rung " + rungIndex}
+              >
+                <button
+                  type="button"
+                  aria-label={"Seleccionar rung " + rungIndex}
+                  aria-pressed={selectedRungId === rung.id}
+                  onClick={() => setSelectedRungId((current) => current === rung.id ? null : rung.id)}
+                  className={
+                    "absolute inset-y-0 left-0 z-20 flex w-[49px] items-center justify-center border-r border-slate-200 font-mono text-xs " +
+                    (selectedRungId === rung.id
+                      ? "bg-[#087bd1] text-white"
+                      : "bg-[#f4f7fa] text-slate-500 hover:bg-sky-100")
+                  }
+                >
+                  {rungIndex}
+                </button>
+                <div className="absolute left-[77px] top-1 z-30 flex items-center gap-1 opacity-60 transition-opacity group-hover/practice-rung:opacity-100 focus-within:opacity-100">
+                  <button type="button" disabled={!preferredAnchor}
+                    onClick={() => { if (preferredAnchor) update(() => createParallelBranch(project, rung.id, preferredAnchor)); }}
+                    title={preferredAnchor ? "Crear una rama OR vacía bajo un contacto" : "Inserta primero un contacto en la línea principal"}
+                    aria-label={"Añadir rama OR al rung " + rungIndex}
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-sky-700 hover:bg-sky-50 disabled:text-slate-300">
+                    <GitBranch size={12} /> OR
+                  </button>
+                  <button type="button" onClick={() => {
+                    if (update(() => removeRung(project, rung.id))) { setSelected(null); setSelectedRungId(null); }
+                  }} title={"Eliminar rung " + rungIndex} aria-label={"Eliminar rung " + rungIndex}
+                    className="flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] text-slate-500 hover:bg-red-50 hover:text-red-700">
+                    <Trash2 size={12} />
+                  </button>
                 </div>
-                <div className="overflow-x-auto">
+                <div>
                   <div className="relative" style={{ width, height: svgHeight }}
                     onDragOver={(event) => onDragOverRung(event, rung.id, width)}
                     onDrop={(event) => onDropRung(event, rung.id, width)}
@@ -266,8 +292,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
                     <svg width={width} height={svgHeight} viewBox={"0 0 " + width + " " + svgHeight}
                       role="group" aria-label={"Rung editable " + rungIndex} className="block">
                       <rect width={width} height={svgHeight} fill="transparent" pointerEvents="all" />
-                      <path d={"M63 15V" + (svgHeight - 15) + " M" + (width - 30) + " 15V" + (svgHeight - 15)}
-                        stroke="#8898a5" strokeWidth="1.5" fill="none" />
+                      <LadderRails leftX={63} rightX={width - 30} top={0} bottom={svgHeight} />
 
                       {groups.map((group, index) => {
                         const item = contacts[index];
@@ -398,7 +423,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
           })}
 
           {selectedInstruction && selectedLocation && (
-            <div className="mb-3 rounded border border-sky-200 bg-sky-50 p-3 text-xs">
+            <div className="m-3 rounded border border-sky-200 bg-sky-50 p-3 text-xs">
               <div className="mb-2 flex items-center gap-1 font-semibold text-sky-900">
                 <GripVertical size={14} /> Propiedades · {selectedInstruction.kind}
                 <span className="ml-2 text-sky-600">
@@ -490,7 +515,7 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
             </div>
           )}
 
-          <details className="mb-3 rounded border border-slate-200 bg-[#f8fafc] p-3">
+          <details className="m-3 rounded border border-slate-200 bg-[#f8fafc] p-3">
             <summary className="flex cursor-pointer items-center gap-2 text-xs font-semibold">
               <Tag size={14} /> Crear tag BOOL
             </summary>
@@ -514,11 +539,11 @@ export function PracticeEditor({ project, selectedTool, draggingKind, onChange, 
             </form>
           </details>
           {error && (
-            <p role="alert" className="mb-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700">
+            <p role="alert" className="m-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-xs text-red-700">
               {error}
             </p>
           )}
-          <p className="mb-5 flex items-center gap-1 text-xs text-slate-500">
+          <p className="mb-5 flex items-center gap-1 px-4 text-xs text-slate-500">
             <FileCode2 size={14} /> Editor Ladder preliminar: rungs, ramas OR independientes, contactos en serie y una OTE.
             Sin OR anidados ni ejecución de PracticeRoutine todavía.
           </p>
