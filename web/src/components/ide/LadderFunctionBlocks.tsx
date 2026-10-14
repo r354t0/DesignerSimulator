@@ -1,85 +1,43 @@
-import type { DemoValues } from "../../plc/demoModel";
+import {
+  DEMO_BLOCKS,
+  type DemoBit,
+  type DemoBlockKind,
+  type DemoBlockState,
+} from "../../plc/timerCounterDemo";
 
-/**
- * Studio-inspired VISUAL preview. Values are examples only: no timer clock or
- * edge-triggered counter is implemented yet. TONOFF is a custom instruction.
- */
-export type PreviewBlockKind = "TON" | "TOF" | "TONOFF" | "CTU" | "CTD";
-
-export const PREVIEW_BLOCKS: {
-  kind: PreviewBlockKind;
-  tag: string;
-  contact: keyof DemoValues;
-  description: string;
-  values: ReadonlyArray<readonly [string, string]>;
-  bits: ReadonlyArray<string>;
-}[] = [
-  {
-    kind: "TON",
-    tag: "TMR_StartDelay",
-    contact: "Start_PB",
-    description: "Retardo a la conexión",
-    values: [["PRE", "5000"], ["ACC", "2300"]],
-    bits: ["EN", "TT", "DN"],
-  },
-  {
-    kind: "TOF",
-    tag: "TMR_StopDelay",
-    contact: "Motor_Run",
-    description: "Retardo a la desconexión",
-    values: [["PRE", "2500"], ["ACC", "1100"]],
-    bits: ["EN", "TT", "DN"],
-  },
-  {
-    kind: "TONOFF",
-    tag: "TMR_DualDelay",
-    contact: "Auto_Mode",
-    description: "Retardo ON/OFF · bloque personalizado",
-    values: [["ON PRE", "1800"], ["OFF PRE", "2200"], ["ACC", "800"]],
-    bits: ["EN", "TT", "DN"],
-  },
-  {
-    kind: "CTU",
-    tag: "CNT_BoxesUp",
-    contact: "Start_PB",
-    description: "Contador ascendente",
-    values: [["PRE", "10"], ["ACC", "4"]],
-    bits: ["CU", "DN", "OV"],
-  },
-  {
-    kind: "CTD",
-    tag: "CNT_BoxesDown",
-    contact: "Stop_PB",
-    description: "Contador descendente",
-    values: [["PRE", "8"], ["ACC", "2"]],
-    bits: ["CD", "DN", "UN"],
-  },
-];
-
+/** Static rung definitions; live status comes from the demo runtime. */
+export const PREVIEW_BLOCKS = DEMO_BLOCKS;
 export const PREVIEW_BLOCK_WIDTH = 198;
 export const PREVIEW_BLOCK_HEIGHT = 114;
 
 interface Props {
-  kind: PreviewBlockKind;
+  kind: DemoBlockKind;
   tag: string;
   x: number;
   y: number;
   online: boolean;
   energized: boolean;
-  values: ReadonlyArray<readonly [string, string]>;
-  bits: ReadonlyArray<string>;
+  state: DemoBlockState;
+  bits: readonly DemoBit[];
 }
 
 export function LadderFunctionBlock({
-  kind, tag, x, y, online, energized, values, bits,
+  kind, tag, x, y, online, energized, state, bits,
 }: Props) {
   const active = online && energized;
   const top = y - PREVIEW_BLOCK_HEIGHT / 2;
   const green = "#00c83a";
   const graphite = "#64748b";
+  const values: ReadonlyArray<readonly [string, string]> = kind === "TONOFF"
+    ? [["ON PRE", String(state.pre)], ["OFF PRE", String(state.offPre)], ["ACC", String(Math.round(state.acc))]]
+    : [["PRE", String(state.pre)], ["ACC", String(Math.round(state.acc))]];
+  const bitValues: Record<DemoBit, boolean> = {
+    EN: state.en, TT: state.tt, DN: state.dn,
+    CU: state.cu, CD: state.cd, OV: state.ov, UN: state.un,
+  };
 
   return (
-    <g aria-label={kind + " " + tag + " · representación visual"}>
+    <g aria-label={kind + " " + tag + " · valores de simulación"}>
       <rect
         x={x}
         y={top}
@@ -140,16 +98,15 @@ export function LadderFunctionBlock({
             cx={x + 142}
             cy={top + 48 + i * 19}
             r="3.7"
-            fill={active && i === 0 ? green : "#d5dce3"}
+            fill={online && bitValues[bit] ? green : "#d5dce3"}
           />
           <text x={x + 153} y={top + 52 + i * 19} fontSize="10.5" fill="#445566">
             {bit}
           </text>
         </g>
       ))}
-      {/* Status lamps are intentionally illustrative; ACC and DN are not calculated yet. */}
       <text x={x + 9} y={top + 105} fontSize="8.5" fill="#8793a0">
-        Valores de muestra
+        {kind === "CTU" || kind === "CTD" ? "Pulsos · demo" : "Milisegundos · demo"}
       </text>
     </g>
   );
