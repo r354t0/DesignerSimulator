@@ -151,7 +151,7 @@ test("invalid branch anchors, duplicate instruction IDs and unsupported opcodes 
         ...project.rungs[0].parallelBranches[0],
         anchorId: "missing-anchor",
         instructions: [ { id: "start", kind: "XIC", tag: "Stop_PB" },
-          { id: "unsupported", kind: "TON", tag: "Start_PB" } ],
+          { id: "unsupported", kind: "CTU", tag: "Start_PB" } ],
       }],
     }],
   };
