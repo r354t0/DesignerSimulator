@@ -1,4 +1,4 @@
-import type { PracticeProject, PracticeTag, PracticeInstruction } from "./practiceDocument.ts";
+import { isOutputKind, type PracticeProject, type PracticeTag, type PracticeInstruction } from "./practiceDocument.ts";
 
 /**
  * Event-driven Ladder evaluation (Phase 2C): top-to-bottom rung order, left-to-
@@ -22,6 +22,21 @@ export interface SeriesScan {
   /** Power after OR reunion, keyed by main-line anchor contact ID. */
   joinedPower: Record<string, boolean>;
   writes: Record<string, boolean>;
+}
+
+/**
+ * Logix-like ONS prescan: arm each storage BOOL to TRUE so an input already
+ * energized at the instant of RUN does not generate a spurious startup pulse.
+ * OTL/OTU outputs remain retentive across STOP/RUN.
+ */
+export function prescanBitInstructions(project: PracticeProject): PracticeProject {
+  const memory = new Set(project.rungs.flatMap((rung) => [
+    ...rung.instructions, ...(rung.parallelBranches ?? []).flatMap((b) => b.instructions),
+  ]).filter((item) => item.kind === "ONS").map((item) => item.tag));
+  if (!project.tags.some((tag) => memory.has(tag.name) && tag.type === "BOOL" &&
+      tag.value !== true)) return project;
+  return { ...project, tags: project.tags.map((tag): PracticeTag =>
+    memory.has(tag.name) && tag.type === "BOOL" ? { ...tag, value: true } : tag) };
 }
 
 /** Kept as an API alias for existing Stage 2B clients; OR is now supported. */
@@ -51,10 +66,22 @@ export function evaluateSeriesScan(project: PracticeProject): SeriesScan {
     if (value === undefined) {
       throw new Error("Tag BOOL inexistente o incompatible: " + instruction.tag);
     }
-    if (instruction.kind !== "XIC" && instruction.kind !== "XIO") {
+    let condition: boolean;
+    if (instruction.kind === "XIC") condition = value;
+    else if (instruction.kind === "XIO") condition = !value;
+    else if (instruction.kind === "ONS") {
+      // Storage BOOL records the input power before this one-shot.
+      // TRUE for consecutive energized scans, FALSE once the upstream path
+      // goes false. The one-shot passes exactly one scan on a rising edge.
+      condition = powerIn && !value;
+      if (constantTags.has(instruction.tag)) {
+        throw new Error("ONS no admite tag de memoria constante: " + instruction.tag);
+      }
+      tagValues.set(instruction.tag, powerIn);
+      writes[instruction.tag] = powerIn;
+    } else {
       throw new Error("Instrucción todavía no ejecutable: " + instruction.kind);
     }
-    const condition = instruction.kind === "XIC" ? value : !value;
     const powerOut = powerIn && condition;
     instructionFlow[instruction.id] = { powerIn, condition, powerOut, value };
     return powerOut;
@@ -65,7 +92,7 @@ export function evaluateSeriesScan(project: PracticeProject): SeriesScan {
     const branchesByAnchor = new Map<string, NonNullable<typeof rung.parallelBranches>>();
     for (const branch of rung.parallelBranches ?? []) {
       const anchor = rung.instructions.find((item) => item.id === branch.anchorId);
-      if (!anchor || anchor.kind === "OTE") {
+      if (!anchor || isOutputKind(anchor.kind)) {
         throw new Error("La rama OR no tiene contacto principal válido: " + branch.id);
       }
       if (branch.instructions.length === 0) {
@@ -76,7 +103,7 @@ export function evaluateSeriesScan(project: PracticeProject): SeriesScan {
       branchesByAnchor.set(branch.anchorId, group);
     }
 
-    const main = rung.instructions.filter((item) => item.kind !== "OTE");
+    const main = rung.instructions.filter((item) => !isOutputKind(item.kind));
     let mainIndex = 0;
     while (mainIndex < main.length) {
       const anchor = main[mainIndex];
@@ -110,17 +137,22 @@ export function evaluateSeriesScan(project: PracticeProject): SeriesScan {
       mainIndex = end + 1;
     }
 
-    for (const instruction of rung.instructions.filter((item) => item.kind === "OTE")) {
+    for (const instruction of rung.instructions.filter((item) => isOutputKind(item.kind))) {
       if (!tagValues.has(instruction.tag)) {
         throw new Error("Tag BOOL inexistente o incompatible: " + instruction.tag);
       }
       if (constantTags.has(instruction.tag)) {
-        throw new Error("OTE intenta escribir un tag constante: " + instruction.tag);
+        throw new Error(instruction.kind + " no admite tag constante: " + instruction.tag);
       }
-      tagValues.set(instruction.tag, power);
-      writes[instruction.tag] = power;
+      // OTE is non-retentive; OTL/OTU write only when their rung has power.
+      if (instruction.kind === "OTE" || power) {
+        const nextValue = instruction.kind === "OTU" ? false : power;
+        tagValues.set(instruction.tag, nextValue);
+        writes[instruction.tag] = nextValue;
+      }
+      const value = tagValues.get(instruction.tag)!;
       instructionFlow[instruction.id] = {
-        powerIn: power, condition: power, powerOut: power, value: power,
+        powerIn: power, condition: power, powerOut: power, value,
       };
     }
     rungPower[rung.id] = power;
