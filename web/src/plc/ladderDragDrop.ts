@@ -3,15 +3,14 @@ import { MAX_PRACTICE_CONTACTS, isOutputKind, contactCount, findInstruction, typ
 export const LADDER_DRAG_MIME = "application/x-designersimulator-ladder-instruction";
 export const LADDER_MOVE_MIME = "application/x-designersimulator-ladder-move";
 export const LADDER_TAG_MIME = "application/x-designersimulator-ladder-tag";
-// Compact rung layout: keep room above symbols for two-line comments and
-// Studio-style selection. Most reclaimed space is BELOW the instructions.
-export const PRACTICE_MAIN_Y = 81;
-export const PRACTICE_BRANCH_Y = 160;
+// Compact the UPPER rung padding while preserving the lower clearance
+// for the ONS legend. Move main and OR lanes up together so branches align.
+export const PRACTICE_MAIN_Y = 73;
+export const PRACTICE_BRANCH_Y = 152;
 export const PRACTICE_BRANCH_GAP = 85;
-// Preserve the symbol baseline while adding clearance BELOW its glyph/ONS label.
-// The former 98px row clipped the ONS text at y=81+20 and crowded the rung below.
-export const PRACTICE_MAIN_HEIGHT = 112;
-export const PRACTICE_OR_HEIGHT = 190;
+// Keep the same bottom padding relative to each symbol, including ONS text.
+export const PRACTICE_MAIN_HEIGHT = 104;
+export const PRACTICE_OR_HEIGHT = 182;
 export const branchLaneY = (index: number) => PRACTICE_BRANCH_Y + index * PRACTICE_BRANCH_GAP;
 
 /** Height of the visible rung: expand only for actual OR lanes or a drag preview. */
