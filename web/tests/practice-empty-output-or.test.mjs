@@ -86,3 +86,15 @@ test("limits count completed coils together with empty lanes", () => {
   const noCoil = initialPracticeProject();
   assert.throws(() => createEmptyOutputBranch(noCoil, "rung-1"), /bobina OTE/);
 });
+
+
+test("a reserved eighth empty output lane can be filled but a ninth output is rejected", () => {
+  let p = populated();
+  for (let i = 0; i < 7; i++) p = createEmptyOutputBranch(p, "rung-1");
+  assert.throws(() => insertInstruction(p, "rung-1", 0, ote("ninth")), /Máximo 8/);
+  p = fillEmptyOutputBranch(p, "rung-1", "output-or-7", ote("eighth"));
+  assert.equal(p.rungs[0].instructions.filter((item) => item.kind === "OTE").length, 2);
+  assert.equal(p.rungs[0].emptyOutputBranches.length, 6);
+  assert.equal(buildPracticeProject(p).diagnostics.filter((d) => d.code === "OUTPUT_LIMIT").length, 0);
+  assert.throws(() => createEmptyOutputBranch(p, "rung-1"), /Máximo 8/);
+});
