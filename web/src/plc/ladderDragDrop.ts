@@ -32,6 +32,9 @@ export function isEditableKind(value: string): value is EditableKind {
 
 export interface LadderGroupGeometry {
   anchorId: string;
+  endId: string;
+  mainIds: string[];
+  mainCenters: number[];
   x: number;
   left: number;
   right: number;
@@ -46,48 +49,53 @@ export interface LadderGeometry {
 }
 
 /**
- * Expanded OR branches reserve horizontal room for their series instructions,
- * so tags never collide with adjacent main-line contacts.
+ * One visual group can now contain several main-line contacts in series,
+ * bypassed by one or more OR lanes. Other contacts remain single-cell groups.
  */
 export function getRungGeometry(rung: PracticeRung, viewportWidth = 760): LadderGeometry {
   const contacts = rung.instructions.filter((item) => item.kind !== "OTE");
-  const totalCells = contacts.reduce((count, contact) => {
-    const branches = (rung.parallelBranches ?? []).filter((item) => item.anchorId === contact.id);
-    return count + Math.max(1, ...branches.map((branch) => branch.instructions.length));
-  }, 0);
-  const lastContactX = totalCells > 0
-    ? FIRST_CONTACT_X + (totalCells - 1) * CONTACT_STEP
+  const groups: LadderGroupGeometry[] = [];
+  const mainSlots = [98];
+  let consumed = 0;
+  let index = 0;
+  while (index < contacts.length) {
+    const anchor = contacts[index];
+    const branches = (rung.parallelBranches ?? []).filter((item) => item.anchorId === anchor.id);
+    const endId = branches[0]?.endId ?? anchor.id;
+    const endIndex = branches.length ? contacts.findIndex((item) => item.id === endId) : index;
+    const last = Math.max(index, endIndex);
+    const main = contacts.slice(index, last + 1);
+    const count = Math.max(main.length, 1, ...branches.map((branch) => branch.instructions.length));
+    const firstX = FIRST_CONTACT_X + consumed;
+    consumed += count * CONTACT_STEP;
+    const centers = main.length <= 1
+      ? [firstX + (count - 1) * CONTACT_STEP / 2]
+      : main.map((_, i) => firstX + i * ((count - 1) * CONTACT_STEP) / (main.length - 1));
+    const left = firstX - GROUP_HALF_WIDTH;
+    const right = firstX + (count - 1) * CONTACT_STEP + GROUP_HALF_WIDTH;
+    groups.push({
+      anchorId: anchor.id, endId: main.at(-1)?.id ?? anchor.id,
+      mainIds: main.map((item) => item.id), mainCenters: centers,
+      x: centers[0], left, right,
+      branchCenters: (branches[0]?.instructions ?? []).map((_, i) => firstX + i * CONTACT_STEP),
+      branchLanes: branches.map((branch, laneIndex) => ({
+        id: branch.id, y: branchLaneY(laneIndex),
+        centers: branch.instructions.map((_, i) => firstX + i * CONTACT_STEP),
+      })),
+    });
+    for (let i = 0; i < centers.length; i++) {
+      mainSlots.push(i === centers.length - 1 ? right + 9 : (centers[i] + centers[i + 1]) / 2);
+    }
+    index = last + 1;
+  }
+  const lastContactX = consumed > 0
+    ? FIRST_CONTACT_X + consumed - CONTACT_STEP
     : FIRST_CONTACT_X;
-  // Reserve room around the coil, growing only when the total contact
-  // count (including the longest OR branch) actually needs more space.
-  const minWidth = totalCells > 0
+  const minWidth = consumed > 0
     ? lastContactX + LAST_CONTACT_TO_COIL + COIL_RIGHT_INSET
     : MIN_RUNG_WIDTH;
   const width = Math.max(MIN_RUNG_WIDTH, viewportWidth, minWidth);
-  let consumed = 0;
-  const groups = contacts.map((item) => {
-    const branches = (rung.parallelBranches ?? []).filter((part) => part.anchorId === item.id);
-    const count = Math.max(1, ...branches.map((branch) => branch.instructions.length));
-    const firstX = FIRST_CONTACT_X + consumed;
-    consumed += count * CONTACT_STEP;
-    return {
-      anchorId: item.id,
-      x: firstX + (count - 1) * CONTACT_STEP / 2,
-      left: firstX - GROUP_HALF_WIDTH,
-      right: firstX + (count - 1) * CONTACT_STEP + GROUP_HALF_WIDTH,
-      branchCenters: (branches[0]?.instructions ?? []).map((_, i) => firstX + i * CONTACT_STEP),
-      branchLanes: branches.map((branch, index) => ({
-        id: branch.id, y: branchLaneY(index),
-        centers: branch.instructions.map((_, i) => firstX + i * CONTACT_STEP),
-      })),
-    };
-  });
-  return {
-    width,
-    coilX: width - COIL_RIGHT_INSET,
-    groups,
-    mainSlots: [98, ...groups.map((group) => group.right + 9)],
-  };
+  return { width, coilX: width - COIL_RIGHT_INSET, groups, mainSlots };
 }
 
 export interface LadderDropTarget {
