@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
+import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, FileCode2, Hammer, Play, Square, XCircle } from "lucide-react";
 import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
 import { resolveLadderDeleteAction } from "../../plc/ladderShortcuts";
+import { getBitMenuTarget } from "../../plc/practiceBitMenu";
 import { buildPracticeProject, getPracticeBuildSignature, type BuildDiagnostic, type LadderBuildResult } from "../../plc/practiceBuild";
 import { evaluateSeriesScan } from "../../plc/practiceRuntime";
 import {
@@ -32,6 +34,7 @@ import {
   removeInstruction,
   removeParallelBranch,
   removeRung,
+  setTagValue,
   type EditableKind,
   type PracticeProject,
 } from "../../plc/practiceDocument";
@@ -65,6 +68,7 @@ export function PracticeEditor({
   const [tagDragSource, setTagDragSource] = useState<string | null>(null);
   const [tagDropTarget, setTagDropTarget] = useState<string | null>(null);
   const [tagSelector, setTagSelector] = useState<TagSelectorState | null>(null);
+  const [bitMenu, setBitMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLElement | null>(null);
   const [viewportWidth, setViewportWidth] = useState(760);
@@ -88,6 +92,23 @@ export function PracticeEditor({
   useEffect(() => {
     if (!draggingKind && !moving) setDropPreview(null);
   }, [draggingKind, moving]);
+  useEffect(() => {
+    if (!bitMenu) return;
+    const closeMenu = () => setBitMenu(null);
+    const closeWithEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") closeMenu();
+    };
+    window.addEventListener("pointerdown", closeMenu);
+    window.addEventListener("keydown", closeWithEscape);
+    window.addEventListener("resize", closeMenu);
+    window.addEventListener("scroll", closeMenu, true);
+    return () => {
+      window.removeEventListener("pointerdown", closeMenu);
+      window.removeEventListener("keydown", closeWithEscape);
+      window.removeEventListener("resize", closeMenu);
+      window.removeEventListener("scroll", closeMenu, true);
+    };
+  }, [bitMenu]);
 
   const update = (operation: () => PracticeProject): boolean => {
     try {
@@ -209,12 +230,33 @@ export function PracticeEditor({
       editorRef.current?.focus({ preventScroll: true });
     }
   };
+  const openBitContextMenu = (event: ReactMouseEvent<HTMLButtonElement>, instructionId: string) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setTagSelector(null);
+    setSelected(instructionId);
+    setSelectedOrBranch(null);
+    setBitMenu({
+      id: instructionId,
+      x: Math.max(8, Math.min(event.clientX, window.innerWidth - 242)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - 168)),
+    });
+  };
+
+  const currentBitMenuTarget = bitMenu ? getBitMenuTarget(project, bitMenu.id, running) : null;
+  const changeContextBit = (value: boolean) => {
+    if (!currentBitMenuTarget?.editable) return;
+    update(() => setTagValue(project, currentBitMenuTarget.tagName, value));
+    setBitMenu(null);
+  };
+
   const beginMove = (event: DragEvent<HTMLButtonElement>, id: string, kind: EditableKind) => {
     event.dataTransfer.effectAllowed = "move";
     event.dataTransfer.setData(LADDER_MOVE_MIME, id);
     setMoving({ id, kind });
     setSelected(id);
     setSelectedOrBranch(null);
+    setBitMenu(null);
     setDropPreview(null);
   };
 
@@ -477,7 +519,8 @@ export function PracticeEditor({
               <button key={"drag-" + item.id} type="button" draggable
                 aria-label={"Mover instrucción " + item.kind + " " + item.tag}
                 title="Arrastra el símbolo para mover la instrucción; arrastra el tag para copiarlo"
-                onClick={() => { setSelected(item.id); setSelectedOrBranch(null); }}
+                onClick={() => { setSelected(item.id); setSelectedOrBranch(null); setBitMenu(null); }}
+                onContextMenu={(event) => openBitContextMenu(event, item.id)}
                 onDragStart={(event) => beginMove(event, item.id, item.kind)}
                 onDragEnd={() => { setMoving(null); setDropPreview(null); }}
                 onDragOver={(event) => dragOverTagTarget(event, item.id)}
@@ -506,6 +549,7 @@ export function PracticeEditor({
                   if (event.detail <= 1) openTagSelector(event, item.id, "suggestions");
                 }}
                 onDoubleClick={(event) => openTagSelector(event, item.id, "dialog")}
+                onContextMenu={(event) => openBitContextMenu(event, item.id)}
                 onDragStart={(event) => beginTagCopy(event, item.id)}
                 onDragEnd={() => { setTagDragSource(null); setTagDropTarget(null); }}
                 onDragOver={(event) => dragOverTagTarget(event, item.id)}
@@ -772,6 +816,34 @@ export function PracticeEditor({
           </p>
         </div>
       </div>
+
+      {bitMenu && currentBitMenuTarget && createPortal(
+        <div role="menu" aria-label={"Valor BOOL de " + currentBitMenuTarget.tagName}
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={(event) => event.stopPropagation()}
+          style={{ position: "fixed", left: bitMenu.x, top: bitMenu.y, zIndex: 9999 }}
+          className="w-[224px] rounded border border-slate-300 bg-white p-1.5 text-slate-800 shadow-xl">
+          <div className="border-b border-slate-200 px-2 py-1.5 text-xs font-semibold">
+            {currentBitMenuTarget.tagName}
+            <span className="ml-2 font-mono text-sky-700">{Number(currentBitMenuTarget.value)}</span>
+          </div>
+          <button type="button" role="menuitem" disabled={!currentBitMenuTarget.editable}
+            onClick={() => changeContextBit(true)}
+            className="w-full rounded px-2 py-1.5 text-left text-xs hover:bg-sky-50 disabled:cursor-not-allowed disabled:text-slate-400">
+            Establecer bit = 1 (TRUE)
+          </button>
+          <button type="button" role="menuitem" disabled={!currentBitMenuTarget.editable}
+            onClick={() => changeContextBit(false)}
+            className="w-full rounded px-2 py-1.5 text-left text-xs hover:bg-sky-50 disabled:cursor-not-allowed disabled:text-slate-400">
+            Establecer bit = 0 (FALSE)
+          </button>
+          {currentBitMenuTarget.reason && (
+            <p className="border-t border-slate-200 px-2 py-2 text-[11px] text-amber-800">
+              {currentBitMenuTarget.reason}
+            </p>
+          )}
+        </div>, document.body,
+      )}
       {buildOutputOpen && buildRecord && (
         <section aria-label="Resultados de Build" className="flex max-h-[224px] min-h-[110px] shrink-0 flex-col border-t-2 border-[#8294a8] bg-[#f4f7fa] text-slate-800">
           <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-200 px-3 py-1.5 text-xs">
