@@ -911,12 +911,14 @@ export function PracticeEditor({
                                 })}
                                 {outputs.map((output, index) => {
                                   const coilRowY = outputYs[index];
+                                  const assignedTag = project.tags.find((tag) => tag.name === output.tag);
                                   return (
                                     <g key={output.id}>
                                       <Wire x1={coilX - 75} y1={coilRowY}
                                         x2={coilX - 24} y2={coilRowY} live={rungLive} />
                                       <Coil x={coilX} y={coilRowY} kind={output.kind as "OTE" | "OTL" | "OTU"} tag={output.tag || "??"}
-                                        comment={project.tags.find((tag) => tag.name === output.tag)?.description}
+                                        comment={assignedTag?.description}
+                                        storedValue={assignedTag?.type === "BOOL" && assignedTag.value === true}
                                         labelWidth={96} selected={selected === output.id}
                                         online={running} live={rungLive} />
                                       <Wire x1={coilX + 24} y1={coilRowY}
