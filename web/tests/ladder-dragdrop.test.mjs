@@ -39,7 +39,7 @@ test("OTE snaps to the right-hand coil terminal and respects one coil per rung",
 
 test("unrelated rungs and full contact capacity are handled correctly", () => {
   let project = createRung(initialPracticeProject(), "rung-2");
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 32; i++) {
     project = insertInstruction(project, "rung-1", i, {
       id: "contact-" + i, kind: "XIC", tag: "Start_PB",
     });
