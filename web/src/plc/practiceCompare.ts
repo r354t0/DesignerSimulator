@@ -42,9 +42,10 @@ export function numericTagOptions(tags: readonly PracticeTag[]): NumericTagOptio
 export function comparisonTagOptions(
   tags: readonly PracticeTag[], kind: CompareKind,
 ): ComparisonTagOption[] {
-  const numeric = numericTagOptions(tags).map((entry) => {
+  const numeric: ComparisonTagOption[] = numericTagOptions(tags).map((entry) => {
     const root = tags.find((tag) => tag.name === entry.name.split(".")[0]);
-    const type = root?.type === "INT" || root?.type === "REAL" ? root.type : "DINT";
+    const type: ComparisonTagOption["type"] =
+      root?.type === "INT" || root?.type === "REAL" ? root.type : "DINT";
     return { ...entry, type };
   });
   if (kind !== "EQU" && kind !== "NEQ") return numeric;

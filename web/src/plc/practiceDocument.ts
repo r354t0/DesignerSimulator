@@ -900,6 +900,9 @@ export function setTagValue(
       throw new Error("Selecciona un miembro válido del tag estructurado.");
     }
     const oldValue = tag.value[member];
+    if (typeof value === "string") {
+      throw new Error("Los miembros TIMER/COUNTER no admiten texto STRING.");
+    }
     assertValidTagValue(typeof oldValue === "boolean" ? "BOOL" : "DINT", value);
     const next = { ...tag.value, [member]: value };
     return { ...project, tags: project.tags.map((item) =>
