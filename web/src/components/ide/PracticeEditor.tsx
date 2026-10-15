@@ -388,6 +388,7 @@ export function PracticeEditor({
     ? project.rungs.find((rung) => rung.id === selectedOrBranch.rungId)
       ?.parallelBranches?.find((branch) => branch.id === selectedOrBranch.branchId)
     : null;
+  const selectedOutputLocation = selectedLocation?.instruction.kind === "OTE" ? selectedLocation : null;
   const parallelTarget = selectedOrBranch && selectedBranchModel
     ? { rungId: selectedOrBranch.rungId, anchorId: selectedBranchModel.anchorId }
     : getParallelBranchTarget(project, selected, selectedRungId);
@@ -403,6 +404,13 @@ export function PracticeEditor({
   };
 
   const insertSelectedParallelBranch = () => {
+    if (selectedOutputLocation) {
+      // Studio-style output OR: another independently-addressed OTE sharing
+      // this rung's logic, initially ?? so its tag can be assigned normally.
+      insertAt(selectedOutputLocation.rungId, 0, "OTE");
+      setSelectedRungId(selectedOutputLocation.rungId);
+      return;
+    }
     if (!parallelTarget) {
       setError("Selecciona un contacto principal o un rung con un contacto disponible para crear una rama OR.");
       return;
@@ -477,7 +485,7 @@ export function PracticeEditor({
         onDragEnd={onPaletteDragEnd}
         onInsertRung={insertSelectedRungBelow}
         onInsertParallel={insertSelectedParallelBranch}
-        canInsertParallel={Boolean(parallelTarget)}
+        canInsertParallel={Boolean(parallelTarget || selectedOutputLocation)}
       />
 
       <div className="min-h-0 flex-1 overflow-auto bg-white" ref={viewportRef}>
