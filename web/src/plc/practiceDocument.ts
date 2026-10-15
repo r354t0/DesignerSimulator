@@ -220,6 +220,36 @@ export function insertRungBelow(
 }
 
 /**
+ * Move one entire rung before or after another rung. Stable IDs and the
+ * original nested instructions/OR branches travel together without copying.
+ * A self-drop or a drop at the existing boundary is a true no-op.
+ */
+export function moveRung(
+  project: PracticeProject,
+  sourceId: string,
+  targetId: string,
+  placement: "before" | "after",
+): PracticeProject {
+  const sourceIndex = project.rungs.findIndex((rung) => rung.id === sourceId);
+  const targetIndex = project.rungs.findIndex((rung) => rung.id === targetId);
+  if (sourceIndex < 0 || targetIndex < 0) {
+    throw new Error("No se encontró el rung de origen o destino.");
+  }
+  if (placement !== "before" && placement !== "after") {
+    throw new Error("Posición de rung no admitida.");
+  }
+  if (sourceIndex === targetIndex) return project;
+  const desiredIndex = targetIndex + (placement === "after" ? 1 : 0);
+  // Insertion index in the array after removing the original rung.
+  const index = sourceIndex < desiredIndex ? desiredIndex - 1 : desiredIndex;
+  if (index === sourceIndex) return project;
+  const next = [...project.rungs];
+  const [source] = next.splice(sourceIndex, 1);
+  next.splice(index, 0, source);
+  return { ...project, rungs: next };
+}
+
+/**
  * Pick a valid main-line contact for a parallel branch. A selected
  * instruction wins over a gutter-selected rung; when just the rung is
  * selected, choose its first contact that has no branch yet.

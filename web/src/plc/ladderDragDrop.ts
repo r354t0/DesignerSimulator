@@ -3,6 +3,7 @@ import { MAX_PRACTICE_CONTACTS, isOutputKind, contactCount, findInstruction, typ
 export const LADDER_DRAG_MIME = "application/x-designersimulator-ladder-instruction";
 export const LADDER_MOVE_MIME = "application/x-designersimulator-ladder-move";
 export const LADDER_TAG_MIME = "application/x-designersimulator-ladder-tag";
+export const LADDER_RUNG_MIME = "application/x-designersimulator-ladder-rung";
 // Compact the UPPER rung padding while preserving the lower clearance
 // for the ONS legend. Move main and OR lanes up together so branches align.
 export const PRACTICE_MAIN_Y = 73;

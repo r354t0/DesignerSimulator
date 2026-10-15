@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, FileCode2, Hammer, Pause, Play, Square, StepForward, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, FileCode2, GripVertical, Hammer, Pause, Play, Square, StepForward, XCircle } from "lucide-react";
 import { Coil, Contact, TimerBlock, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
@@ -16,6 +16,7 @@ import {
   LADDER_DRAG_MIME,
   LADDER_MOVE_MIME,
   LADDER_TAG_MIME,
+  LADDER_RUNG_MIME,
   type VisualLadderDropTarget,
 } from "../../plc/ladderDragDrop";
 import {
@@ -33,6 +34,7 @@ import {
   findInstruction,
   insertInstruction,
   moveInstruction,
+  moveRung,
   moveInstructionToEmptyOutputBranch,
   moveToParallel,
   removeInstruction,
@@ -78,6 +80,9 @@ export function PracticeEditor({
   const [error, setError] = useState("");
   const [dropPreview, setDropPreview] = useState<(VisualLadderDropTarget & { rungId: string }) | null>(null);
   const [moving, setMoving] = useState<InternalDrag | null>(null);
+  const [draggingRungId, setDraggingRungId] = useState<string | null>(null);
+  const [rungDropTarget, setRungDropTarget] = useState<
+    { rungId: string; placement: "before" | "after" } | null>(null);
   const [tagDragSource, setTagDragSource] = useState<string | null>(null);
   const [tagDropTarget, setTagDropTarget] = useState<string | null>(null);
   const [tagSelector, setTagSelector] = useState<TagSelectorState | null>(null);
@@ -152,7 +157,7 @@ export function PracticeEditor({
           rung.emptyOutputBranches?.includes(selectedOrBranch.branchId)))),
       isTextEditing,
       isTagSelectorOpen: Boolean(tagSelector),
-      isDragging: Boolean(moving || tagDragSource || draggingKind),
+      isDragging: Boolean(moving || tagDragSource || draggingKind || draggingRungId),
       ctrlKey: event.ctrlKey,
       altKey: event.altKey,
       metaKey: event.metaKey,
@@ -284,6 +289,65 @@ export function PracticeEditor({
     setSelectedOrBranch(null);
     setBitMenu(null);
     setDropPreview(null);
+  };
+
+  // Whole-rung dragging starts only from the left-number gutter. A separate
+  // MIME type keeps this path independent from instruction/tag drag-and-drop.
+  const beginRungMove = (event: DragEvent<HTMLButtonElement>, rungId: string) => {
+    event.stopPropagation();
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData(LADDER_RUNG_MIME, rungId);
+    setDraggingRungId(rungId);
+    setRungDropTarget(null);
+    setDropPreview(null);
+    setMoving(null);
+    setTagSelector(null);
+    setEditingPresetId(null);
+    setBitMenu(null);
+    setSelected(null);
+    setSelectedOrBranch(null);
+    setSelectedRungId(rungId);
+  };
+
+  const rungPlacement = (
+    event: DragEvent<HTMLElement>,
+  ): "before" | "after" => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    return event.clientY < bounds.top + bounds.height / 2 ? "before" : "after";
+  };
+
+  const dragOverWholeRung = (event: DragEvent<HTMLElement>, targetId: string) => {
+    if (!event.dataTransfer.types.includes(LADDER_RUNG_MIME) || !draggingRungId) return;
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer.dropEffect = "move";
+    const placement = rungPlacement(event);
+    setRungDropTarget((previous) =>
+      previous?.rungId === targetId && previous.placement === placement
+        ? previous : { rungId: targetId, placement });
+  };
+
+  const dropWholeRung = (event: DragEvent<HTMLElement>, targetId: string) => {
+    if (!event.dataTransfer.types.includes(LADDER_RUNG_MIME)) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const sourceId = event.dataTransfer.getData(LADDER_RUNG_MIME);
+    const placement = rungPlacement(event);
+    if (sourceId && sourceId === draggingRungId &&
+        project.rungs.some((rung) => rung.id === sourceId)) {
+      const next = moveRung(project, sourceId, targetId, placement);
+      if (next !== project) update(() => next);
+      setSelected(null);
+      setSelectedOrBranch(null);
+      setSelectedRungId(sourceId);
+    }
+    setDraggingRungId(null);
+    setRungDropTarget(null);
+  };
+
+  const finishRungMove = () => {
+    setDraggingRungId(null);
+    setRungDropTarget(null);
   };
 
   // Dragging a tag label copies a reference. Dragging the symbol body moves
@@ -686,14 +750,52 @@ export function PracticeEditor({
               <article
                 key={rung.id}
                 data-rung-id={rung.id}
-                className="group/practice-rung relative border-b border-slate-100 bg-white"
+                className={"group/practice-rung relative border-b border-slate-100 bg-white " +
+                  (draggingRungId === rung.id ? "opacity-60" : "")}
                 style={{ width: Math.max(canvasWidth, width) }}
                 aria-label={"Rung " + rungIndex}
+                onDragOver={(event) => dragOverWholeRung(event, rung.id)}
+                onDrop={(event) => dropWholeRung(event, rung.id)}
+                onDragLeave={(event) => {
+                  if (event.dataTransfer.types.includes(LADDER_RUNG_MIME) &&
+                      !event.currentTarget.contains(event.relatedTarget as Node)) {
+                    setRungDropTarget((previous) =>
+                      previous?.rungId === rung.id ? null : previous);
+                  }
+                }}
               >
+                {rungDropTarget?.rungId === rung.id && draggingRungId !== rung.id && (
+                  <div aria-hidden="true" className={
+                    "pointer-events-none absolute inset-x-0 z-40 border-t-[3px] border-sky-500 " +
+                    (rungDropTarget.placement === "before" ? "top-0" : "bottom-0")
+                  }>
+                    <span className="absolute left-[54px] -top-[13px] rounded bg-sky-600 px-1.5 py-0.5 text-[10px] font-semibold text-white shadow">
+                      {rungDropTarget.placement === "before" ? "Antes" : "Después"} del rung {rungIndex}
+                    </span>
+                  </div>
+                )}
                 <button
                   type="button"
-                  aria-label={"Seleccionar rung " + rungIndex}
+                  draggable={project.rungs.length > 1}
+                  aria-label={"Seleccionar o arrastrar rung " + rungIndex}
                   aria-pressed={selectedRungId === rung.id}
+                  title="Clic: seleccionar · Arrastrar número: mover rung completo · Alt+↑/↓: subir/bajar"
+                  onDragStart={(event) => beginRungMove(event, rung.id)}
+                  onDragEnd={finishRungMove}
+                  onKeyDown={(event) => {
+                    if (!event.altKey || (event.key !== "ArrowUp" && event.key !== "ArrowDown")) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const nextIndex = rungIndex + (event.key === "ArrowUp" ? -1 : 1);
+                    const targetRung = project.rungs[nextIndex];
+                    if (!targetRung) return;
+                    if (update(() => moveRung(project, rung.id, targetRung.id,
+                      event.key === "ArrowUp" ? "before" : "after"))) {
+                      setSelected(null);
+                      setSelectedOrBranch(null);
+                      setSelectedRungId(rung.id);
+                    }
+                  }}
                   onClick={() => {
                     setSelected(null);
                     setSelectedOrBranch(null);
@@ -701,12 +803,13 @@ export function PracticeEditor({
                     editorRef.current?.focus({ preventScroll: true });
                   }}
                   className={
-                    "absolute inset-y-0 left-0 z-20 flex w-[49px] items-center justify-center border-r border-slate-200 font-mono text-xs " +
+                    "absolute inset-y-0 left-0 z-20 flex w-[49px] cursor-grab select-none items-center justify-center gap-0.5 border-r border-slate-200 font-mono text-xs active:cursor-grabbing " +
                     (selectedRungId === rung.id
                       ? "bg-[#087bd1] text-white"
                       : "bg-[#f4f7fa] text-slate-500 hover:bg-sky-100")
                   }
                 >
+                  <GripVertical size={12} aria-hidden="true" className="shrink-0 opacity-55" />
                   {rungIndex}
                 </button>
                 <div>
@@ -1076,7 +1179,7 @@ export function PracticeEditor({
             </p>
           )}
           <p className="mb-5 flex items-center gap-1 px-4 text-xs text-slate-500">
-            <FileCode2 size={14} /> Clic en etiqueta: buscar tag; doble clic: tabla de variables; arrastre: copiar tag. Clic en conductor OR + Supr: borrar rama.
+            <FileCode2 size={14} /> Arrastra el número izquierdo para mover un rung completo (o Alt+↑/↓). Clic en etiqueta: buscar tag; doble clic: tabla de variables; arrastre: copiar tag. Clic en conductor OR + Supr: borrar rama.
             RUN ejecuta scans periódicos; PAUSE congela las salidas y SCAN realiza una sola evaluación.
           </p>
         </div>
