@@ -199,7 +199,8 @@ export function Contact({
   // Logix semantics: XIC = bit TRUE; XIO = bit FALSE.
   const condition = kind === "XIC" ? value : !value;
   const flow = powerIn && condition;
-  const activeSymbol = online && condition;
+  // A TRUE contact without upstream power is not an energized path.
+  const activeSymbol = online && flow;
   const halfBarGap = 14 * SYMBOL_SCALE;
   const halfBarHeight = 15 * SYMBOL_SCALE;
   const leadLength = 30 * SYMBOL_SCALE;
