@@ -108,3 +108,15 @@ test("selector groups TIMER members; PRE/ACC are shown read-only and not assigne
   assert.deepEqual(getTagPickerRows(p.tags, "TON", "").filter((item) => item.name === "Timer_01")
     .map((item) => item.selectable), [true]);
 });
+
+
+test("output coils cannot directly address TIMER.DN; XIC/XIO may read the member", () => {
+  const p = configured();
+  assert.throws(() => insertInstruction(p, "rung-1", 2,
+    { id: "wrong-output", kind: "OTE", tag: "Timer_01.DN" }), /BOOL/);
+  const invalid = { ...p, rungs: p.rungs.map((rung) => ({
+    ...rung, instructions: [...rung.instructions,
+      { id: "bad-ote", kind: "OTE", tag: "Timer_01.DN" }],
+  })) };
+  assert.ok(buildPracticeProject(invalid).diagnostics.some((d) => d.code === "INCOMPATIBLE_TAG"));
+});
