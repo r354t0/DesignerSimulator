@@ -1,5 +1,5 @@
 import { isCompareKind, isCounterKind, isOutputKind, isTimerKind, isValidTimerPreset, type PracticeProject, type PracticeTag, type PracticeInstruction } from "./practiceDocument.ts";
-import { compareNumbers, readNumericOperand } from "./practiceCompare.ts";
+import { compareValues, readComparisonOperand } from "./practiceCompare.ts";
 
 /**
  * Event-driven Ladder evaluation (Phase 2C): top-to-bottom rung order, left-to-
@@ -205,9 +205,9 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
       const currentTags = project.tags.map((tag) =>
         timerUpdates.has(tag.name) ? { ...tag, value: timerUpdates.get(tag.name)! } :
         counterUpdates.has(tag.name) ? { ...tag, value: { ...counterUpdates.get(tag.name)! } } : tag);
-      const a = readNumericOperand(currentTags, instruction.compareA);
-      const b = readNumericOperand(currentTags, instruction.compareB);
-      const condition = compareNumbers(instruction.kind, a, b);
+      const a = readComparisonOperand(currentTags, instruction.kind, instruction.compareA);
+      const b = readComparisonOperand(currentTags, instruction.kind, instruction.compareB);
+      const condition = compareValues(instruction.kind, a, b);
       const powerOut = powerIn && condition;
       instructionFlow[instruction.id] = { powerIn, condition, powerOut, value: condition };
       return powerOut;

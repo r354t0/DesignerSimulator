@@ -1,4 +1,4 @@
-import { validateNumericOperand } from "./practiceCompare.ts";
+import { validateComparisonOperand, validateComparisonPair } from "./practiceCompare.ts";
 import { isCompareKind, MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, isOutputKind, isTimerKind, isCounterKind, isValidTimerPreset, isValidCounterPreset, type EditableKind, type PracticeInstruction,
   type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
 
@@ -122,12 +122,19 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
           rung.id, rungIndex, id, branchId);
       }
       for (const [side, operand] of [["A", instruction.compareA], ["B", instruction.compareB]] as const) {
-        const reason = validateNumericOperand(project.tags, operand);
+        const reason = validateComparisonOperand(project.tags, instruction.kind, operand);
         if (reason) {
           push("error", "INVALID_COMPARE_OPERAND",
             at + ": " + instruction.kind + " Source " + side + ": " + reason,
             rung.id, rungIndex, id, branchId);
         }
+      }
+      const incompatible = validateComparisonPair(
+        project.tags, instruction.kind, instruction.compareA, instruction.compareB);
+      if (incompatible) {
+        push("error", "INCOMPATIBLE_COMPARE_TYPES",
+          at + ": " + instruction.kind + ": " + incompatible,
+          rung.id, rungIndex, id, branchId);
       }
       return;
     }

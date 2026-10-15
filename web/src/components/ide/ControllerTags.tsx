@@ -23,11 +23,12 @@ interface Props {
 type Tab = "monitor" | "edit";
 type Scope = "practice" | "demo";
 
-function TextCell({ value, label, onCommit, className = "" }: {
+function TextCell({ value, label, onCommit, className = "", disabled = false }: {
   value: string;
   label: string;
   onCommit: (value: string) => boolean;
   className?: string;
+  disabled?: boolean;
 }) {
   const [draft, setDraft] = useState(value);
   useEffect(() => setDraft(value), [value]);
@@ -40,7 +41,7 @@ function TextCell({ value, label, onCommit, className = "" }: {
     if (event.key === "Escape") { setDraft(value); event.currentTarget.blur(); }
   };
   return (
-    <input type="text" aria-label={label} value={draft} onChange={(event) => setDraft(event.target.value)}
+    <input type="text" aria-label={label} value={draft} disabled={disabled} onChange={(event) => setDraft(event.target.value)}
       onBlur={commit} onKeyDown={keydown} title={draft}
       className={"w-full min-w-0 rounded-sm border border-transparent bg-transparent px-1 py-0.5 text-[11px] text-slate-900 hover:border-slate-300 focus:border-sky-500 focus:bg-white focus:outline-none " + className}
     />
@@ -187,6 +188,13 @@ export function ControllerTags({
     const sourceValue = member && typeof tag.value === "object" ? tag.value[member] : tag.value;
     if (typeof sourceValue === "boolean") return boolValue(tag.name, sourceValue,
       tag.constant || (practiceRunning && scope === "practice" && writtenOutputs.has(tag.name)), member);
+    if (typeof sourceValue === "string") {
+      return <TextCell key={tag.name + (member ?? "") + tag.type}
+        value={sourceValue} label={"Valor de " + tag.name + (member ? "." + member : "")}
+        onCommit={(value) => applyValue(tag.name, value, member)}
+        disabled={tag.constant}
+        className="font-mono text-right"/>;
+    }
     if (typeof sourceValue === "number") {
       return <NumberCell key={tag.name + (member ?? "") + tag.type}
         value={sourceValue} label={"Valor de " + tag.name + (member ? "." + member : "")}

@@ -24,11 +24,11 @@ export const isOutputKind = (kind: EditableKind): kind is OutputKind =>
 export const isContactKind = (kind: EditableKind): kind is ContactKind =>
   (CONTACT_KINDS as readonly string[]).includes(kind);
 
-export type TagType = "BOOL" | "DINT" | "REAL" | "TIMER" | "COUNTER";
+export type TagType = "BOOL" | "INT" | "DINT" | "REAL" | "STRING" | "TIMER" | "COUNTER";
 export type TagExternalAccess = "Read/Write" | "Read Only" | "None";
 export type TagStyle = "Decimal" | "Binary" | "Hex";
-export type TagMemberValue = number | boolean;
-export type TagValue = boolean | number | Record<string, TagMemberValue>;
+export type TagMemberValue = number | boolean | string;
+export type TagValue = boolean | number | string | Record<string, number | boolean>;
 export interface PracticeTag {
   name: string;
   description: string;
@@ -38,13 +38,14 @@ export interface PracticeTag {
   constant: boolean;
   style: TagStyle;
 }
-export const TAG_TYPES: TagType[] = ["BOOL", "DINT", "REAL", "TIMER", "COUNTER"];
+export const TAG_TYPES: TagType[] = ["BOOL", "INT", "DINT", "REAL", "STRING", "TIMER", "COUNTER"];
 export const TAG_EXTERNAL_ACCESS: TagExternalAccess[] = ["Read/Write", "Read Only", "None"];
 export const TAG_STYLES: TagStyle[] = ["Decimal", "Binary", "Hex"];
 
 export function defaultTagValue(type: TagType): TagValue {
   if (type === "BOOL") return false;
-  if (type === "DINT" || type === "REAL") return 0;
+  if (type === "INT" || type === "DINT" || type === "REAL") return 0;
+  if (type === "STRING") return "";
   if (type === "TIMER") return { PRE: 0, ACC: 0, EN: false, TT: false, DN: false };
   return { PRE: 0, ACC: 0, CU: false, CD: false, DN: false, OV: false, UN: false };
 }
@@ -82,13 +83,15 @@ export type TimerPresetSource =
   | { mode: "literal"; value: number }
   | { mode: "tag"; tag: string };
 export type NumericOperand = { mode: "literal"; value: number } | { mode: "tag"; tag: string };
+/** Only equality comparisons accept STRING values, other operators stay numeric. */
+export type ComparisonOperand = { mode: "literal"; value: number | string } | { mode: "tag"; tag: string };
 export interface PracticeInstruction {
   id: string;
   kind: EditableKind;
   tag: string;
   preset?: TimerPresetSource;
-  compareA?: NumericOperand;
-  compareB?: NumericOperand;
+  compareA?: ComparisonOperand;
+  compareB?: ComparisonOperand;
 }
 export const MAX_TIMER_PRESET = 2147483647;
 export function isValidTimerPreset(value: number): boolean {
@@ -857,13 +860,26 @@ export function editTag(
   };
 }
 
+export const INT_MIN = -32768;
+export const INT_MAX = 32767;
+export const MAX_STRING_LENGTH = 82;
+
 function assertValidTagValue(type: TagType, value: TagMemberValue): void {
+  if (type === "STRING") {
+    if (typeof value !== "string" || value.length > MAX_STRING_LENGTH) {
+      throw new Error("STRING requiere texto de hasta " + MAX_STRING_LENGTH + " caracteres.");
+    }
+    return;
+  }
   if (type === "BOOL") {
     if (typeof value !== "boolean") throw new Error("BOOL solo admite valores booleanos.");
     return;
   }
   if (typeof value !== "number" || !Number.isFinite(value)) {
     throw new Error("Introduce un valor numérico válido.");
+  }
+  if (type === "INT" && (!Number.isInteger(value) || value < INT_MIN || value > INT_MAX)) {
+    throw new Error("INT requiere un entero de 16 bits entre " + INT_MIN + " y " + INT_MAX + ".");
   }
   if (type === "DINT" && (!Number.isInteger(value) || value < -2147483648 || value > 2147483647)) {
     throw new Error("DINT requiere un entero de 32 bits.");

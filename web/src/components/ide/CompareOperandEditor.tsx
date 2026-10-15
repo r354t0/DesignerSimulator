@@ -2,9 +2,9 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import {
-  numericTagOptions, numericOperandLabel, parseNumericOperand,
+  comparisonTagOptions, numericOperandLabel, parseComparisonOperand,
 } from "../../plc/practiceCompare";
-import type { NumericOperand, PracticeTag } from "../../plc/practiceDocument";
+import type { ComparisonOperand, PracticeTag, CompareKind } from "../../plc/practiceDocument";
 
 export interface CompareOperandAnchor {
   left: number;
@@ -19,12 +19,12 @@ export interface CompareOperandAnchor {
 export function CompareOperandEditor({
   kind, side, operand, tags, anchor, onSave, onClose,
 }: {
-  kind: string;
+  kind: CompareKind;
   side: "A" | "B";
-  operand?: NumericOperand;
+  operand?: ComparisonOperand;
   tags: readonly PracticeTag[];
   anchor: CompareOperandAnchor;
-  onSave: (source: NumericOperand) => void;
+  onSave: (source: ComparisonOperand) => void;
   onClose: () => void;
 }) {
   const [draft, setDraft] = useState(operand ? numericOperandLabel(operand) : "");
@@ -33,14 +33,14 @@ export function CompareOperandEditor({
   const [dirty, setDirty] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
-  const options = useMemo(() => numericTagOptions(tags), [tags]);
-  const search = /[A-Za-z_]/.test(draft);
+  const options = useMemo(() => comparisonTagOptions(tags, kind), [tags, kind]);
+  const search = !draft.trimStart().startsWith('"') && /[A-Za-z_]/.test(draft);
   const visible = search
     ? options.filter((row) => row.name.toLowerCase().includes(draft.trim().toLowerCase()))
     : options;
 
   const apply = (text: string): boolean => {
-    const parsed = parseNumericOperand(text, tags);
+    const parsed = parseComparisonOperand(text, tags, kind);
     if (!parsed.ok) {
       setError(parsed.message);
       input.current?.focus();
@@ -113,10 +113,13 @@ export function CompareOperandEditor({
           setIndex(null);
           setError("");
         }}
-        placeholder="Número o variable DINT/REAL"
+        placeholder={kind === "EQU" || kind === "NEQ"
+          ? 'Número, tag o texto entre comillas: "LISTO"'
+          : "Número o variable INT/DINT/REAL"}
         className="mt-2 w-full rounded border border-slate-300 px-2 py-1.5 font-mono text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"/>
       <div className="mt-2 flex items-center justify-between text-[11px] text-slate-600">
-        <strong>Variables numéricas disponibles</strong>
+        <strong>{kind === "EQU" || kind === "NEQ"
+          ? "Variables numéricas y STRING" : "Variables numéricas disponibles"}</strong>
         <span>{visible.length}</span>
       </div>
       <div className="mt-1 max-h-[166px] overflow-y-auto rounded border border-slate-200"
@@ -130,7 +133,9 @@ export function CompareOperandEditor({
             onMouseEnter={() => setIndex(i)}
             onClick={() => apply(row.name)}>
             <span className="min-w-0 truncate font-mono">{row.name}</span>
-            <span className="shrink-0 font-mono text-slate-500">{row.value}</span>
+            <span className="max-w-[115px] shrink-0 truncate font-mono text-slate-500">
+              {typeof row.value === "string" ? JSON.stringify(row.value) : row.value}
+            </span>
           </button>
         )) : (
           <p className="p-3 text-xs text-slate-500">
@@ -140,7 +145,8 @@ export function CompareOperandEditor({
       </div>
       {error && <p role="alert" className="mt-2 text-xs text-red-700">{error}</p>}
       <p className="mt-2 text-[11px] leading-4 text-slate-500">
-        DINT, REAL, TIMER.PRE/ACC o COUNTER.PRE/ACC · Enter o clic fuera: guardar · Esc/X: cancelar.
+        INT/DINT/REAL, PRE/ACC{kind === "EQU" || kind === "NEQ"
+          ? ', STRING o texto entre comillas dobles' : ''} · Enter o clic fuera: guardar · Esc/X: cancelar.
       </p>
     </div>, document.body,
   );
