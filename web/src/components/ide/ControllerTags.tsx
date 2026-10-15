@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react";
 import { ChevronDown, ChevronRight, RotateCcw, Search, Trash2 } from "lucide-react";
 import {
-  createTag, deleteTag, editTag, setTagValue,
+  createTag, deleteTag, editTag, setTagValue, isOutputKind,
   TAG_EXTERNAL_ACCESS, TAG_STYLES, TAG_TYPES,
   type PracticeProject, type PracticeTag, type TagExternalAccess, type TagStyle,
   type TagType, type TagMemberValue,
@@ -169,8 +169,11 @@ export function ControllerTags({
   const toggleExpand = (name: string) => setExpanded((previous) =>
     previous.includes(name) ? previous.filter((x) => x !== name) : [...previous, name]);
 
-  const writtenOutputs = new Set(project.rungs.flatMap((rung) =>
-    rung.instructions.filter((item) => item.kind === "OTE").map((item) => item.tag)));
+  const writtenOutputs = new Set(project.rungs.flatMap((rung) => [
+    ...rung.instructions.filter((item) => isOutputKind(item.kind) || item.kind === "ONS"),
+    ...(rung.parallelBranches ?? []).flatMap((branch) =>
+      branch.instructions.filter((item) => item.kind === "ONS")),
+  ].map((item) => item.tag)));
   const boolValue = (name: string, value: boolean, disabled: boolean, member?: string) => (
     <button type="button" aria-label={"Cambiar valor de " + name + (member ? "." + member : "")}
       aria-pressed={value} disabled={disabled}
