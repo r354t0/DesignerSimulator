@@ -1,4 +1,4 @@
-import { isOutputKind, type PracticeProject, type PracticeInstruction } from "./practiceDocument.ts";
+import { isOutputKind, isTimerKind, type PracticeProject, type PracticeInstruction } from "./practiceDocument.ts";
 import type { SeriesScan } from "./practiceRuntime.ts";
 import type { ScanMode } from "./practiceScanCycle.ts";
 
@@ -41,7 +41,10 @@ function getSelectedInstruction(project: PracticeProject, id: string) {
 }
 
 function tagValue(project: PracticeProject, name: string): boolean | undefined {
-  const tag = project.tags.find((item) => item.name === name);
+  const [root, member] = name.split(".");
+  const tag = project.tags.find((item) => item.name === root);
+  if (member) return tag?.type === "TIMER" && typeof tag.value === "object" &&
+    ["EN", "TT", "DN"].includes(member) ? tag.value[member] === true : undefined;
   return tag?.type === "BOOL" && typeof tag.value === "boolean" ? tag.value : undefined;
 }
 
@@ -92,6 +95,19 @@ function instructionReadout(
   const sampledValue = tagValue(frame!.project, instruction.tag);
   const isPending = pendingInputs.includes(instruction.tag) && sourceValue !== sampledValue;
 
+  if (isTimerKind(instruction.kind)) {
+    const tag = project.tags.find((item) => item.name === instruction.tag);
+    const v = tag?.type === "TIMER" && typeof tag.value === "object" ? tag.value : null;
+    result.fields = [
+      { label: "PRE (ms)", value: String(v?.PRE ?? "??") },
+      { label: "ACC (ms)", value: String(v?.ACC ?? "??") },
+      { label: "EN", value: BOOL(v?.EN === true) },
+      { label: "TT", value: BOOL(v?.TT === true) },
+      { label: "DN", value: BOOL(v?.DN === true) },
+    ];
+    result.status = mode === "paused" ? "paused" : flow.powerIn ? "energized" : "blocked";
+    return result;
+  }
   if (isOutputKind(instruction.kind)) {
     result.fields = [
       { label: "Entrada de energía", value: POW(flow.powerIn) },
