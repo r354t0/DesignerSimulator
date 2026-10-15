@@ -4,7 +4,7 @@ import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymb
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
 import { resolveLadderDeleteAction } from "../../plc/ladderShortcuts";
-import { buildPracticeProject, type BuildDiagnostic, type LadderBuildResult } from "../../plc/practiceBuild";
+import { buildPracticeProject, getPracticeBuildSignature, type BuildDiagnostic, type LadderBuildResult } from "../../plc/practiceBuild";
 import {
   findVisualLadderDropTarget,
   getRungGeometry,
@@ -66,7 +66,7 @@ export function PracticeEditor({
   const editorRef = useRef<HTMLElement | null>(null);
   const [viewportWidth, setViewportWidth] = useState(760);
   const [buildRecord, setBuildRecord] = useState<{
-    project: PracticeProject;
+    signature: string;
     result: LadderBuildResult;
     requestedBy: "build" | "run";
   } | null>(null);
@@ -145,7 +145,7 @@ export function PracticeEditor({
     }
   };
 
-  const buildIsStale = Boolean(buildRecord && buildRecord.project !== project);
+  const buildIsStale = Boolean(buildRecord && buildRecord.signature !== getPracticeBuildSignature(project));
   const currentBuild = buildRecord?.result ?? null;
   const buildStatus = !buildRecord ? "Sin verificar" :
     buildIsStale ? "Build pendiente" :
@@ -157,7 +157,7 @@ export function PracticeEditor({
    */
   const verifyPracticeRoutine = (requestedBy: "build" | "run") => {
     const result = buildPracticeProject(project);
-    setBuildRecord({ project, result, requestedBy });
+    setBuildRecord({ signature: getPracticeBuildSignature(project), result, requestedBy });
     setBuildOutputOpen(true);
     setBuildMessage(requestedBy === "run"
       ? result.success
