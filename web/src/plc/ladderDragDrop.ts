@@ -1,4 +1,4 @@
-import { MAX_PRACTICE_CONTACTS, contactCount, findInstruction, type EditableKind, type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
+import { MAX_PRACTICE_CONTACTS, isOutputKind, contactCount, findInstruction, type EditableKind, type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
 
 export const LADDER_DRAG_MIME = "application/x-designersimulator-ladder-instruction";
 export const LADDER_MOVE_MIME = "application/x-designersimulator-ladder-move";
@@ -27,7 +27,7 @@ export const COIL_RIGHT_INSET = 89;
 export const LAST_CONTACT_TO_COIL = 117;
 
 export function isEditableKind(value: string): value is EditableKind {
-  return value === "XIC" || value === "XIO" || value === "OTE";
+  return ["XIC", "XIO", "ONS", "OTE", "OTL", "OTU"].includes(value);
 }
 
 export interface LadderGroupGeometry {
@@ -53,7 +53,7 @@ export interface LadderGeometry {
  * bypassed by one or more OR lanes. Other contacts remain single-cell groups.
  */
 export function getRungGeometry(rung: PracticeRung, viewportWidth = 760): LadderGeometry {
-  const contacts = rung.instructions.filter((item) => item.kind !== "OTE");
+  const contacts = rung.instructions.filter((item) => !isOutputKind(item.kind));
   const groups: LadderGroupGeometry[] = [];
   const mainSlots = [98];
   let consumed = 0;
@@ -130,9 +130,9 @@ export function findLadderDropTarget(
   if (!rung || !Number.isFinite(pointerX) || !Number.isFinite(width)) return null;
   if (pointerX < 63 || pointerX > width - 30) return null;
   const geometry = getRungGeometry(rung, width);
-  const contacts = rung.instructions.filter((item) => item.kind !== "OTE");
+  const contacts = rung.instructions.filter((item) => !isOutputKind(item.kind));
 
-  if (kind === "OTE") {
+  if (isOutputKind(kind)) {
     return { kind, position: contacts.length, x: geometry.coilX };
   }
   if (contactCount(rung) >= MAX_PRACTICE_CONTACTS || pointerX > geometry.coilX - 54) return null;
@@ -158,7 +158,7 @@ export function findVisualLadderDropTarget(
   const geometry = getRungGeometry(rung, width);
   const moving = movingId ? findInstruction(project, movingId) : null;
 
-  if (y >= 126 && kind !== "OTE") {
+  if (y >= 126 && !isOutputKind(kind)) {
     const group = geometry.groups.find((item) => x >= item.left - 12 && x <= item.right + 12);
     if (!group || movingId === group.anchorId) return null;
     if (moving?.lane === "main" && project.rungs.some((r) =>
@@ -185,11 +185,11 @@ export function findVisualLadderDropTarget(
   }
 
   if (y < 13 || y > 125) return null;
-  if (moving?.instruction.kind === "OTE" && moving.rungId === rungId) {
+  if (moving?.isOutputKind(instruction.kind) && moving.rungId === rungId) {
     return { kind, lane: "main", position: rung.instructions.length - 1,
       x: geometry.coilX, y: PRACTICE_MAIN_Y };
   }
-  if (kind !== "OTE" && moving?.rungId === rungId) {
+  if (!isOutputKind(kind) && moving?.rungId === rungId) {
     if (x < 63 || x > geometry.coilX - 54) return null;
     const position = nearestSlot(geometry.mainSlots, x);
     return { kind, lane: "main", position,
