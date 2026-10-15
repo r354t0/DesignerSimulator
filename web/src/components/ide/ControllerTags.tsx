@@ -12,6 +12,7 @@ interface Props {
   project: PracticeProject;
   onChange: (next: PracticeProject) => void;
   practiceRunning: boolean;
+  practicePaused: boolean;
   inputs: DemoInputs;
   values: DemoValues;
   online: boolean;
@@ -90,7 +91,7 @@ const cellWidths = {
 };
 
 export function ControllerTags({
-  project, onChange, practiceRunning, inputs, values, online, onTagChange, onResetCounters,
+  project, onChange, practiceRunning, practicePaused, inputs, values, online, onTagChange, onResetCounters,
 }: Props) {
   const [tab, setTab] = useState<Tab>("monitor");
   const [scope, setScope] = useState<Scope>("practice");
@@ -400,7 +401,7 @@ export function ControllerTags({
           </div>
           <span className="truncate text-[10px] text-slate-600">
             {rows.length} de {allRows.length} tags · {scope === "practice"
-              ? practiceRunning ? "RUN · XIC/XIO/OTE con AND/OR (sin scan periódico)" : "Práctica detenida · valores editables"
+              ? practicePaused ? "PAUSE · salidas y flujo congelados" : practiceRunning ? "RUN · Scan Cycle periódico activo" : "Práctica detenida · valores editables"
               : online ? "DEMO · REM RUN" : "DEMO · OFFLINE"}
           </span>
           {scope === "demo" && tab === "monitor" && <button type="button" onClick={onResetCounters}
