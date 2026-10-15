@@ -33,8 +33,8 @@ export function getPracticeBuildSignature(project: PracticeProject): string {
     rungs: project.rungs.map((rung) => ({
       id: rung.id,
       instructions: rung.instructions.map(({ id, kind, tag }) => ({ id, kind, tag })),
-      branches: (rung.parallelBranches ?? []).map(({ id, anchorId, instructions }) => ({
-        id, anchorId, instructions: instructions.map(({ id: instructionId, kind, tag }) =>
+      branches: (rung.parallelBranches ?? []).map(({ id, anchorId, endId, instructions }) => ({
+        id, anchorId, endId, instructions: instructions.map(({ id: instructionId, kind, tag }) =>
           ({ id: instructionId, kind, tag })),
       })),
     })),
@@ -183,6 +183,8 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
       checkInstruction(instruction, rung, rungIndex, "main");
     }
     const usedBranchIds = new Set<string>();
+    const mainContactIds = instructions.filter((item) => item.kind !== "OTE").map((item) => item.id);
+    const coveredBy: string[] = [];
     for (const branch of branches) {
       if (usedBranchIds.has(branch.id)) {
         push("error", "DUPLICATE_BRANCH",
@@ -195,6 +197,26 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
         push("error", "INVALID_BRANCH_ANCHOR",
           at + ": la rama OR no está asociada a un contacto principal válido.",
           rung.id, rungIndex, undefined, branch.id);
+      }
+      const first = mainContactIds.indexOf(branch.anchorId);
+      const last = mainContactIds.indexOf(branch.endId ?? branch.anchorId);
+      if (first < 0 || last < first) {
+        push("error", "INVALID_OR_JOIN",
+          at + ": la unión de la rama OR no está después del contacto inicial.",
+          rung.id, rungIndex, undefined, branch.id);
+      } else {
+        for (const contactId of mainContactIds.slice(first, last + 1)) {
+          if (coveredBy.includes(contactId) &&
+            !(branches.some((other) => other !== branch &&
+              other.anchorId === branch.anchorId &&
+              (other.endId ?? other.anchorId) === (branch.endId ?? branch.anchorId)))) {
+            push("error", "OVERLAPPING_OR",
+              at + ": existen grupos OR superpuestos; ajusta sus uniones.",
+              rung.id, rungIndex, undefined, branch.id);
+            break;
+          }
+          coveredBy.push(contactId);
+        }
       }
       if (branch.instructions.length === 0) {
         push("error", "EMPTY_OR_BRANCH",
