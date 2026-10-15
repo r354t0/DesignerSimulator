@@ -103,7 +103,7 @@ test("an OTE without contacts is valid with an explicit warning", () => {
   assert.deepEqual(codes(report), ["UNCONDITIONAL_OUTPUT"]);
 });
 
-test("duplicate OTE writers warn and same rung multiple OTEs error", () => {
+test("duplicate OTE writers warn and parallel OTEs in the same rung are valid", () => {
   let project = initialPracticeProject();
   project = insertInstruction(project, "rung-1", 0, xic("c1"));
   project = insertInstruction(project, "rung-1", 1, ote("out1"));
@@ -118,7 +118,7 @@ test("duplicate OTE writers warn and same rung multiple OTEs error", () => {
     rung.id === "rung-2" ? { ...rung, instructions: [
       ...rung.instructions, ote("extra", "Lamp_Run"),
     ] } : rung) };
-  assert.ok(codes(buildPracticeProject(malformed)).includes("MULTIPLE_COILS"));
+  assert.equal(buildPracticeProject(malformed).success, true);
 });
 
 test("constant output and illegally placed OTE fail verification", () => {
