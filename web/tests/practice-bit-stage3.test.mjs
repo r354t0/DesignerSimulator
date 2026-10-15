@@ -47,6 +47,7 @@ test("OTU releases the retained BOOL only while its rung is energized", () => {
   let p = buildStartStop();
   p = evaluateSeriesScan(setTagValue(p, "Start_PB", true)).project;
   assert.equal(val(p, "Motor_Run"), true);
+  p = setTagValue(p, "Start_PB", false);
   p = evaluateSeriesScan(setTagValue(p, "Stop_PB", true)).project;
   assert.equal(val(p, "Motor_Run"), false);
   p = evaluateSeriesScan(setTagValue(p, "Stop_PB", false)).project;
