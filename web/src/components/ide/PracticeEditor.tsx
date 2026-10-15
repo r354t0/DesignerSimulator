@@ -21,6 +21,10 @@ import {
   changeInstructionTag,
   copyInstructionTag,
   createParallelBranch,
+  createEmptyOutputBranch,
+  removeEmptyOutputBranch,
+  fillEmptyOutputBranch,
+  MAX_PARALLEL_OUTPUTS,
   getParallelBranchTarget,
   getPaletteInsertionTarget,
   insertRungBelow,
@@ -128,7 +132,8 @@ export function PracticeEditor({
       hasSelectedRung: Boolean(selectedRungId && project.rungs.some((rung) => rung.id === selectedRungId)),
       hasSelectedBranch: Boolean(selectedOrBranch && project.rungs.some((rung) =>
         rung.id === selectedOrBranch.rungId &&
-        rung.parallelBranches?.some((branch) => branch.id === selectedOrBranch.branchId))),
+        (rung.parallelBranches?.some((branch) => branch.id === selectedOrBranch.branchId) ||
+          rung.emptyOutputBranches?.includes(selectedOrBranch.branchId)))),
       isTextEditing,
       isTagSelectorOpen: Boolean(tagSelector),
       isDragging: Boolean(moving || tagDragSource || draggingKind),
@@ -148,8 +153,11 @@ export function PracticeEditor({
     } else if (action === "branch" && selectedOrBranch) {
       const rung = project.rungs.find((item) => item.id === selectedOrBranch.rungId);
       const branch = rung?.parallelBranches?.find((item) => item.id === selectedOrBranch.branchId);
-      if (branch && update(() =>
-        removeParallelBranch(project, selectedOrBranch.rungId, branch.anchorId, branch.id))) {
+      const outputLane = rung?.emptyOutputBranches?.includes(selectedOrBranch.branchId);
+      if ((branch || outputLane) && update(() =>
+        branch
+          ? removeParallelBranch(project, selectedOrBranch.rungId, branch.anchorId, branch.id)
+          : removeEmptyOutputBranch(project, selectedOrBranch.rungId, selectedOrBranch.branchId))) {
         setSelectedOrBranch(null);
         setDropPreview(null);
       }
@@ -218,7 +226,9 @@ export function PracticeEditor({
     const instruction = { id, tag: "", kind };
     const done = update(() => anchorId
       ? addParallelContact(project, rungId, anchorId, instruction, position, branchId)
-      : insertInstruction(project, rungId, position, instruction));
+      : branchId && kind === "OTE"
+        ? fillEmptyOutputBranch(project, rungId, branchId, instruction)
+        : insertInstruction(project, rungId, position, instruction));
     if (done) {
       setSelected(id);
       setSelectedOrBranch(null);
@@ -388,6 +398,10 @@ export function PracticeEditor({
       ?.parallelBranches?.find((branch) => branch.id === selectedOrBranch.branchId)
     : null;
   const selectedOutputLocation = selectedLocation?.instruction.kind === "OTE" ? selectedLocation : null;
+  const selectedEmptyOutputBranch = selectedOrBranch &&
+    project.rungs.find((rung) => rung.id === selectedOrBranch.rungId)
+      ?.emptyOutputBranches?.includes(selectedOrBranch.branchId)
+    ? selectedOrBranch : null;
   const parallelTarget = selectedOrBranch && selectedBranchModel
     ? { rungId: selectedOrBranch.rungId, anchorId: selectedBranchModel.anchorId }
     : getParallelBranchTarget(project, selected, selectedRungId);
@@ -404,10 +418,18 @@ export function PracticeEditor({
 
   const insertSelectedParallelBranch = () => {
     if (selectedOutputLocation) {
-      // Studio-style output OR: another independently-addressed OTE sharing
-      // this rung's logic, initially ?? so its tag can be assigned normally.
-      insertAt(selectedOutputLocation.rungId, 0, "OTE");
-      setSelectedRungId(selectedOutputLocation.rungId);
+      // An OR on an OTE creates only an EMPTY parallel output conductor.
+      const rungId = selectedOutputLocation.rungId;
+      const before = project.rungs.find((rung) => rung.id === rungId)?.emptyOutputBranches ?? [];
+      if (update(() => createEmptyOutputBranch(project, rungId))) {
+        const after = [...(before ?? [])];
+        let serial = 1;
+        while (after.includes("output-or-" + serial)) serial++;
+        setSelected(null);
+        setSelectedRungId(null);
+        setSelectedOrBranch({ rungId, branchId: "output-or-" + serial });
+        editorRef.current?.focus({ preventScroll: true });
+      }
       return;
     }
     if (!parallelTarget) {
@@ -422,6 +444,11 @@ export function PracticeEditor({
   };
   const handlePaletteClick = (kind: "XIC" | "XIO" | "OTE") => {
     onSelectPaletteTool(kind);
+    if (selectedEmptyOutputBranch && kind === "OTE") {
+      insertAt(selectedEmptyOutputBranch.rungId, 0, kind, undefined,
+        selectedEmptyOutputBranch.branchId);
+      return;
+    }
     if (selectedOrBranch && selectedBranchModel && kind !== "OTE") {
       insertAt(selectedOrBranch.rungId, selectedBranchModel.instructions.length, kind,
         selectedBranchModel.anchorId, selectedBranchModel.id);
@@ -498,11 +525,13 @@ export function PracticeEditor({
           {project.rungs.map((rung, rungIndex) => {
             const contacts = rung.instructions.filter((part) => part.kind !== "OTE");
             const outputs = rung.instructions.filter((part) => part.kind === "OTE");
+            const emptyOutputBranches = rung.emptyOutputBranches ?? [];
             const layout = getWrappedRungLayout(
               rung, canvasWidth, Boolean(draggingKind || moving),
-              draggingKind === "OTE" && rung.instructions.filter((item) => item.kind === "OTE").length < 8,
+              draggingKind === "OTE" &&
+                outputs.length + emptyOutputBranches.length < MAX_PARALLEL_OUTPUTS,
             );
-            const { width, coilX, coilY, outputYs, groups, rows } = layout;
+            const { width, coilX, coilY, outputYs, emptyOutputYs, groups, rows } = layout;
             const svgHeight = layout.height;
             const rungLive = running && Boolean(runtimeView?.rungPower[rung.id]);
             const drawContact = (item: typeof contacts[number], x: number, centerY: number) => {
@@ -623,7 +652,8 @@ export function PracticeEditor({
                           ? Boolean(runtimeView?.joinedPower[outgoingId]) : incomingPower);
                         const lastRow = rowIndex === rows.length - 1;
                         const from = row.groups.at(-1)?.right ?? 64;
-                        const to = lastRow && outputs.length ? coilX - 75 : width - 30;
+                        const to = lastRow && (outputs.length || emptyOutputBranches.length)
+                          ? coilX - 75 : width - 30;
                         return (
                           <g key={"wrap-row-" + row.index}>
                             {/* A new continuation line begins at the left rail; the
@@ -769,14 +799,40 @@ export function PracticeEditor({
                                   "v20m-4 -5l4 5 4 -5"} />
                               </g>
                             )}
-                            {lastRow && outputs.length > 0 && (
+                            {lastRow && (outputs.length > 0 || emptyOutputBranches.length > 0) && (
                               <g>
                                 {/* Both sides of the OTE bank share the same input
                                     power: every output is a PARALLEL end branch. */}
-                                {outputs.length > 1 && (
+                                {outputs.length + emptyOutputBranches.length > 1 && (
                                   <Wire x1={coilX - 75} y1={coilY}
-                                    x2={coilX - 75} y2={outputYs.at(-1)!} live={rungLive} />
+                                    x2={coilX - 75} y2={emptyOutputYs.at(-1) ?? outputYs.at(-1)!}
+                                    live={rungLive} />
                                 )}
+                                {emptyOutputBranches.map((branchId, index) => {
+                                  const laneY = emptyOutputYs[index];
+                                  const selectedLane = selectedOrBranch?.rungId === rung.id &&
+                                    selectedOrBranch.branchId === branchId;
+                                  return (
+                                    <g key={branchId}>
+                                      {selectedLane && <rect x={coilX - 83} y={laneY - 28}
+                                        width="125" height="53" rx="4" fill="#dbeafe" fillOpacity="0.6"
+                                        stroke="#0284c7" strokeWidth="1.5" strokeDasharray="4 3"
+                                        pointerEvents="none" />}
+                                      <Wire x1={coilX - 75} y1={laneY}
+                                        x2={coilX - 29} y2={laneY} />
+                                      <Wire x1={coilX + 29} y1={laneY}
+                                        x2={width - 30} y2={laneY} />
+                                      <rect x={coilX - 29} y={laneY - 12}
+                                        width="58" height="24" rx="3" fill="#ffffff"
+                                        stroke="#94a3b8" strokeWidth="1.3" strokeDasharray="4 3"
+                                        pointerEvents="none" />
+                                      <text x={coilX} y={laneY - 17} textAnchor="middle"
+                                        fontSize="10" fill="#64748b">Rama OR vacía</text>
+                                      <text x={coilX} y={laneY + 4} textAnchor="middle"
+                                        fontSize="11" fill="#64748b">OTE</text>
+                                    </g>
+                                  );
+                                })}
                                 {outputs.map((output, index) => {
                                   const coilRowY = outputYs[index];
                                   return (
@@ -839,6 +895,25 @@ export function PracticeEditor({
                       dragButton(output, coilX, outputYs[index]),
                       tagDragButton(output, coilX, outputYs[index]),
                     ])}
+                    {emptyOutputBranches.map((branchId, index) => (
+                      <button key={branchId} type="button"
+                        aria-label={"Seleccionar rama de salida OR vacía " + (index + 1)}
+                        title="Rama de salida vacía. Selecciona y pulsa OTE o arrastra una bobina; Supr elimina la rama."
+                        className={"absolute z-10 rounded border focus-visible:outline-2 focus-visible:outline-sky-500 " +
+                          (selectedOrBranch?.branchId === branchId
+                            ? "border-sky-500 bg-sky-100/20" : "border-transparent hover:border-sky-400")}
+                        style={{ left: coilX - 39, top: emptyOutputYs[index] - 18,
+                          width: 78, height: 38 }}
+                        onClick={() => {
+                          setSelected(null);
+                          setSelectedRungId(null);
+                          setSelectedOrBranch({ rungId: rung.id, branchId });
+                          editorRef.current?.focus({ preventScroll: true });
+                        }}
+                      >
+                        <span className="sr-only">Seleccionar rama OR de salida vacía</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
               </article>
