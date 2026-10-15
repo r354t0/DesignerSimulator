@@ -6,17 +6,14 @@ import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
 import { resolveLadderDeleteAction } from "../../plc/ladderShortcuts";
 import { getBitMenuTarget } from "../../plc/practiceBitMenu";
+import { getWrappedRungLayout, findWrappedLadderDropTarget } from "../../plc/ladderWrappedLayout";
 import { buildPracticeProject, getPracticeBuildSignature, type BuildDiagnostic, type LadderBuildResult } from "../../plc/practiceBuild";
 import { evaluateSeriesScan } from "../../plc/practiceRuntime";
 import {
-  findVisualLadderDropTarget,
-  getRungGeometry,
   isEditableKind,
   LADDER_DRAG_MIME,
   LADDER_MOVE_MIME,
   LADDER_TAG_MIME,
-  getPracticeRungHeight,
-  PRACTICE_MAIN_Y,
   type VisualLadderDropTarget,
 } from "../../plc/ladderDragDrop";
 import {
@@ -338,7 +335,7 @@ export function PracticeEditor({
     const area = event.currentTarget.getBoundingClientRect();
     const x = (event.clientX - area.left) * width / area.width;
     const y = event.clientY - area.top;
-    return findVisualLadderDropTarget(project, rungId, kind, x, y, width, moving?.id);
+    return findWrappedLadderDropTarget(project, rungId, kind, x, y, width, moving?.id);
   };
   const onDragOverRung = (event: DragEvent<HTMLDivElement>, rungId: string, width: number) => {
     if (event.dataTransfer.types.includes(LADDER_TAG_MIME)) return;
@@ -382,13 +379,9 @@ export function PracticeEditor({
     setMoving(null);
   };
 
-  // All rows share one horizontal coordinate system so the right rail remains
-  // aligned when the editor is docked/maximized or a long OR branch is added.
-  const canvasWidth = Math.max(
-    480,
-    viewportWidth,
-    ...project.rungs.map((rung) => getRungGeometry(rung, viewportWidth).width),
-  );
+  // Keep the drawing viewport sized to the editor. Wide networks fold into
+  // connected continuation rows, instead of stretching every rung sideways.
+  const canvasWidth = Math.max(480, viewportWidth);
   const selectedLocation = selected ? findInstruction(project, selected) : null;
   const selectedRungForInsert = selectedLocation?.rungId ?? selectedOrBranch?.rungId ?? selectedRungId;
   const selectedBranchModel = selectedOrBranch
@@ -497,12 +490,9 @@ export function PracticeEditor({
           {project.rungs.map((rung, rungIndex) => {
             const contacts = rung.instructions.filter((part) => part.kind !== "OTE");
             const output = rung.instructions.find((part) => part.kind === "OTE");
-            const geometry = getRungGeometry(rung, canvasWidth);
-            const { width, coilX, groups } = geometry;
-            const y = PRACTICE_MAIN_Y;
-            const maxLanes = Math.max(0, ...groups.map((group) => group.branchLanes.length));
-            const showDropLane = Boolean(draggingKind || moving);
-            const svgHeight = getPracticeRungHeight(maxLanes, showDropLane);
+            const layout = getWrappedRungLayout(rung, canvasWidth);
+            const { width, coilX, coilY, groups, rows } = layout;
+            const svgHeight = layout.height;
             const rungLive = running && Boolean(runtimeView?.rungPower[rung.id]);
             const drawContact = (item: typeof contacts[number], x: number, centerY: number) => {
               const flow = runtimeView?.instructionFlow[item.id];
@@ -574,7 +564,7 @@ export function PracticeEditor({
                 key={rung.id}
                 data-rung-id={rung.id}
                 className="group/practice-rung relative border-b border-slate-100 bg-white"
-                style={{ width: canvasWidth }}
+                style={{ width: Math.max(canvasWidth, width) }}
                 aria-label={"Rung " + rungIndex}
               >
                 <button
@@ -610,149 +600,179 @@ export function PracticeEditor({
                       <rect width={width} height={svgHeight} fill="transparent" pointerEvents="all" />
                       <LadderRails leftX={63} rightX={width - 30} top={0} bottom={svgHeight} live={running} />
 
-                      {groups.map((group, index) => {
-                        const item = contacts[index];
-                        const branches = (rung.parallelBranches ?? [])
-                          .filter((branch) => branch.anchorId === item.id);
-                        const from = index === 0 ? 64 : groups[index - 1].right;
+                      {rows.map((row, rowIndex) => {
+                        const firstGroup = row.groups[0];
+                        const previousRow = rows[rowIndex - 1];
+                        const firstId = firstGroup?.mainIds[0];
+                        const priorId = previousRow?.groups.at(-1)?.anchorId;
+                        const incomingPower = rowIndex === 0 ? running :
+                          running && (priorId
+                            ? Boolean(runtimeView?.joinedPower[priorId])
+                            : Boolean(runtimeView?.rungPower[rung.id]));
+                        const outgoingId = row.groups.at(-1)?.anchorId;
+                        const outgoingPower = running && (outgoingId
+                          ? Boolean(runtimeView?.joinedPower[outgoingId]) : incomingPower);
+                        const lastRow = rowIndex === rows.length - 1;
+                        const from = row.groups.at(-1)?.right ?? 64;
+                        const to = lastRow && output ? coilX - 24 : width - 30;
                         return (
-                          <g key={item.id}>
-                            <Wire x1={from} y1={y} x2={group.x - 22} y2={y}
-                              live={running && Boolean(runtimeView?.instructionFlow[item.id]?.powerIn)} />
-                            {/* Selecting the main conductor makes the rung the insertion target,
-                                even when its first contact already anchors multiple OR lanes. */}
-                            <line x1={from} y1={y} x2={group.x - 22} y2={y}
-                              stroke="transparent" strokeWidth={15} pointerEvents="stroke"
-                              role="button" tabIndex={0} aria-label={"Seleccionar línea principal del rung " + rungIndex}
-                              style={{ cursor: "pointer" }}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                setSelected(null); setSelectedOrBranch(null); setSelectedRungId(rung.id);
+                          <g key={"wrap-row-" + row.index}>
+                            {/* A new continuation line begins at the left rail; the
+                                previous line exits at the right rail with arrows. */}
+                            {rowIndex > 0 && (
+                              <g stroke="#8796a6" fill="none" strokeWidth="1.4" pointerEvents="none">
+                                <path d={"M" + 73 + " " + (row.mainY - 22) + "v16m-4 -5l4 5 4 -5"} />
+                              </g>
+                            )}
+                            {row.groups.map((group, groupIndex) => {
+                              const mainItems = group.mainIds.map((id) =>
+                                contacts.find((contact) => contact.id === id)!).filter(Boolean);
+                              const branches = (rung.parallelBranches ?? [])
+                                .filter((branch) => branch.anchorId === group.anchorId);
+                              const before = groupIndex === 0 ? 64 : row.groups[groupIndex - 1].right;
+                              const inputPower = running && Boolean(runtimeView?.instructionFlow[mainItems[0]?.id]?.powerIn);
+                              const mergedPower = running && Boolean(runtimeView?.joinedPower[group.anchorId]);
+                              const selectUpperWire = (instructionId: string) => {
+                                setSelected(instructionId);
+                                setSelectedOrBranch(null);
+                                setSelectedRungId(null);
                                 editorRef.current?.focus({ preventScroll: true });
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" || event.key === " ") {
-                                  event.preventDefault(); setSelected(null); setSelectedOrBranch(null);
-                                  setSelectedRungId(rung.id); editorRef.current?.focus({ preventScroll: true });
-                                }
-                              }} />
-                            <Wire x1={group.x + 22} y1={y} x2={group.right} y2={y}
-                              live={running && Boolean(runtimeView?.instructionFlow[item.id]?.powerOut)} />
-                            {drawContact(item, group.x, y)}
-                            {branches.length > 0 && (
-                              <g>
-                                <Wire x1={group.left} y1={y} x2={group.left}
-                                  y2={group.branchLanes.at(-1)!.y}
-                                  live={running && Boolean(runtimeView?.instructionFlow[item.id]?.powerIn)} />
-                                <Wire x1={group.right} y1={y} x2={group.right}
-                                  y2={group.branchLanes.at(-1)!.y}
-                                  live={running && Boolean(runtimeView?.joinedPower[item.id])} />
-                                {branches.map((branch, laneIndex) => {
-                                  const lane = group.branchLanes[laneIndex];
-                                  const laneY = lane.y;
-                                  return (
-                                    <g key={branch.id}>
-                                      {selectedOrBranch?.rungId === rung.id &&
-                                        selectedOrBranch.branchId === branch.id && (
-                                          <rect x={group.left - 7} y={laneY - 17}
-                                            width={group.right - group.left + 14} height="34" rx="5"
-                                            fill="#dbeafe" fillOpacity="0.75"
-                                            stroke="#0284c7" strokeWidth="1.5" strokeDasharray="4 3"
-                                            pointerEvents="none"/>
-                                        )}
-                                      {branch.instructions.length === 0 ? (
-                                        <Wire x1={group.left} y1={laneY}
-                                          x2={group.right} y2={laneY}
-                                          live={running && Boolean(runtimeView?.branchInput[branch.id])} />
-                                      ) : (
-                                        <>
-                                          {branch.instructions.map((part, partIndex) => {
-                                            const center = lane.centers[partIndex];
-                                            const previous = partIndex === 0
-                                              ? group.left : lane.centers[partIndex - 1] + 22;
-                                            return (
-                                              <g key={part.id}>
-                                                <Wire x1={previous} y1={laneY}
-                                                  x2={center - 22} y2={laneY}
-                                                  live={running && Boolean(runtimeView?.instructionFlow[part.id]?.powerIn)} />
-                                                {drawContact(part, center, laneY)}
-                                              </g>
-                                            );
-                                          })}
-                                          <Wire x1={lane.centers.at(-1)! + 22} y1={laneY}
-                                            x2={group.right} y2={laneY}
-                                            live={running && Boolean(runtimeView?.branchPower[branch.id])} />
-                                        </>
-                                      )}
-                                      {branch.instructions.length === 0 && (
-                                        <text x={group.x} y={laneY + 29} fontSize="10"
-                                          textAnchor="middle" fill="#64748b">
-                                          Rama OR {laneIndex + 1} vacía
-                                        </text>
-                                      )}
-                                      {/* The wire itself selects the OR path; no extra × OR buttons. */}
-                                      <path d={"M" + group.left + " " + laneY +
-                                        "H" + group.right}
-                                        stroke="transparent" strokeWidth="14" fill="none"
-                                        pointerEvents="stroke"
-                                        role="button" tabIndex={0}
-                                        aria-label={"Seleccionar rama OR " + (laneIndex + 1) +
-                                          " del rung " + rungIndex + " para eliminar con Supr"}
-                                        style={{ cursor: "pointer" }}
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          setSelected(null);
-                                          setSelectedRungId(null);
-                                          setSelectedOrBranch({ rungId: rung.id, branchId: branch.id });
-                                          editorRef.current?.focus({ preventScroll: true });
-                                        }}
-                                        onKeyDown={(event) => {
-                                          if (event.key === "Enter" || event.key === " ") {
-                                            event.preventDefault();
-                                            setSelected(null);
-                                            setSelectedRungId(null);
-                                            setSelectedOrBranch({ rungId: rung.id, branchId: branch.id });
-                                            editorRef.current?.focus({ preventScroll: true });
-                                          }
-                                        }}
-                                      >
-                                        <title>Seleccionar rama OR · Supr para eliminarla</title>
-                                      </path>
+                              };
+                              return (
+                                <g key={group.anchorId}>
+                                  <Wire x1={before} y1={row.mainY} x2={group.left} y2={row.mainY}
+                                    live={inputPower} />
+                                  <Wire x1={group.left} y1={row.mainY}
+                                    x2={group.mainCenters[0] - 22} y2={row.mainY} live={inputPower} />
+                                  {mainItems.map((contact, mainIndex) => {
+                                    const center = group.mainCenters[mainIndex];
+                                    const following = mainIndex + 1 < mainItems.length
+                                      ? group.mainCenters[mainIndex + 1] - 22 : group.right;
+                                    const power = running &&
+                                      Boolean(runtimeView?.instructionFlow[contact.id]?.powerOut);
+                                    return (
+                                      <g key={contact.id}>
+                                        {drawContact(contact, center, row.mainY)}
+                                        <Wire x1={center + 22} y1={row.mainY}
+                                          x2={following} y2={row.mainY} live={power} />
+                                        <line x1={center + 22} y1={row.mainY}
+                                          x2={following} y2={row.mainY}
+                                          stroke="transparent" strokeWidth="16" pointerEvents="stroke"
+                                          role="button" tabIndex={0}
+                                          aria-label={"Insertar después de " + (contact.tag || contact.id) + " en la línea principal"}
+                                          style={{ cursor: "pointer" }}
+                                          onClick={(event) => {
+                                            event.stopPropagation(); selectUpperWire(contact.id);
+                                          }}
+                                          onKeyDown={(event) => {
+                                            if (event.key === "Enter" || event.key === " ") {
+                                              event.preventDefault(); selectUpperWire(contact.id);
+                                            }
+                                          }} />
+                                      </g>
+                                    );
+                                  })}
+                                  {branches.length > 0 && (
+                                    <g>
+                                      <Wire x1={group.left} y1={row.mainY} x2={group.left}
+                                        y2={group.branchLanes.at(-1)!.y} live={inputPower} />
+                                      <Wire x1={group.right} y1={row.mainY} x2={group.right}
+                                        y2={group.branchLanes.at(-1)!.y} live={mergedPower} />
+                                      {branches.map((branch, laneIndex) => {
+                                        const lane = group.branchLanes[laneIndex];
+                                        const laneY = lane.y;
+                                        return (
+                                          <g key={branch.id}>
+                                            {selectedOrBranch?.rungId === rung.id &&
+                                              selectedOrBranch.branchId === branch.id && (
+                                                <rect x={group.left - 7} y={laneY - 17}
+                                                  width={group.right - group.left + 14} height="34" rx="5"
+                                                  fill="#dbeafe" fillOpacity="0.75"
+                                                  stroke="#0284c7" strokeWidth="1.5" strokeDasharray="4 3"
+                                                  pointerEvents="none" />
+                                              )}
+                                            {branch.instructions.length === 0 ? (
+                                              <Wire x1={group.left} y1={laneY} x2={group.right}
+                                                y2={laneY}
+                                                live={running && Boolean(runtimeView?.branchInput[branch.id])} />
+                                            ) : (
+                                              <>
+                                                {branch.instructions.map((part, partIndex) => {
+                                                  const center = lane.centers[partIndex];
+                                                  const previous = partIndex === 0
+                                                    ? group.left : lane.centers[partIndex - 1] + 22;
+                                                  return (
+                                                    <g key={part.id}>
+                                                      <Wire x1={previous} y1={laneY}
+                                                        x2={center - 22} y2={laneY}
+                                                        live={running &&
+                                                          Boolean(runtimeView?.instructionFlow[part.id]?.powerIn)} />
+                                                      {drawContact(part, center, laneY)}
+                                                    </g>
+                                                  );
+                                                })}
+                                                <Wire x1={lane.centers.at(-1)! + 22} y1={laneY}
+                                                  x2={group.right} y2={laneY}
+                                                  live={running && Boolean(runtimeView?.branchPower[branch.id])} />
+                                              </>
+                                            )}
+                                            {branch.instructions.length === 0 && (
+                                              <text x={group.x} y={laneY + 29} fontSize="10"
+                                                textAnchor="middle" fill="#64748b">
+                                                Rama OR {laneIndex + 1} vacía
+                                              </text>
+                                            )}
+                                            <path d={"M" + group.left + " " + laneY + "H" + group.right}
+                                              stroke="transparent" strokeWidth="14" fill="none"
+                                              pointerEvents="stroke" role="button" tabIndex={0}
+                                              aria-label={"Seleccionar rama OR " + (laneIndex + 1) +
+                                                " del rung " + rungIndex + " para eliminar con Supr"}
+                                              style={{ cursor: "pointer" }}
+                                              onClick={(event) => {
+                                                event.stopPropagation();
+                                                setSelected(null); setSelectedRungId(null);
+                                                setSelectedOrBranch({ rungId: rung.id, branchId: branch.id });
+                                                editorRef.current?.focus({ preventScroll: true });
+                                              }}
+                                              onKeyDown={(event) => {
+                                                if (event.key === "Enter" || event.key === " ") {
+                                                  event.preventDefault();
+                                                  setSelected(null); setSelectedRungId(null);
+                                                  setSelectedOrBranch({ rungId: rung.id, branchId: branch.id });
+                                                  editorRef.current?.focus({ preventScroll: true });
+                                                }
+                                              }}>
+                                              <title>Seleccionar rama OR · Supr para eliminarla</title>
+                                            </path>
+                                          </g>
+                                        );
+                                      })}
                                     </g>
-                                  );
-                                })}
+                                  )}
+                                </g>
+                              );
+                            })}
+                            <Wire x1={from} y1={row.mainY} x2={to} y2={row.mainY}
+                              live={outgoingPower} />
+                            {!lastRow && (
+                              <g stroke="#8796a6" fill="none" strokeWidth="1.4" pointerEvents="none">
+                                <path d={"M" + (width - 40) + " " + (row.mainY + 5) +
+                                  "v20m-4 -5l4 5 4 -5"} />
+                              </g>
+                            )}
+                            {lastRow && output && (
+                              <g>
+                                <Coil x={coilX} y={coilY} tag={output.tag || "??"}
+                                  comment={project.tags.find((tag) => tag.name === output.tag)?.description}
+                                  labelWidth={96} selected={selected === output.id}
+                                  online={running} live={rungLive} />
+                                <Wire x1={coilX + 24} y1={coilY} x2={width - 30}
+                                  y2={coilY} live={rungLive} />
                               </g>
                             )}
                           </g>
                         );
                       })}
-                      <Wire x1={groups.at(-1)?.right ?? 64} y1={y}
-                        x2={output ? coilX - 24 : width - 30} y2={y} live={rungLive} />
-                      <line x1={groups.at(-1)?.right ?? 64} y1={y}
-                        x2={output ? coilX - 24 : width - 30} y2={y}
-                        stroke="transparent" strokeWidth={15} pointerEvents="stroke"
-                        role="button" tabIndex={0} aria-label={"Seleccionar línea principal del rung " + rungIndex}
-                        style={{ cursor: "pointer" }}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setSelected(null); setSelectedOrBranch(null); setSelectedRungId(rung.id);
-                          editorRef.current?.focus({ preventScroll: true });
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault(); setSelected(null); setSelectedOrBranch(null);
-                            setSelectedRungId(rung.id); editorRef.current?.focus({ preventScroll: true });
-                          }
-                        }} />
-                      {output && (
-                        <g>
-                          <Coil x={coilX} y={y} tag={output.tag || "??"}
-                            comment={project.tags.find((tag) => tag.name === output.tag)?.description}
-                            labelWidth={96} selected={selected === output.id}
-                            online={running} live={rungLive} />
-                          <Wire x1={coilX + 24} y1={y} x2={width - 30} y2={y} live={rungLive} />
-                        </g>
-                      )}
                       {dropPreview?.rungId === rung.id && (
                         <g pointerEvents="none">
                           <rect x={dropPreview.x - (dropPreview.kind === "OTE" ? 42 : 32)}
@@ -772,13 +792,16 @@ export function PracticeEditor({
                     </svg>
 
                     {/* Native HTML buttons enable dragstart consistently across browsers. */}
-                    {groups.flatMap((group, index) => {
-                      const contact = contacts[index];
+                    {groups.flatMap((group) => {
+                      const mainItems = group.mainIds.map((id) =>
+                        contacts.find((contact) => contact.id === id)!).filter(Boolean);
                       const branches = (rung.parallelBranches ?? [])
-                        .filter((branch) => branch.anchorId === contact.id);
+                        .filter((branch) => branch.anchorId === group.anchorId);
                       return [
-                        dragButton(contact, group.x, y),
-                        tagDragButton(contact, group.x, y),
+                        ...mainItems.flatMap((contact, index) => [
+                          dragButton(contact, group.mainCenters[index], group.mainY),
+                          tagDragButton(contact, group.mainCenters[index], group.mainY),
+                        ]),
                         ...branches.flatMap((branch, laneIndex) => {
                           const lane = group.branchLanes[laneIndex];
                           return branch.instructions.flatMap((part, partIndex) => [
@@ -788,8 +811,8 @@ export function PracticeEditor({
                         }),
                       ];
                     })}
-                    {output && dragButton(output, coilX, y)}
-                    {output && tagDragButton(output, coilX, y)}
+                    {output && dragButton(output, coilX, coilY)}
+                    {output && tagDragButton(output, coilX, coilY)}
                   </div>
                 </div>
               </article>
