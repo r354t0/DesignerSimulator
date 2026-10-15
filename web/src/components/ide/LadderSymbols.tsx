@@ -1,3 +1,4 @@
+import { getCoilVisualState } from "../../plc/ladderCoilVisual";
 import type { ReactNode } from "react";
 import { getInstructionSelectionFrame, LADDER_SELECTION_BLUE } from "../../plc/ladderSelection";
 
@@ -239,12 +240,12 @@ export function Contact({
 }
 
 export function Coil({
-  x, y, tag, comment, online, live, labelWidth, selected = false, kind = "OTE",
+  x, y, tag, comment, online, live, storedValue = false, labelWidth, selected = false, kind = "OTE",
 }: {
-x: number; y: number; tag: string; comment?: string; online: boolean; live: boolean; labelWidth?: number; selected?: boolean;
+x: number; y: number; tag: string; comment?: string; online: boolean; live: boolean; storedValue?: boolean; labelWidth?: number; selected?: boolean;
   kind?: "OTE" | "OTL" | "OTU";
 }) {
-  const activeSymbol = online && live;
+  const { symbolLive: activeSymbol, conductorLive } = getCoilVisualState(kind, online, live, storedValue);
   const curveEdge = 14 * SYMBOL_SCALE;
   const curveControl = 26 * SYMBOL_SCALE;
   const halfHeight = 15 * SYMBOL_SCALE;
@@ -281,8 +282,8 @@ x: number; y: number; tag: string; comment?: string; online: boolean; live: bool
         fontSize="12" fontWeight="700" fill={activeSymbol ? HOT : BASE}>
         {kind === "OTL" ? "L" : "U"}
       </text>}
-      <Wire x1={x - wireEnd} y1={y} x2={x - wireStart} y2={y} live={activeSymbol} />
-      <Wire x1={x + wireStart} y1={y} x2={x + wireEnd} y2={y} live={activeSymbol} />
+      <Wire x1={x - wireEnd} y1={y} x2={x - wireStart} y2={y} live={conductorLive} />
+      <Wire x1={x + wireStart} y1={y} x2={x + wireEnd} y2={y} live={conductorLive} />
     </g>
   );
 }
