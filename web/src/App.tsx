@@ -7,7 +7,7 @@ import { ControllerTags } from "./components/ide/ControllerTags";
 import { PracticeEditor } from "./components/ide/PracticeEditor";
 import { initialPracticeProject, type EditableKind, type PracticeProject } from "./plc/practiceDocument";
 import { getPracticeBuildSignature } from "./plc/practiceBuild";
-import { evaluateSeriesScan, stopSeriesScan } from "./plc/practiceRuntime";
+import { evaluateSeriesScan, stopAfterSeriesLogicEdit, stopSeriesScan } from "./plc/practiceRuntime";
 import { isEditableKind, LADDER_DRAG_MIME } from "./plc/ladderDragDrop";
 import { type Instruction } from "./components/ide/LadderSymbols";
 import { evaluateDemo, initialDemoInputs, type DemoInputs, type InputTag } from "./plc/demoModel";
@@ -123,7 +123,7 @@ export default function App() {
     const changedLogic = getPracticeBuildSignature(next) !== getPracticeBuildSignature(practice);
     if (changedLogic && practiceRunning) {
       setPracticeRunning(false);
-      setPractice(next);
+      setPractice(stopAfterSeriesLogicEdit(practice, next));
       return;
     }
     setPractice(practiceRunning ? evaluateSeriesScan(next).project : next);
