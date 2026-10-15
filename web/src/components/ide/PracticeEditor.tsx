@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, FileCode2, Hammer, Play, Square, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, FileCode2, Hammer, Pause, Play, Square, StepForward, XCircle } from "lucide-react";
 import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
@@ -8,7 +8,7 @@ import { resolveLadderDeleteAction } from "../../plc/ladderShortcuts";
 import { getBitMenuTarget, invertInstructionBit } from "../../plc/practiceBitMenu";
 import { getWrappedRungLayout, findWrappedLadderDropTarget } from "../../plc/ladderWrappedLayout";
 import { buildPracticeProject, getPracticeBuildSignature, type BuildDiagnostic, type LadderBuildResult } from "../../plc/practiceBuild";
-import { evaluateSeriesScan } from "../../plc/practiceRuntime";
+import { type PracticeScanState, type ScanMode, SCAN_PERIODS_MS } from "../../plc/practiceScanCycle";
 import {
   isEditableKind,
   LADDER_DRAG_MIME,
@@ -46,8 +46,14 @@ interface Props {
   draggingKind: EditableKind | null;
   onChange: (next: PracticeProject) => void;
   running: boolean;
+  scanMode: ScanMode;
+  scanState: PracticeScanState;
   onStart: () => void;
   onStop: () => void;
+  onPause: () => void;
+  onResume: () => void;
+  onStep: () => void;
+  onScanPeriodChange: (period: number) => void;
   nextId: (prefix: string) => string;
   onSelectPaletteTool: (kind: "XIC" | "XIO" | "OTE") => void;
   onSelectDemoTool: (kind: Instruction) => void;
@@ -57,7 +63,8 @@ interface Props {
 interface InternalDrag { id: string; kind: EditableKind }
 
 export function PracticeEditor({
-  project, selectedTool, draggingKind, onChange, running, onStart, onStop, nextId,
+  project, selectedTool, draggingKind, onChange, running, scanMode, scanState,
+  onStart, onStop, onPause, onResume, onStep, onScanPeriodChange, nextId,
   onSelectPaletteTool, onSelectDemoTool, onPaletteDragStart, onPaletteDragEnd,
 }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
@@ -176,15 +183,19 @@ export function PracticeEditor({
 
   const buildIsStale = Boolean(buildRecord && buildRecord.signature !== getPracticeBuildSignature(project));
   // Pure evaluation also provides live power-flow data for visual monitoring.
-  const runtimeView = running ? evaluateSeriesScan(project) : null;
+  // Show only the LAST completed scan. Inputs changed during PAUSE must not
+  // create fictitious green paths until STEP/RESUME actually executes.
+  const runtimeView = running ? scanState.frame : null;
   const currentBuild = buildRecord?.result ?? null;
-  const buildStatus = running ? "RUN · AND/OR" : !buildRecord ? "Sin verificar" :
+  const buildStatus = scanMode === "running" ? "RUN · Scan Cycle" :
+    scanMode === "paused" ? "PAUSE · detenido" :
+    !buildRecord ? "Sin verificar" :
     buildIsStale ? "Build pendiente" :
       buildRecord.result.success ? "Build correcto" : "Build con errores";
 
   /**
-   * RUN always invokes the same Build verifier, even after a failed or stale
-   * check. Stage A deliberately never claims to run a PLC scan.
+   * RUN always invokes a fresh Build, even after a failed or stale check.
+   * A successful Build starts a periodic browser-based scan session.
    */
   const verifyPracticeRoutine = (requestedBy: "build" | "run") => {
     const result = buildPracticeProject(project);
@@ -197,7 +208,7 @@ export function PracticeEditor({
     setBuildOutputOpen(true);
     setBuildMessage(requestedBy === "run"
       ? result.success
-        ? "Build correcto. Ejecución de XIC/XIO/OTE y ramas OR activa (Etapa C)."
+        ? "Build correcto. Scan Cycle periódico activo (Etapa D)."
         : "RUN no iniciado: corrige los errores del Build antes de ejecutar."
       : result.success
         ? "Build finalizado correctamente. Programa verificado."
@@ -483,19 +494,51 @@ export function PracticeEditor({
           <Hammer size={14} /> Build
         </button>
         <button type="button" onClick={() => verifyPracticeRoutine("run")}
-          title="Ejecutar Build automáticamente; el motor de PLC se implementará en la Etapa B"
+          title="Ejecutar Build y comenzar un nuevo ciclo periódico de scans"
           className="flex items-center gap-1.5 rounded border border-emerald-700 bg-emerald-700 px-2.5 py-1.5 font-semibold text-white hover:bg-emerald-800">
           <Play size={14} /> RUN
         </button>
-        <button type="button" onClick={onStop} disabled={!running}
+        <button type="button" onClick={onPause} disabled={scanMode !== "running"}
+          title="Congelar la ejecución y mantener el estado actual de las salidas"
+          className="flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40">
+          <Pause size={13} /> PAUSE
+        </button>
+        <button type="button" onClick={onResume} disabled={scanMode !== "paused"}
+          title="Reanudar el scan periódico sin reiniciar el contador"
+          className="flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40">
+          <Play size={13} /> RESUME
+        </button>
+        <button type="button" onClick={onStep} disabled={scanMode !== "paused"}
+          title="Ejecutar exactamente un scan y permanecer en PAUSE"
+          className="flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40">
+          <StepForward size={14} /> SCAN
+        </button>
+                <button type="button" onClick={onStop} disabled={!running}
           title="Detener el motor de práctica y desactivar las salidas OTE"
           className="flex items-center gap-1.5 rounded border border-slate-300 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">
           <Square size={13} /> STOP
         </button>
+        <label className="flex items-center gap-1 text-[11px] text-slate-600">
+          Ciclo
+          <select aria-label="Período del Scan Cycle" value={scanState.scanPeriodMs}
+            onChange={(event) => onScanPeriodChange(Number(event.target.value))}
+            className="rounded border border-slate-300 bg-white px-1 py-1 text-[11px] text-slate-800">
+            {SCAN_PERIODS_MS.map((period) =>
+              <option key={period} value={period}>{period} ms</option>)}
+          </select>
+        </label>
+        <span title="Scans ejecutados en la sesión actual"
+          className="font-mono text-[11px] text-slate-600">Scans: {scanState.scanCount}</span>
+        <span title="Duración real de cálculo JavaScript del último scan; no incluye la espera del temporizador ni el renderizado"
+          className="hidden font-mono text-[11px] text-slate-600 lg:inline">
+          Último: {scanState.lastScanDurationMs.toFixed(2)} ms
+        </span>
         <span aria-live="polite"
           className={"rounded border px-2 py-1 text-[11px] font-semibold " +
-            (running
+            (scanMode === "running"
               ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : scanMode === "paused"
+                ? "border-amber-200 bg-amber-50 text-amber-800"
               : !buildRecord || buildIsStale
                 ? "border-amber-200 bg-amber-50 text-amber-800"
               : currentBuild?.success
@@ -939,7 +982,7 @@ export function PracticeEditor({
           )}
           <p className="mb-5 flex items-center gap-1 px-4 text-xs text-slate-500">
             <FileCode2 size={14} /> Clic en etiqueta: buscar tag; doble clic: tabla de variables; arrastre: copiar tag. Clic en conductor OR + Supr: borrar rama.
-            RUN ejecuta XIC/XIO/OTE con AND y ramas OR; el scan periódico corresponde a la siguiente etapa.
+            RUN ejecuta scans periódicos; PAUSE congela las salidas y SCAN realiza una sola evaluación.
           </p>
         </div>
       </div>
