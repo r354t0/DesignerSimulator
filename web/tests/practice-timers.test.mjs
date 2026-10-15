@@ -12,6 +12,7 @@ import {
   stopPracticeScans, setScanPeriod,
 } from "../src/plc/practiceScanCycle.ts";
 import { filterPracticeTags } from "../src/plc/practiceTagSearch.ts";
+import { getWrappedRungLayout, OUTPUT_BRANCH_STEP } from "../src/plc/ladderWrappedLayout.ts";
 import { getOnlineMonitorReadout } from "../src/plc/practiceOnlineMonitor.ts";
 
 const contact = (id, tag) => ({ id, tag, kind: "XIC" });
@@ -171,4 +172,18 @@ test("Online Monitor exposes timer PRE ACC and completion flags", () => {
   assert.equal(readout.label, "TON · T_Start");
   assert.equal(readout.fields.find((f) => f.label === "ACC (ms)")?.value, "100");
   assert.equal(readout.fields.find((f) => f.label === "EN")?.value, "1 (TRUE)");
+});
+
+
+test("TIMER blocks have bottom clearance on ordinary and multi-output rungs", () => {
+  let p = timerProgram();
+  const layout = getWrappedRungLayout(p.rungs[0], 760);
+  assert.ok(layout.height >= layout.coilY + 47,
+    "TIMER bottom status indicators must not be cropped");
+  p = insertInstruction(p, "rung-1", 2, output("reset-inline", "RES", "T_Start"));
+  const stacked = getWrappedRungLayout(p.rungs[0], 760);
+  assert.equal(stacked.outputYs.length, 2);
+  assert.equal(stacked.outputYs[1] - stacked.outputYs[0], OUTPUT_BRANCH_STEP);
+  assert.ok(stacked.height >= stacked.outputYs[1] + 47,
+    "last timer block has clearance despite stacked output branches");
 });
