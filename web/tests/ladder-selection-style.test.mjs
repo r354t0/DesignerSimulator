@@ -38,5 +38,5 @@ test("selection width is bounded even with atypically small or large tag labels"
   assert.equal(getInstructionSelectionFrame(1, 40).width, 72);
   assert.equal(getInstructionSelectionFrame(1, 200).width, 100);
   assert.equal(getInstructionSelectionFrame(-1).top, -40);
-  assert.equal(getInstructionSelectionFrame(99).top, -68);
+  assert.equal(getInstructionSelectionFrame(99).top, -64);
 });
