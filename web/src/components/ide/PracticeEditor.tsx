@@ -527,8 +527,6 @@ export function PracticeEditor({
               <option key={period} value={period}>{period} ms</option>)}
           </select>
         </label>
-        <span title="Scans ejecutados en la sesión actual"
-          className="font-mono text-[11px] text-slate-600">Scans: {scanState.scanCount}</span>
         <span title="Duración real de cálculo JavaScript del último scan; no incluye la espera del temporizador ni el renderizado"
           className="hidden font-mono text-[11px] text-slate-600 lg:inline">
           Último: {scanState.lastScanDurationMs.toFixed(2)} ms
