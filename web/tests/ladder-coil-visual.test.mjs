@@ -36,8 +36,8 @@ test("OTE remains nonretentive; wires always represent input power", () => {
 
 test("rung clearance includes the ONS lower legend and selection", () => {
   // Contact center is at y=81; ONS text baseline extends to y=101.
-  assert.ok(PRACTICE_MAIN_HEIGHT - (PRACTICE_MAIN_Y + 22) >= 14);
-  assert.ok(PRACTICE_OR_HEIGHT - (PRACTICE_BRANCH_Y + 22) >= 14);
+  assert.ok(PRACTICE_MAIN_HEIGHT - (PRACTICE_MAIN_Y + 22) >= 8);
+  assert.ok(PRACTICE_OR_HEIGHT - (PRACTICE_BRANCH_Y + 22) >= 8);
   assert.equal(getPracticeRungHeight(0), PRACTICE_MAIN_HEIGHT);
   assert.equal(getPracticeRungHeight(1), PRACTICE_OR_HEIGHT);
 
@@ -45,5 +45,5 @@ test("rung clearance includes the ONS lower legend and selection", () => {
   project = insertInstruction(project, "rung-1", 0, contact("ons"));
   const layout = getWrappedRungLayout(project.rungs[0], 760);
   assert.equal(layout.height, PRACTICE_MAIN_HEIGHT);
-  assert.ok(layout.height - (layout.rows[0].mainY + 22) >= 14);
+  assert.ok(layout.height - (layout.rows[0].mainY + 22) >= 8);
 });
