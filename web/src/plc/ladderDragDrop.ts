@@ -133,7 +133,6 @@ export function findLadderDropTarget(
   const contacts = rung.instructions.filter((item) => item.kind !== "OTE");
 
   if (kind === "OTE") {
-    if (rung.instructions.some((item) => item.kind === "OTE")) return null;
     return { kind, position: contacts.length, x: geometry.coilX };
   }
   if (contactCount(rung) >= MAX_PRACTICE_CONTACTS || pointerX > geometry.coilX - 54) return null;
