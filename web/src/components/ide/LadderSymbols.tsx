@@ -2,7 +2,7 @@ import { getCoilVisualState } from "../../plc/ladderCoilVisual";
 import type { ReactNode } from "react";
 import { getInstructionSelectionFrame, LADDER_SELECTION_BLUE } from "../../plc/ladderSelection";
 
-export type Instruction = "XIC" | "XIO" | "ONS" | "OTE" | "OTL" | "OTU" | "TON" | "TOF" | "TONOFF" | "CTU" | "CTD";
+export type Instruction = "XIC" | "XIO" | "ONS" | "OTE" | "OTL" | "OTU" | "TON" | "TOF" | "RTO" | "RES" | "TONOFF" | "CTU" | "CTD";
 
 export const INSTRUCTIONS: { id: Instruction; label: string }[] = [
   { id: "XIC", label: "Examine If Closed" },
@@ -13,6 +13,8 @@ export const INSTRUCTIONS: { id: Instruction; label: string }[] = [
   { id: "OTU", label: "Output Unlatch" },
   { id: "TON", label: "Timer On Delay" },
   { id: "TOF", label: "Timer Off Delay" },
+  { id: "RTO", label: "Retentive Timer" },
+  { id: "RES", label: "Reset Timer" },
   { id: "TONOFF", label: "Dual On/Off Delay (custom simulator block)" },
   { id: "CTU", label: "Count Up" },
   { id: "CTD", label: "Count Down" },
@@ -150,7 +152,7 @@ export const SYMBOL_SCALE = 0.5;
 
 export function ToolbarSymbol({ kind }: { kind: Instruction }) {
   const isContact = kind === "XIC" || kind === "XIO" || kind === "ONS";
-  const isBlock = ["TON", "TOF", "TONOFF", "CTU", "CTD"].includes(kind);
+  const isBlock = ["TON", "TOF", "RTO", "RES", "TONOFF", "CTU", "CTD"].includes(kind);
   return (
     <svg width="46" height="28" viewBox="0 0 92 50" aria-hidden="true">
       <g stroke="currentColor" strokeWidth="2.4" fill="none" strokeLinecap="square">
@@ -353,6 +355,46 @@ export function RungFrame({
       </text>
       <Wire x1={60} y1={y} x2={100} y2={y} live={live} />
       {children}
+    </g>
+  );
+}
+
+
+/** Compact Logix-like TIMER output block; PRE and ACC are milliseconds. */
+export function TimerBlock({
+  x, y, kind, tag, preset, accumulated, en, tt, dn, selected, online, live,
+}: {
+  x: number; y: number; kind: "TON" | "TOF" | "RTO" | "RES";
+  tag: string; preset: number; accumulated: number;
+  en: boolean; tt: boolean; dn: boolean;
+  selected?: boolean; online: boolean; live: boolean;
+}) {
+  const stroke = online && live ? HOT : BASE;
+  return (
+    <g>
+      <rect x={x - 68} y={y - 27} width={136} height={68} rx={3}
+        fill="#f9fafb" stroke={selected ? LADDER_SELECTION_BLUE : stroke}
+        strokeWidth={selected ? 2 : 1.5}/>
+      <text x={x - 58} y={y - 14} fontSize={11} fontWeight="700"
+        fill="#1c354b">{kind}</text>
+      <text x={x + 58} y={y - 14} textAnchor="end" fontSize={10}
+        fill={selected ? LADDER_SELECTION_BLUE : "#34465a"}>
+        {ellipsizeSvgLabel(tag, 84)}
+      </text>
+      <path d={`M${x-62} ${y-9}h124`} stroke="#cbd5e1" strokeWidth={1}/>
+      <text x={x - 57} y={y + 3} fontSize={10} fill="#556372">PRE</text>
+      <text x={x + 54} y={y + 3} textAnchor="end" fontSize={10}
+        fontFamily="monospace" fill="#1c354b">{preset}</text>
+      <text x={x - 57} y={y + 17} fontSize={10} fill="#556372">ACC</text>
+      <text x={x + 54} y={y + 17} textAnchor="end" fontSize={10}
+        fontFamily="monospace" fill="#1c354b">{accumulated}</text>
+      <text x={x} y={y + 34} textAnchor="middle" fontSize={9} fontWeight="600"
+        fill="#64748b">
+        <tspan fill={en ? HOT : "#64748b"}>EN {Number(en)}</tspan>
+        <tspan dx={9} fill={tt ? HOT : "#64748b"}>TT {Number(tt)}</tspan>
+        <tspan dx={9} fill={dn ? HOT : "#64748b"}>DN {Number(dn)}</tspan>
+      </text>
+      <title>{kind} · {tag} · PRE {preset}ms · ACC {accumulated}ms</title>
     </g>
   );
 }
