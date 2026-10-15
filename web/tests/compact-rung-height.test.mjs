@@ -30,7 +30,7 @@ test("OR heights account for actual lanes and leave no large bottom padding", ()
     const bottomOfLast = branchLaneY(lanes - 1) + frame.top + frame.height;
     const height = getPracticeRungHeight(lanes);
     assert.ok(height - bottomOfLast >= 3, "last OR selection must fit inside rung");
-    assert.ok(height - bottomOfLast <= 8, "no excessive empty space beneath OR");
+    assert.ok(height - bottomOfLast <= 20, "compact margin below OR, including ONS label clearance");
   }
   assert.equal(getPracticeRungHeight(0, true), PRACTICE_OR_HEIGHT,
     "keep a provisional OR drop lane during an active drag");
