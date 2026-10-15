@@ -1,3 +1,4 @@
+import type { EditableKind } from "../../plc/practiceDocument";
 import { useRef, useState, type DragEvent } from "react";
 import { ChevronLeft, ChevronRight, Grip, Info } from "lucide-react";
 import { INSTRUCTIONS, ToolbarSymbol, type Instruction } from "./LadderSymbols";
@@ -8,9 +9,9 @@ import {
 
 interface Props {
   selectedInstruction: Instruction;
-  onSelectEditable: (kind: "XIC" | "XIO" | "OTE") => void;
+  onSelectEditable: (kind: EditableKind) => void;
   onSelectDemo: (kind: Instruction) => void;
-  onDragStart: (event: DragEvent<HTMLButtonElement>, kind: "XIC" | "XIO" | "OTE") => void;
+  onDragStart: (event: DragEvent<HTMLButtonElement>, kind: EditableKind) => void;
   onDragEnd: () => void;
   onInsertRung: () => void;
   onInsertParallel: () => void;
@@ -99,11 +100,11 @@ export function InstructionPalette({
           <button type="button" onClick={onInsertParallel}
             disabled={!canInsertParallel}
             title={outputSelected
-              ? "Añadir una bobina OTE en paralelo a la salida seleccionada"
+              ? "Crear una rama de salida paralela VACÍA para OTE, OTL u OTU"
               : canInsertParallel
                 ? "Crear una rama OR vacía bajo el contacto seleccionado"
                 : "Selecciona un contacto, una OTE o un rung válido"}
-            aria-label={outputSelected ? "Crear salida OTE paralela" : "Crear rama paralela OR"}
+            aria-label={outputSelected ? "Crear rama paralela de salida vacía" : "Crear rama paralela OR"}
             className="flex h-[42px] min-w-[50px] shrink-0 flex-col items-center justify-center rounded-sm border border-transparent text-[10px] leading-[12px] text-[#37475b] hover:border-[#b0c0d4] hover:bg-[#eef3f9] disabled:cursor-not-allowed disabled:text-[#a0aab8] disabled:hover:border-transparent disabled:hover:bg-transparent"
           >
             <StructuralGlyph parallel />
@@ -155,9 +156,9 @@ export function InstructionPalette({
           <ChevronRight size={15}/>
         </button>
         <div className="hidden max-w-[164px] shrink-0 items-center gap-1 border-l border-[#c4cedb] pl-2 text-[10px] leading-3 text-[#627084] xl:flex"
-          title="Solo XIC, XIO y OTE pueden editarse actualmente en PracticeRoutine">
+          title="Instrucciones Bit disponibles en PracticeRoutine">
           {supported ? <Grip size={13} className="shrink-0"/> : <Info size={13} className="shrink-0"/>}
-          <span>{supported ? "XIC / XIO / OTE: arrastra al rung" : "Funciones pendientes o solo demo"}</span>
+          <span>{supported ? "XIC / XIO / ONS / OTE / OTL / OTU" : "Funciones pendientes o solo demo"}</span>
         </div>
       </div>
       <div className="flex h-[24px] shrink-0 items-stretch border-t border-[#f4f7fa] bg-[#d1dae7] px-1">
