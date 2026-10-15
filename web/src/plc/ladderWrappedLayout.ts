@@ -31,6 +31,7 @@ export interface WrappedRungLayout {
   coilX: number;
   coilY: number;
   outputYs: number[];
+  emptyOutputYs: number[];
   wrapped: boolean;
 }
 
@@ -81,7 +82,7 @@ export function getWrappedRungLayout(
     const maxLanes = Math.max(0, ...sourceGroups.map((item) => item.branchLanes.length));
     const outputs = index === packed.length - 1
       ? rung.instructions.filter((item) => item.kind === "OTE").length +
-        (previewOutput ? 1 : 0)
+        (rung.emptyOutputBranches?.length ?? 0) + (previewOutput ? 1 : 0)
       : 0;
     const outputExtension = Math.max(0, outputs - 1) * OUTPUT_BRANCH_STEP;
     const height = Math.max(getPracticeRungHeight(maxLanes, showDropLane),
@@ -112,6 +113,8 @@ export function getWrappedRungLayout(
     width, height: top, rows, groups,
     coilX, coilY, outputYs: rung.instructions.filter((item) => item.kind === "OTE")
       .map((_, index) => outputBranchY(coilY, index)),
+    emptyOutputYs: (rung.emptyOutputBranches ?? []).map((_, index) =>
+      outputBranchY(coilY, rung.instructions.filter((item) => item.kind === "OTE").length + index)),
     wrapped: rows.length > 1,
   };
 }
@@ -123,7 +126,7 @@ export function findWrappedLadderDropTarget(
   const rung = project.rungs.find((item) => item.id === rungId);
   if (!rung || !Number.isFinite(x) || !Number.isFinite(y)) return null;
   const layout = getWrappedRungLayout(rung, viewport, true,
-    kind === "OTE" && !movingId);
+    kind === "OTE" && !movingId && !(rung.emptyOutputBranches?.length));
   const row = layout.rows.find((candidate) =>
     y >= candidate.top && y <= candidate.top + candidate.height);
   if (!row) return null;
@@ -132,6 +135,14 @@ export function findWrappedLadderDropTarget(
 
   if (kind === "OTE") {
     if (row.index !== layout.rows.length - 1) return null;
+    const emptyIndex = layout.emptyOutputYs.findIndex((laneY) =>
+      Math.abs(laneY - y) <= OUTPUT_BRANCH_STEP / 2);
+    const emptyId = emptyIndex >= 0 && x >= layout.coilX - 105
+      ? rung.emptyOutputBranches?.[emptyIndex] : undefined;
+    if (emptyId) {
+      return { kind, lane: "main", branchId: emptyId, position: contacts.length,
+        x: layout.coilX, y: layout.emptyOutputYs[emptyIndex] };
+    }
     return { kind, lane: "main", position: contacts.length,
       x: layout.coilX,
       y: layout.outputYs.at(-1) !== undefined
