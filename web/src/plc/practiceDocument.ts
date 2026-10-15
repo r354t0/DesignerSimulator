@@ -150,7 +150,9 @@ function ensureTag(project: PracticeProject, tag: string, kind: EditableKind): v
     if (member || item.type !== "TIMER") throw new Error(kind + " requiere tag TIMER.");
   } else if (member) {
     if (item.type !== "TIMER" || !["EN", "TT", "DN"].includes(member) ||
-        kind === "ONS") throw new Error(kind + " requiere un operando BOOL válido.");
+        (kind !== "XIC" && kind !== "XIO")) {
+      throw new Error(kind + " requiere un BOOL declarado (sin miembros TIMER).");
+    }
   } else if (item.type !== "BOOL") {
     throw new Error(kind + " requiere un tag BOOL.");
   }
