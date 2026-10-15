@@ -61,11 +61,49 @@ function validateTagName(project: PracticeProject, name: string, excludeName?: s
 
 function tagInUse(project: PracticeProject, name: string): boolean {
   return project.rungs.some((rung) => allInstructions(rung).some((item) =>
-    item.tag === name || item.tag.startsWith(name + ".")));
+    item.tag === name || item.tag.startsWith(name + ".") ||
+    (item.preset?.mode === "tag" && item.preset.tag === name)));
 }
 
 /** An empty tag means that the symbol exists but has not been assigned an operand yet. */
-export interface PracticeInstruction { id: string; kind: EditableKind; tag: string }
+/** Optional PRE override. Without one, the TIMER tag's PRE member is used. */
+export type TimerPresetSource =
+  | { mode: "literal"; value: number }
+  | { mode: "tag"; tag: string };
+export interface PracticeInstruction {
+  id: string;
+  kind: EditableKind;
+  tag: string;
+  preset?: TimerPresetSource;
+}
+export const MAX_TIMER_PRESET = 2147483647;
+export function isValidTimerPreset(value: number): boolean {
+  return Number.isInteger(value) && value >= 0 && value <= MAX_TIMER_PRESET;
+}
+
+/** Update one timer's PRE source without writing directly into its tag. */
+export function setInstructionTimerPreset(
+  project: PracticeProject, instructionId: string, preset: TimerPresetSource | undefined,
+): PracticeProject {
+  const found = findInstruction(project, instructionId);
+  if (!found || !["TON", "TOF", "RTO"].includes(found.instruction.kind)) {
+    throw new Error("Selecciona una instrucción TON, TOF o RTO.");
+  }
+  if (preset?.mode === "literal" && !isValidTimerPreset(preset.value)) {
+    throw new Error("PRE debe ser un entero entre 0 y " + MAX_TIMER_PRESET + " ms.");
+  }
+  if (preset?.mode === "tag") {
+    const tag = project.tags.find((item) => item.name === preset.tag);
+    if (!tag || tag.type !== "DINT") throw new Error("PRE requiere un tag DINT existente.");
+    if (typeof tag.value !== "number" || !isValidTimerPreset(tag.value)) {
+      throw new Error("La variable DINT debe contener un PRE no negativo.");
+    }
+  }
+  return { ...project, rungs: project.rungs.map((rung) => ({
+    ...rung, instructions: rung.instructions.map((item) => item.id === instructionId
+      ? { ...item, preset } : item),
+  })) };
+}
 export interface ParallelBranch {
   id: string;
   anchorId: string;
@@ -704,12 +742,24 @@ export function editTag(
     rungs: nextName === previousName ? project.rungs : project.rungs.map((rung) => ({
       ...rung,
       instructions: rung.instructions.map((item) =>
-        item.tag === previousName || item.tag.startsWith(previousName + ".")
-          ? { ...item, tag: nextName + item.tag.slice(previousName.length) } : item),
+        item.tag === previousName || item.tag.startsWith(previousName + ".") ||
+          item.preset?.mode === "tag" && item.preset.tag === previousName
+          ? { ...item,
+              tag: item.tag === previousName || item.tag.startsWith(previousName + ".")
+                ? nextName + item.tag.slice(previousName.length) : item.tag,
+              preset: item.preset?.mode === "tag" && item.preset.tag === previousName
+                ? { mode: "tag" as const, tag: nextName } : item.preset,
+            } : item),
       parallelBranches: rung.parallelBranches?.map((branch) => ({
         ...branch, instructions: branch.instructions.map((item) =>
-          item.tag === previousName || item.tag.startsWith(previousName + ".")
-          ? { ...item, tag: nextName + item.tag.slice(previousName.length) } : item),
+          item.tag === previousName || item.tag.startsWith(previousName + ".") ||
+          item.preset?.mode === "tag" && item.preset.tag === previousName
+          ? { ...item,
+              tag: item.tag === previousName || item.tag.startsWith(previousName + ".")
+                ? nextName + item.tag.slice(previousName.length) : item.tag,
+              preset: item.preset?.mode === "tag" && item.preset.tag === previousName
+                ? { mode: "tag" as const, tag: nextName } : item.preset,
+            } : item),
       })),
     })),
   };
@@ -748,6 +798,11 @@ export function setTagValue(
       item.name === name ? { ...item, value: next } : item) };
   }
   assertValidTagValue(tag.type, value);
+  if (tag.type === "DINT" && project.rungs.some((rung) => allInstructions(rung).some((item) =>
+    item.preset?.mode === "tag" && item.preset.tag === name)) &&
+      !isValidTimerPreset(value as number)) {
+    throw new Error("DINT usado como PRE requiere un entero no negativo en milisegundos.");
+  }
   return { ...project, tags: project.tags.map((item) =>
     item.name === name ? { ...item, value } : item) };
 }
