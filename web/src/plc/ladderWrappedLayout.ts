@@ -39,7 +39,9 @@ export interface WrappedRungLayout {
  * and indivisible. A single exceptionally wide OR group remains scrollable,
  * avoiding broken bypass paths.
  */
-export function getWrappedRungLayout(rung: PracticeRung, viewport = 760, showDropLane = false): WrappedRungLayout {
+export function getWrappedRungLayout(
+  rung: PracticeRung, viewport = 760, showDropLane = false, previewOutput = false,
+): WrappedRungLayout {
   const base = getRungGeometry(rung, viewport);
   const maxGroupSpan = Math.max(0, ...base.groups.map((group) => group.right - group.left));
   const width = Math.max(MIN_RUNG_WIDTH, viewport,
@@ -78,7 +80,9 @@ export function getWrappedRungLayout(rung: PracticeRung, viewport = 760, showDro
   packed.forEach((sourceGroups, index) => {
     const maxLanes = Math.max(0, ...sourceGroups.map((item) => item.branchLanes.length));
     const outputs = index === packed.length - 1
-      ? rung.instructions.filter((item) => item.kind === "OTE").length : 0;
+      ? rung.instructions.filter((item) => item.kind === "OTE").length +
+        (previewOutput ? 1 : 0)
+      : 0;
     const outputExtension = Math.max(0, outputs - 1) * OUTPUT_BRANCH_STEP;
     const height = Math.max(getPracticeRungHeight(maxLanes, showDropLane),
       getPracticeRungHeight(0) + outputExtension) + (index < packed.length - 1 ? 29 : 0);
@@ -118,7 +122,8 @@ export function findWrappedLadderDropTarget(
 ): VisualLadderDropTarget | null {
   const rung = project.rungs.find((item) => item.id === rungId);
   if (!rung || !Number.isFinite(x) || !Number.isFinite(y)) return null;
-  const layout = getWrappedRungLayout(rung, viewport, true);
+  const layout = getWrappedRungLayout(rung, viewport, true,
+    kind === "OTE" && !movingId);
   const row = layout.rows.find((candidate) =>
     y >= candidate.top && y <= candidate.top + candidate.height);
   if (!row) return null;
