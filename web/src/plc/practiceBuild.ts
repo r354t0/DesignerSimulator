@@ -1,4 +1,4 @@
-import { MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, isOutputKind, isTimerKind, type EditableKind, type PracticeInstruction,
+import { MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, isOutputKind, isTimerKind, isValidTimerPreset, type EditableKind, type PracticeInstruction,
   type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
 
 export type DiagnosticSeverity = "error" | "warning";
@@ -32,11 +32,11 @@ export function getPracticeBuildSignature(project: PracticeProject): string {
     tags: project.tags.map(({ name, type, constant }) => ({ name, type, constant })),
     rungs: project.rungs.map((rung) => ({
       id: rung.id,
-      instructions: rung.instructions.map(({ id, kind, tag }) => ({ id, kind, tag })),
+      instructions: rung.instructions.map(({ id, kind, tag, preset }) => ({ id, kind, tag, preset })),
       emptyOutputBranches: rung.emptyOutputBranches ?? [],
       branches: (rung.parallelBranches ?? []).map(({ id, anchorId, endId, instructions }) => ({
-        id, anchorId, endId, instructions: instructions.map(({ id: instructionId, kind, tag }) =>
-          ({ id: instructionId, kind, tag })),
+        id, anchorId, endId, instructions: instructions.map(({ id: instructionId, kind, tag, preset }) =>
+          ({ id: instructionId, kind, tag, preset })),
       })),
     })),
   });
@@ -147,6 +147,39 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
           at + ": TIMER requiere PRE/ACC en milisegundos, enteros no negativos.",
           rung.id, rungIndex, id, branchId);
       }
+    }
+    if (["TON", "TOF", "RTO"].includes(instruction.kind) && instruction.preset) {
+      const source = instruction.preset;
+      if (source.mode === "literal") {
+        if (!isValidTimerPreset(source.value)) {
+          push("error", "INVALID_TIMER_PRESET",
+            at + ": PRE literal debe ser un entero entre 0 y 2147483647 ms.",
+            rung.id, rungIndex, id, branchId);
+        }
+      } else if (source.mode === "tag") {
+        const reference = tags.get(source.tag);
+        if (!reference) {
+          push("error", "UNKNOWN_TIMER_PRESET_TAG",
+            at + ": no existe la variable PRE «" + source.tag + "».",
+            rung.id, rungIndex, id, branchId);
+        } else if (reference.type !== "DINT") {
+          push("error", "INCOMPATIBLE_TIMER_PRESET_TAG",
+            at + ": PRE debe referenciar un DINT, no " + reference.type + ".",
+            rung.id, rungIndex, id, branchId);
+        } else if (typeof reference.value !== "number" ||
+          !isValidTimerPreset(reference.value)) {
+          push("error", "INVALID_TIMER_PRESET",
+            at + ": el DINT usado como PRE requiere un entero no negativo en ms.",
+            rung.id, rungIndex, id, branchId);
+        }
+      } else {
+        push("error", "INVALID_TIMER_PRESET",
+          at + ": modo PRE no admitido.", rung.id, rungIndex, id, branchId);
+      }
+    }
+    if (instruction.kind === "RES" && instruction.preset) {
+      push("error", "INVALID_TIMER_PRESET",
+        at + ": RES no recibe PRE.", rung.id, rungIndex, id, branchId);
     }
     if (instruction.kind === "ONS") {
       if (tag.constant) {
