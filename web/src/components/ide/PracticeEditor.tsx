@@ -8,7 +8,7 @@ import { resolveLadderDeleteAction } from "../../plc/ladderShortcuts";
 import { getBitMenuTarget, invertInstructionBit } from "../../plc/practiceBitMenu";
 import { getWrappedRungLayout, findWrappedLadderDropTarget } from "../../plc/ladderWrappedLayout";
 import { buildPracticeProject, getPracticeBuildSignature, type BuildDiagnostic, type LadderBuildResult } from "../../plc/practiceBuild";
-import { type PracticeScanState, type ScanMode, SCAN_PERIODS_MS } from "../../plc/practiceScanCycle";
+import { getRunAction, type PracticeScanState, type ScanMode, SCAN_PERIODS_MS } from "../../plc/practiceScanCycle";
 import {
   isEditableKind,
   LADDER_DRAG_MIME,
@@ -487,65 +487,74 @@ export function PracticeEditor({
       onKeyDown={handleEditorKeyDown}
       className="flex h-full min-h-0 flex-col bg-white text-slate-800 outline-none"
     >
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-[#e9eef4] px-2.5 py-1.5 text-xs">
-        <button type="button" onClick={() => verifyPracticeRoutine("build")}
-          title="Verificar todo PracticeRoutine sin ejecutar"
-          className="flex items-center gap-1.5 rounded border border-slate-300 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-slate-100">
-          <Hammer size={14} /> Build
-        </button>
-        <button type="button" onClick={() => verifyPracticeRoutine("run")}
-          title="Ejecutar Build y comenzar un nuevo ciclo periódico de scans"
-          className="flex items-center gap-1.5 rounded border border-emerald-700 bg-emerald-700 px-2.5 py-1.5 font-semibold text-white hover:bg-emerald-800">
-          <Play size={14} /> RUN
-        </button>
-        <button type="button" onClick={onPause} disabled={scanMode !== "running"}
-          title="Congelar la ejecución y mantener el estado actual de las salidas"
-          className="flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40">
-          <Pause size={13} /> PAUSE
-        </button>
-        <button type="button" onClick={onResume} disabled={scanMode !== "paused"}
-          title="Reanudar el scan periódico sin reiniciar el contador"
-          className="flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40">
-          <Play size={13} /> RESUME
-        </button>
-        <button type="button" onClick={onStep} disabled={scanMode !== "paused"}
-          title="Ejecutar exactamente un scan y permanecer en PAUSE"
-          className="flex items-center gap-1 rounded border border-slate-300 bg-white px-2 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 disabled:opacity-40">
-          <StepForward size={14} /> SCAN
-        </button>
-                <button type="button" onClick={onStop} disabled={!running}
-          title="Detener el motor de práctica y desactivar las salidas OTE"
-          className="flex items-center gap-1.5 rounded border border-slate-300 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">
-          <Square size={13} /> STOP
-        </button>
-        <label className="flex items-center gap-1 text-[11px] text-slate-600">
-          Ciclo
-          <select aria-label="Período del Scan Cycle" value={scanState.scanPeriodMs}
-            onChange={(event) => onScanPeriodChange(Number(event.target.value))}
-            className="rounded border border-slate-300 bg-white px-1 py-1 text-[11px] text-slate-800">
-            {SCAN_PERIODS_MS.map((period) =>
-              <option key={period} value={period}>{period} ms</option>)}
-          </select>
-        </label>
-        <span title="Duración real de cálculo JavaScript del último scan; no incluye la espera del temporizador ni el renderizado"
-          className="hidden font-mono text-[11px] text-slate-600 lg:inline">
-          Último: {scanState.lastScanDurationMs.toFixed(2)} ms
-        </span>
-        <span aria-live="polite"
-          className={"rounded border px-2 py-1 text-[11px] font-semibold " +
-            (scanMode === "running"
-              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-              : scanMode === "paused"
-                ? "border-amber-200 bg-amber-50 text-amber-800"
-              : !buildRecord || buildIsStale
-                ? "border-amber-200 bg-amber-50 text-amber-800"
-              : currentBuild?.success
+      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-slate-200 bg-[#e9eef4] px-3 py-1.5 text-xs">
+        <div className="flex shrink-0 items-center gap-2">
+          <button type="button" onClick={() => verifyPracticeRoutine("build")}
+            title="Verificar PracticeRoutine sin iniciar el scan"
+            className="flex items-center gap-1.5 rounded border border-slate-300 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-slate-100">
+            <Hammer size={14} /> Build
+          </button>
+          <button type="button"
+            disabled={scanMode === "running"}
+            onClick={() => {
+              const action = getRunAction(scanMode);
+              if (action === "resume") onResume();
+              else if (action === "build-and-start") verifyPracticeRoutine("run");
+            }}
+            title={scanMode === "paused"
+              ? "Reanudar la simulación pausada, conservando el contador de scans"
+              : "Ejecutar Build automáticamente e iniciar RUN"}
+            className="flex items-center gap-1.5 rounded border border-emerald-700 bg-emerald-700 px-2.5 py-1.5 font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50">
+            <Play size={14} /> RUN
+          </button>
+          <button type="button" onClick={onStop} disabled={!running}
+            title="Detener el Scan Cycle y desactivar las salidas OTE"
+            className="flex items-center gap-1.5 rounded border border-slate-300 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">
+            <Square size={13} /> STOP
+          </button>
+          <button type="button" onClick={onPause} disabled={scanMode !== "running"}
+            title="Pausar el Scan Cycle y mantener las salidas congeladas"
+            className="flex items-center gap-1.5 rounded border border-slate-300 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">
+            <Pause size={13} /> PAUSE
+          </button>
+          <button type="button" onClick={onStep} disabled={scanMode !== "paused"}
+            title="Ejecutar exactamente un scan mientras está en PAUSE"
+            className="flex items-center gap-1.5 rounded border border-slate-300 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">
+            <StepForward size={14} /> SCAN
+          </button>
+        </div>
+        <div className="ml-auto flex shrink-0 items-center justify-end gap-2 whitespace-nowrap">
+          <label className="flex items-center gap-1 text-[11px] text-slate-600">
+            Ciclo
+            <select aria-label="Período del Scan Cycle" value={scanState.scanPeriodMs}
+              onChange={(event) => onScanPeriodChange(Number(event.target.value))}
+              className="rounded border border-slate-300 bg-white px-1 py-1 text-[11px] text-slate-800">
+              {SCAN_PERIODS_MS.map((period) =>
+                <option key={period} value={period}>{period} ms</option>)}
+            </select>
+          </label>
+          <span title="Duración del último cálculo Ladder en JavaScript (no incluye la espera ni el renderizado)"
+            className="hidden font-mono text-[11px] tabular-nums text-slate-600 lg:inline">
+            Último: {scanState.lastScanDurationMs.toFixed(2)} ms
+          </span>
+          <span aria-live="polite"
+            className={"rounded border px-2 py-1 text-[11px] font-semibold " +
+              (scanMode === "running"
                 ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                : "border-red-200 bg-red-50 text-red-800")}>
-          {buildStatus}
-        </span>
-        <span className="hidden min-w-0 truncate text-slate-500 md:inline">Herramienta: <strong className="text-sky-800">{selectedTool}</strong></span>
-        <span className="ml-auto text-slate-500">{project.rungs.length} rungs · {project.tags.length} tags</span>
+                : scanMode === "paused"
+                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                  : !buildRecord || buildIsStale
+                    ? "border-amber-200 bg-amber-50 text-amber-800"
+                    : currentBuild?.success
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                      : "border-red-200 bg-red-50 text-red-800")}>
+            {buildStatus}
+          </span>
+        </div>
+      </div>
+      <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-[#f8fafc] px-3 py-0.5 text-[11px] text-slate-500">
+        <span>Herramienta: <strong className="text-sky-800">{selectedTool}</strong></span>
+        <span>{project.rungs.length} rungs · {project.tags.length} tags</span>
       </div>
       <InstructionPalette
         selectedInstruction={selectedTool}
