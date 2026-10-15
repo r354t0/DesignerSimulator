@@ -4,7 +4,7 @@ import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, FileC
 import { Coil, Contact, TimerBlock, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
-import { TimerPresetEditor } from "./TimerPresetEditor";
+import { TimerPresetEditor, type TimerPresetAnchor } from "./TimerPresetEditor";
 import { resolveLadderDeleteAction } from "../../plc/ladderShortcuts";
 import { getBitMenuTarget, invertInstructionBit } from "../../plc/practiceBitMenu";
 import { getOnlineMonitorReadout, type MonitorSelection } from "../../plc/practiceOnlineMonitor";
@@ -82,6 +82,7 @@ export function PracticeEditor({
   const [tagDropTarget, setTagDropTarget] = useState<string | null>(null);
   const [tagSelector, setTagSelector] = useState<TagSelectorState | null>(null);
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
+  const [editingPresetAnchor, setEditingPresetAnchor] = useState<TimerPresetAnchor | null>(null);
   const [bitMenu, setBitMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLElement | null>(null);
@@ -1019,10 +1020,12 @@ export function PracticeEditor({
                         return (
                           <button key={"pre-" + item.id} type="button"
                             aria-label={"Editar PRE de " + item.kind + " " + (item.tag || "sin asignar")}
-                            title="Clic para editar PRE: literal (ms) o variable DINT"
+                            title="Clic para escribir PRE o seleccionar una variable DINT"
                             onClick={(event) => {
                               event.stopPropagation();
                               setSelected(item.id);
+                              const rect = event.currentTarget.getBoundingClientRect();
+                              setEditingPresetAnchor({ left: rect.left, top: rect.top, bottom: rect.bottom });
                               setEditingPresetId(item.id);
                               setTagSelector(null);
                             }}
@@ -1079,10 +1082,11 @@ export function PracticeEditor({
         </div>
       </div>
 
-      {editingPreset && editingPresetId &&
+      {editingPreset && editingPresetId && editingPresetAnchor &&
         ["TON", "TOF", "RTO"].includes(editingPreset.kind) && (
           <TimerPresetEditor key={editingPresetId}
             instruction={editingPreset}
+            anchor={editingPresetAnchor}
             tags={project.tags}
             onSave={(preset) => {
               if (update(() => setInstructionTimerPreset(project, editingPresetId, preset))) {
