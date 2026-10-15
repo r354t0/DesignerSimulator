@@ -1,7 +1,5 @@
-import type {
-  EditableKind, PracticeInstruction, PracticeProject, PracticeRung,
-  MAX_PRACTICE_CONTACTS,
-} from "./practiceDocument.ts";
+import { MAX_PRACTICE_CONTACTS, type EditableKind, type PracticeInstruction,
+  type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
 
 export type DiagnosticSeverity = "error" | "warning";
 
