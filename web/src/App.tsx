@@ -222,7 +222,7 @@ export default function App() {
         case "ladder":
           return <LadderEditor online={online} inputs={inputs} values={values} blocks={blocks} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
         case "tags":
-          return <ControllerTags project={practice} onChange={handlePracticeChange} practiceRunning={practiceMode !== "stopped"} online={online} inputs={inputs} values={values} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
+          return <ControllerTags project={practice} onChange={handlePracticeChange} practiceRunning={practiceMode !== "stopped"} practicePaused={practiceMode === "paused"} online={online} inputs={inputs} values={values} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
         case "simulation":
           return <SimulationScene online={online} inputs={inputs} values={values} onTagChange={handleTagChange} />;
         default:
