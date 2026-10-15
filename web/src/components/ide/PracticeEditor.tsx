@@ -5,7 +5,7 @@ import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymb
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
 import { resolveLadderDeleteAction } from "../../plc/ladderShortcuts";
-import { getBitMenuTarget } from "../../plc/practiceBitMenu";
+import { getBitMenuTarget, invertInstructionBit } from "../../plc/practiceBitMenu";
 import { getWrappedRungLayout, findWrappedLadderDropTarget } from "../../plc/ladderWrappedLayout";
 import { buildPracticeProject, getPracticeBuildSignature, type BuildDiagnostic, type LadderBuildResult } from "../../plc/practiceBuild";
 import { evaluateSeriesScan } from "../../plc/practiceRuntime";
@@ -31,7 +31,6 @@ import {
   removeInstruction,
   removeParallelBranch,
   removeRung,
-  setTagValue,
   type EditableKind,
   type PracticeProject,
 } from "../../plc/practiceDocument";
@@ -242,8 +241,8 @@ export function PracticeEditor({
 
   const currentBitMenuTarget = bitMenu ? getBitMenuTarget(project, bitMenu.id, running) : null;
   const toggleContextBit = () => {
-    if (!currentBitMenuTarget?.editable) return;
-    update(() => setTagValue(project, currentBitMenuTarget.tagName, !currentBitMenuTarget.value));
+    if (!currentBitMenuTarget?.editable || !bitMenu) return;
+    update(() => invertInstructionBit(project, bitMenu.id, running));
     setBitMenu(null);
   };
 
