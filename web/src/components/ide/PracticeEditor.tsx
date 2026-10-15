@@ -575,6 +575,23 @@ export function PracticeEditor({
                           <g key={item.id}>
                             <Wire x1={from} y1={y} x2={group.x - 22} y2={y}
                               live={running && Boolean(runtimeView?.instructionFlow[item.id]?.powerIn)} />
+                            {/* Selecting the main conductor makes the rung the insertion target,
+                                even when its first contact already anchors multiple OR lanes. */}
+                            <line x1={from} y1={y} x2={group.x - 22} y2={y}
+                              stroke="transparent" strokeWidth={15} pointerEvents="stroke"
+                              role="button" tabIndex={0} aria-label={"Seleccionar línea principal del rung " + rungIndex}
+                              style={{ cursor: "pointer" }}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                setSelected(null); setSelectedOrBranch(null); setSelectedRungId(rung.id);
+                                editorRef.current?.focus({ preventScroll: true });
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter" || event.key === " ") {
+                                  event.preventDefault(); setSelected(null); setSelectedOrBranch(null);
+                                  setSelectedRungId(rung.id); editorRef.current?.focus({ preventScroll: true });
+                                }
+                              }} />
                             <Wire x1={group.x + 22} y1={y} x2={group.right} y2={y}
                               live={running && Boolean(runtimeView?.instructionFlow[item.id]?.powerOut)} />
                             {drawContact(item, group.x, y)}
@@ -667,6 +684,22 @@ export function PracticeEditor({
                       })}
                       <Wire x1={groups.at(-1)?.right ?? 64} y1={y}
                         x2={output ? coilX - 24 : width - 30} y2={y} live={rungLive} />
+                      <line x1={groups.at(-1)?.right ?? 64} y1={y}
+                        x2={output ? coilX - 24 : width - 30} y2={y}
+                        stroke="transparent" strokeWidth={15} pointerEvents="stroke"
+                        role="button" tabIndex={0} aria-label={"Seleccionar línea principal del rung " + rungIndex}
+                        style={{ cursor: "pointer" }}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setSelected(null); setSelectedOrBranch(null); setSelectedRungId(rung.id);
+                          editorRef.current?.focus({ preventScroll: true });
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault(); setSelected(null); setSelectedOrBranch(null);
+                            setSelectedRungId(rung.id); editorRef.current?.focus({ preventScroll: true });
+                          }
+                        }} />
                       {output && (
                         <g>
                           <Coil x={coilX} y={y} tag={output.tag || "??"}
