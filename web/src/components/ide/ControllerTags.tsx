@@ -392,7 +392,7 @@ export function ControllerTags({
           </div>
           <span className="truncate text-[10px] text-slate-600">
             {rows.length} de {allRows.length} tags · {scope === "practice"
-              ? practiceRunning ? "RUN · lógica XIC/XIO/OTE en serie (sin scan periódico)" : "Práctica detenida · valores editables"
+              ? practiceRunning ? "RUN · XIC/XIO/OTE con AND/OR (sin scan periódico)" : "Práctica detenida · valores editables"
               : online ? "DEMO · REM RUN" : "DEMO · OFFLINE"}
           </span>
           {scope === "demo" && tab === "monitor" && <button type="button" onClick={onResetCounters}
