@@ -122,10 +122,12 @@ test("COUNTER status members are readable by XIC/XIO but not writable by OTE", (
 });
 
 test("Build rejects invalid COUNTER operand/type and malformed COUNTER values", () => {
-  let p = initialPracticeProject();
-  p = insertInstruction(p, "rung-1", 0, {
-    id: "bad", kind: "CTU", tag: "Start_PB",
-  });
+  const valid = fixture();
+  const p = { ...valid, rungs: valid.rungs.map((rung) => ({
+    ...rung, instructions: rung.instructions.map((instruction) =>
+      instruction.id === "counter"
+        ? { ...instruction, tag: "Start_PB" } : instruction),
+  })) };
   assert.ok(buildPracticeProject(p).diagnostics.some((d) => d.code === "INCOMPATIBLE_TAG"));
   const broken = fixture("CTU");
   const modified = {
