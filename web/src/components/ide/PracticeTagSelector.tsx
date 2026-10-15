@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { createPortal } from "react-dom";
 import { Check, Search, X } from "lucide-react";
 import { filterPracticeTags } from "../../plc/practiceTagSearch";
-import type { PracticeTag } from "../../plc/practiceDocument";
+import { isTimerKind, type PracticeTag, type EditableKind } from "../../plc/practiceDocument";
 
 export type TagSelectorMode = "suggestions" | "dialog";
 
@@ -26,7 +26,19 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const results = useMemo(() => filterPracticeTags(tags, query), [tags, query]);
+  const results = useMemo(() => {
+    const kind = selector.kind as EditableKind;
+    const options = isTimerKind(kind)
+      ? tags.filter((tag) => tag.type === "TIMER")
+      : kind === "ONS" ? tags.filter((tag) => tag.type === "BOOL")
+        : [...tags.filter((tag) => tag.type === "BOOL"),
+            ...tags.filter((tag) => tag.type === "TIMER")
+              .flatMap((tag) => (["EN", "TT", "DN"] as const).map((member) => ({
+                ...tag, name: tag.name + "." + member, type: "BOOL" as const,
+                description: tag.description + " · " + member,
+              })))];
+    return filterPracticeTags(options, query);
+  }, [tags, query, selector.kind]);
   const suggestions = selector.mode === "suggestions";
   const shown = suggestions ? results.slice(0, 8) : results;
 
@@ -86,7 +98,7 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
   const tableRows = (
     <div className={suggestions ? "max-h-[250px] overflow-y-auto" : "max-h-[340px] overflow-y-auto"}>
       {shown.length === 0 ? (
-        <p className="px-4 py-5 text-center text-xs text-slate-500">No se encontraron tags BOOL.</p>
+        <p className="px-4 py-5 text-center text-xs text-slate-500">No se encontraron variables compatibles.</p>
       ) : (
         <table className="w-full border-collapse text-left text-xs">
           <thead className="sticky top-0 bg-slate-100 text-slate-600">
@@ -117,7 +129,7 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
                       <span className="truncate">{tag.name}</span>
                       {tag.name === selector.currentTag && <Check size={12} className="shrink-0 text-emerald-700" />}
                     </span>
-                    {!suggestions && <span className="text-slate-500">BOOL</span>}
+                    {!suggestions && <span className="text-slate-500">{tag.type}</span>}
                     <span className="min-w-0 truncate text-slate-500" title={tag.description}>{tag.description || "—"}</span>
                   </button>
                 </td>
@@ -166,7 +178,7 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
         <header className="flex items-center justify-between border-b border-slate-200 bg-[#f4f6f8] px-4 py-3">
           <div>
             <h3 className="text-sm font-semibold">Seleccionar variable · {selector.kind}</h3>
-            <p className="mt-1 text-xs text-slate-500">Tags de PracticeRoutine · Tipo BOOL · Actual: {selector.currentTag || "Sin asignar"}</p>
+            <p className="mt-1 text-xs text-slate-500">Tags compatibles de PracticeRoutine · Actual: {selector.currentTag || "Sin asignar"}</p>
           </div>
           <button type="button" aria-label="Cerrar selector de tags" onClick={onClose}
             className="rounded p-2 text-slate-500 hover:bg-slate-200"><X size={17}/></button>
