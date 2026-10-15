@@ -1,7 +1,7 @@
 import { getPracticeBuildSignature } from "./practiceBuild.ts";
 import { type PracticeProject } from "./practiceDocument.ts";
 import {
-  evaluateSeriesScan, stopAfterSeriesLogicEdit, stopSeriesScan,
+  evaluateSeriesScan, prescanBitInstructions, stopAfterSeriesLogicEdit, stopSeriesScan,
   type SeriesScan,
 } from "./practiceRuntime.ts";
 
@@ -67,6 +67,7 @@ function performScan(state: PracticeScanState): PracticeScanState {
 export function startPracticeScans(state: PracticeScanState): PracticeScanState {
   return performScan({
     ...state,
+    project: prescanBitInstructions(state.project),
     mode: "running",
     scanCount: 0,
     lastScanDurationMs: 0,
