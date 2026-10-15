@@ -15,10 +15,14 @@ test("single rung is compact while leaving the comment and selection visible", (
   const height = getPracticeRungHeight(0);
   assert.equal(height, PRACTICE_MAIN_HEIGHT);
   assert.ok(height < 122, "reduce the previous oversized rung height");
-  assert.ok(PRACTICE_MAIN_Y + frame.top >= 10, "leave room ABOVE two-line comments");
+  assert.ok(PRACTICE_MAIN_Y + frame.top >= 8, "compact top padding must still contain two-line comments");
   assert.ok(height - (PRACTICE_MAIN_Y + frame.top + frame.height) >= 3,
     "selected symbol must fit BELOW its rail with a small margin");
   assert.equal(getPracticeRungHeight(0, false), height);
+  // Recover upper space without undoing the ONS bottom-margin correction.
+  assert.ok(height <= 104, "shorter rung from reduced upper padding");
+  assert.ok(height - (PRACTICE_MAIN_Y + 22) >= 8,
+    "keep the lower ONS symbol clear of the next rung");
 });
 
 test("OR heights account for actual lanes and leave no large bottom padding", () => {
@@ -35,6 +39,8 @@ test("OR heights account for actual lanes and leave no large bottom padding", ()
   assert.equal(getPracticeRungHeight(0, true), PRACTICE_OR_HEIGHT,
     "keep a provisional OR drop lane during an active drag");
   assert.ok(PRACTICE_BRANCH_Y - PRACTICE_MAIN_Y >= 78);
+  assert.ok(PRACTICE_OR_HEIGHT - (PRACTICE_BRANCH_Y + 22) >= 8,
+    "retain ONS bottom clearance in the lowest OR branch");
 });
 
 test("compact placement preserves main and OR drag-and-drop targets", () => {
