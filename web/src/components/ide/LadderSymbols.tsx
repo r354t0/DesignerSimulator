@@ -362,10 +362,10 @@ export function RungFrame({
 
 /** Compact Logix-like TIMER output block; PRE and ACC are milliseconds. */
 export function TimerBlock({
-  x, y, kind, tag, preset, accumulated, en, tt, dn, selected, online, live,
+  x, y, kind, tag, preset, presetLabel, accumulated, en, tt, dn, selected, online, live,
 }: {
   x: number; y: number; kind: "TON" | "TOF" | "RTO" | "RES";
-  tag: string; preset: number; accumulated: number;
+  tag: string; preset: number; presetLabel?: string; accumulated: number;
   en: boolean; tt: boolean; dn: boolean;
   selected?: boolean; online: boolean; live: boolean;
 }) {
@@ -384,7 +384,7 @@ export function TimerBlock({
       <path d={`M${x-62} ${y-9}h124`} stroke="#cbd5e1" strokeWidth={1}/>
       <text x={x - 57} y={y + 3} fontSize={10} fill="#556372">PRE</text>
       <text x={x + 54} y={y + 3} textAnchor="end" fontSize={10}
-        fontFamily="monospace" fill="#1c354b">{preset}</text>
+        fontFamily="monospace" fill="#1c354b">{ellipsizeSvgLabel(presetLabel ?? String(preset), 92)}</text>
       <text x={x - 57} y={y + 17} fontSize={10} fill="#556372">ACC</text>
       <text x={x + 54} y={y + 17} textAnchor="end" fontSize={10}
         fontFamily="monospace" fill="#1c354b">{accumulated}</text>
