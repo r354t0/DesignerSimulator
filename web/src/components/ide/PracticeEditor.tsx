@@ -601,9 +601,7 @@ export function PracticeEditor({
                       <LadderRails leftX={63} rightX={width - 30} top={0} bottom={svgHeight} live={running} />
 
                       {rows.map((row, rowIndex) => {
-                        const firstGroup = row.groups[0];
                         const previousRow = rows[rowIndex - 1];
-                        const firstId = firstGroup?.mainIds[0];
                         const priorId = previousRow?.groups.at(-1)?.anchorId;
                         const incomingPower = rowIndex === 0 ? running :
                           running && (priorId
