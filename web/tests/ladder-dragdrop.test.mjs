@@ -7,7 +7,7 @@ test("accept only implemented Ladder instruction tools", () => {
   assert.equal(isEditableKind("XIC"), true);
   assert.equal(isEditableKind("XIO"), true);
   assert.equal(isEditableKind("OTE"), true);
-  assert.equal(isEditableKind("TON"), false);
+  assert.equal(isEditableKind("TON"), true);
   assert.equal(isEditableKind("<script>"), false);
 });
 
