@@ -76,8 +76,8 @@ test("single SCAN from PAUSE computes exactly one pass and stays paused", () => 
   assert.equal(state.scanCount, count + 1);
   assert.equal(get(state, "Motor_Run"), false);
   assert.equal(state.frame?.instructionFlow.start.powerOut, false);
-  assert.strictEqual(stepPracticeScan(stopPracticeScans(state)),
-    stopPracticeScans(state).mode === "stopped" ? state : null);
+  const stopped = stopPracticeScans(state);
+  assert.strictEqual(stepPracticeScan(stopped), stopped);
 });
 
 test("RESUME continues same session and a fresh RUN resets scan counter", () => {
