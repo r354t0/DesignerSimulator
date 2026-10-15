@@ -2,7 +2,7 @@ import { getCoilVisualState } from "../../plc/ladderCoilVisual";
 import type { ReactNode } from "react";
 import { getInstructionSelectionFrame, LADDER_SELECTION_BLUE } from "../../plc/ladderSelection";
 
-export type Instruction = "XIC" | "XIO" | "ONS" | "OTE" | "OTL" | "OTU" | "TON" | "TOF" | "RTO" | "RES" | "TONOFF" | "CTU" | "CTD";
+export type Instruction = "XIC" | "XIO" | "ONS" | "OTE" | "OTL" | "OTU" | "TON" | "TOF" | "RTO" | "RES" | "TONOFF" | "CTU" | "CTD" | "EQU" | "NEQ" | "LES" | "LEQ" | "GRT" | "GEQ";
 
 export const INSTRUCTIONS: { id: Instruction; label: string }[] = [
   { id: "XIC", label: "Examine If Closed" },
@@ -18,6 +18,12 @@ export const INSTRUCTIONS: { id: Instruction; label: string }[] = [
   { id: "TONOFF", label: "Dual On/Off Delay (custom simulator block)" },
   { id: "CTU", label: "Count Up" },
   { id: "CTD", label: "Count Down" },
+  { id: "EQU", label: "Equal" },
+  { id: "NEQ", label: "Not Equal" },
+  { id: "LES", label: "Less Than" },
+  { id: "LEQ", label: "Less Than or Equal" },
+  { id: "GRT", label: "Greater Than" },
+  { id: "GEQ", label: "Greater Than or Equal" },
 ];
 
 const BASE = "#58636f";
@@ -152,7 +158,7 @@ export const SYMBOL_SCALE = 0.5;
 
 export function ToolbarSymbol({ kind }: { kind: Instruction }) {
   const isContact = kind === "XIC" || kind === "XIO" || kind === "ONS";
-  const isBlock = ["TON", "TOF", "RTO", "RES", "TONOFF", "CTU", "CTD"].includes(kind);
+  const isBlock = ["TON", "TOF", "RTO", "RES", "TONOFF", "CTU", "CTD", "EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ"].includes(kind);
   return (
     <svg width="46" height="28" viewBox="0 0 92 50" aria-hidden="true">
       <g stroke="currentColor" strokeWidth="2.4" fill="none" strokeLinecap="square">
