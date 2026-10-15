@@ -6,6 +6,8 @@ import { LadderEditor } from "./components/ide/LadderEditor";
 import { ControllerTags } from "./components/ide/ControllerTags";
 import { PracticeEditor } from "./components/ide/PracticeEditor";
 import { initialPracticeProject, type EditableKind, type PracticeProject } from "./plc/practiceDocument";
+import { getPracticeBuildSignature } from "./plc/practiceBuild";
+import { evaluateSeriesScan, stopSeriesScan } from "./plc/practiceRuntime";
 import { isEditableKind, LADDER_DRAG_MIME } from "./plc/ladderDragDrop";
 import { type Instruction } from "./components/ide/LadderSymbols";
 import { evaluateDemo, initialDemoInputs, type DemoInputs, type InputTag } from "./plc/demoModel";
@@ -71,6 +73,7 @@ export default function App() {
   const [instruction, setInstruction] = useState<Instruction>("XIC");
   const [draggingKind, setDraggingKind] = useState<EditableKind | null>(null);
   const [practice, setPractice] = useState<PracticeProject>(initialPracticeProject);
+  const [practiceRunning, setPracticeRunning] = useState(false);
   const practiceIdCounter = useRef(1);
   const nextPracticeId = useCallback((prefix: string) => `${prefix}-${++practiceIdCounter.current}`, []);
   const [online, setOnline] = useState(false);
@@ -113,6 +116,29 @@ export default function App() {
   const handleResetCounters = useCallback(() => {
     setDemo((previous) => ({ ...previous, blocks: resetDemoCounters(previous.blocks) }));
   }, []);
+  // Stage 2B is deliberately event-driven, not a simulated periodic PLC scan.
+  // Re-evaluate immediately after editing monitored inputs, and pause safely
+  // when the program structure changes after RUN.
+  const handlePracticeChange = useCallback((next: PracticeProject) => {
+    const changedLogic = getPracticeBuildSignature(next) !== getPracticeBuildSignature(practice);
+    if (changedLogic && practiceRunning) {
+      setPracticeRunning(false);
+      setPractice(next);
+      return;
+    }
+    setPractice(practiceRunning ? evaluateSeriesScan(next).project : next);
+  }, [practice, practiceRunning]);
+
+  const startPractice = useCallback(() => {
+    setPractice((previous) => evaluateSeriesScan(previous).project);
+    setPracticeRunning(true);
+  }, []);
+
+  const stopPractice = useCallback(() => {
+    setPracticeRunning(false);
+    setPractice((previous) => stopSeriesScan(previous));
+  }, []);
+
 
   const openEditorView = useCallback((view: EditorView) => {
     const tab = view === "ladder"
@@ -159,7 +185,10 @@ export default function App() {
               project={practice}
               selectedTool={instruction}
               draggingKind={draggingKind}
-              onChange={setPractice}
+              onChange={handlePracticeChange}
+              running={practiceRunning}
+              onStart={startPractice}
+              onStop={stopPractice}
               nextId={nextPracticeId}
               onSelectPaletteTool={setInstruction}
               onSelectDemoTool={(kind) => {
@@ -173,14 +202,14 @@ export default function App() {
         case "ladder":
           return <LadderEditor online={online} inputs={inputs} values={values} blocks={blocks} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
         case "tags":
-          return <ControllerTags project={practice} onChange={setPractice} online={online} inputs={inputs} values={values} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
+          return <ControllerTags project={practice} onChange={handlePracticeChange} practiceRunning={practiceRunning} online={online} inputs={inputs} values={values} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
         case "simulation":
           return <SimulationScene online={online} inputs={inputs} values={values} onTagChange={handleTagChange} />;
         default:
           return <div className="p-4">Panel no disponible</div>;
       }
     },
-    [online, inputs, values, blocks, practice, instruction, draggingKind, nextPracticeId, handleTagChange, handleResetCounters, openEditorView, onToolbarDragStart],
+    [online, inputs, values, blocks, practice, practiceRunning, instruction, draggingKind, nextPracticeId, handlePracticeChange, startPractice, stopPractice, handleTagChange, handleResetCounters, openEditorView, onToolbarDragStart],
   );
 
   const syncTabSelection = useCallback((updatedModel: Model) => {
@@ -248,7 +277,7 @@ export default function App() {
         <span>VirtualPLC</span>
         <span className="text-slate-600">|</span>
         <span>{online ? "Monitoreo DEMO · Sin controlador físico" : "Sin conexión a controlador"}</span>
-        <span className="ml-auto">Etapa 2A · Build estático · Motor Ladder pendiente</span>
+        <span className="ml-auto">Etapa 2B · XIC/XIO/OTE en serie · OR pendiente</span>
       </footer>
     </div>
   );
