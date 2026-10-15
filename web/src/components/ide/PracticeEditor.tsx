@@ -46,7 +46,6 @@ interface Props {
   onPaletteDragStart: (event: DragEvent<HTMLButtonElement>, kind: "XIC" | "XIO" | "OTE") => void;
   onPaletteDragEnd: () => void;
 }
-const EDITABLE = new Set<Instruction>(["XIC", "XIO", "OTE"]);
 interface InternalDrag { id: string; kind: EditableKind }
 
 export function PracticeEditor({
