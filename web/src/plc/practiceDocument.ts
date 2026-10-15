@@ -191,7 +191,8 @@ export function insertInstruction(
   let updated: PracticeInstruction[];
 
   if (item.kind === "OTE") {
-    if (rung.instructions.filter((existing) => existing.kind === "OTE").length >= MAX_PARALLEL_OUTPUTS) {
+    if (rung.instructions.filter((existing) => existing.kind === "OTE").length +
+        (rung.emptyOutputBranches?.length ?? 0) >= MAX_PARALLEL_OUTPUTS) {
       throw new Error("Máximo " + MAX_PARALLEL_OUTPUTS + " bobinas OTE en paralelo por rung.");
     }
     // These OTEs are parallel outputs: none conditions the others.
@@ -263,9 +264,10 @@ export function fillEmptyOutputBranch(
   if (!(rung.emptyOutputBranches ?? []).includes(branchId)) {
     throw new Error("Selecciona una rama de salida vacía.");
   }
-  // Allocate and remove the empty slot as a single immutable project update.
-  const inserted = insertInstruction(project, rungId, rung.instructions.length, item);
-  return removeEmptyOutputBranch(inserted, rungId, branchId);
+  // Release the slot before allocating the OTE so the combined output limit
+  // stays valid even when all eight branches are reserved.
+  const released = removeEmptyOutputBranch(project, rungId, branchId);
+  return insertInstruction(released, rungId, rung.instructions.length, item);
 }
 
 /** Create an independent OR lane even when this contact has other OR lanes. */
@@ -465,7 +467,8 @@ export function moveInstruction(
 
   if (source.instruction.kind === "OTE") {
     if (sameRung) return project;
-    if (target.instructions.filter((item) => item.kind === "OTE").length >= MAX_PARALLEL_OUTPUTS) {
+    if (target.instructions.filter((item) => item.kind === "OTE").length +
+        (target.emptyOutputBranches?.length ?? 0) >= MAX_PARALLEL_OUTPUTS) {
       throw new Error("Máximo " + MAX_PARALLEL_OUTPUTS + " bobinas OTE en paralelo por rung.");
     }
   } else if (contactCount(target) + (sameRung ? 0 : movingCount) > MAX_PRACTICE_CONTACTS) {
