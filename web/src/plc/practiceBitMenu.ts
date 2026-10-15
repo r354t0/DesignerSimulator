@@ -1,4 +1,4 @@
-import { findInstruction, type PracticeProject } from "./practiceDocument.ts";
+import { findInstruction, setTagValue, type PracticeProject } from "./practiceDocument.ts";
 
 /**
  * Bit changes from an instruction's context menu are intended for monitored
@@ -34,4 +34,16 @@ export function getBitMenuTarget(
   if (outputOwned) return { instructionId, tagName, value: tag.value,
     editable: false, reason: "El tag es una salida controlada por OTE durante RUN." };
   return { instructionId, tagName, value: tag.value, editable: true };
+}
+
+
+/** Flip the selected BOOL exactly once, respecting RUN and OTE ownership. */
+export function invertInstructionBit(
+  project: PracticeProject, instructionId: string, running: boolean,
+): PracticeProject {
+  const target = getBitMenuTarget(project, instructionId, running);
+  if (!target?.editable) {
+    throw new Error(target?.reason ?? "No se encontró una variable BOOL editable.");
+  }
+  return setTagValue(project, target.tagName, !target.value);
 }
