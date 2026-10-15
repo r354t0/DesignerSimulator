@@ -1,7 +1,7 @@
 import {
   isValidTimerPreset, MAX_TIMER_PRESET,
   type PracticeTag, type TimerPresetSource,
-} from "./practiceDocument";
+} from "./practiceDocument.ts";
 
 /** Only DINTs with a valid millisecond value can drive a timer PRE. */
 export function getAssignableTimerPresetTags(tags: readonly PracticeTag[]): PracticeTag[] {
