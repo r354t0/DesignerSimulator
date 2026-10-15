@@ -1,9 +1,16 @@
 /**
- * Immutable PLC practice document model. Editable routines are not executed yet.
- * Main contacts can own multiple independent parallel OR lanes, each with
- * series contacts. Nested OR and parallel coils are not supported.
+ * Immutable PLC practice document. Contact paths can contain XIC/XIO/ONS,
+ * output banks can contain OTE/OTL/OTU. Nested OR remains out of scope.
  */
-export type EditableKind = "XIC" | "XIO" | "OTE";
+export type EditableKind = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS";
+export type OutputKind = "OTE" | "OTL" | "OTU";
+export type ContactKind = "XIC" | "XIO" | "ONS";
+export const OUTPUT_KINDS: readonly OutputKind[] = ["OTE", "OTL", "OTU"];
+export const CONTACT_KINDS: readonly ContactKind[] = ["XIC", "XIO", "ONS"];
+export const isOutputKind = (kind: EditableKind): kind is OutputKind =>
+  (OUTPUT_KINDS as readonly string[]).includes(kind);
+export const isContactKind = (kind: EditableKind): kind is ContactKind =>
+  (CONTACT_KINDS as readonly string[]).includes(kind);
 
 export type TagType = "BOOL" | "DINT" | "REAL" | "TIMER" | "COUNTER";
 export type TagExternalAccess = "Read/Write" | "Read Only" | "None";
@@ -92,11 +99,11 @@ function allInstructions(rung: PracticeRung): PracticeInstruction[] {
 function ensureTag(project: PracticeProject, tag: string): void {
   const item = project.tags.find((entry) => entry.name === tag);
   if (!item) throw new Error("Selecciona un tag existente.");
-  if (item.type !== "BOOL") throw new Error("XIC, XIO y OTE solo admiten tags BOOL.");
+  if (item.type !== "BOOL") throw new Error("Las instrucciones Bit solo admiten tags BOOL.");
 }
 
 function ensureNewInstruction(project: PracticeProject, item: PracticeInstruction): void {
-  if (!["XIC", "XIO", "OTE"].includes(item.kind)) {
+  if (![...CONTACT_KINDS, ...OUTPUT_KINDS].includes(item.kind)) {
     throw new Error("Esta instrucción aún no está habilitada para edición.");
   }
   // A new XIC/XIO/OTE may be inserted before the user assigns a BOOL operand.
@@ -118,7 +125,7 @@ export const MAX_PRACTICE_CONTACTS = 32;
 export const MAX_PARALLEL_OUTPUTS = 8;
 
 export function contactCount(rung: PracticeRung): number {
-  return rung.instructions.filter((item) => item.kind !== "OTE").length +
+  return rung.instructions.filter((item) => !isOutputKind(item.kind)).length +
     (rung.parallelBranches ?? []).reduce((sum, branch) => sum + branch.instructions.length, 0);
 }
 
@@ -169,13 +176,13 @@ export function getParallelBranchTarget(
     ? findInstruction(project, selectedInstructionId)
     : null;
   if (selectedInstructionId) {
-    if (!location || location.lane !== "main" || location.instruction.kind === "OTE") return null;
+    if (!location || location.lane !== "main" || isOutputKind(location.instruction.kind)) return null;
     return { rungId: location.rungId, anchorId: location.instruction.id };
   }
 
   const rung = project.rungs.find((item) => item.id === selectedRungId);
   if (!rung) return null;
-  const anchor = rung.instructions.find((item) => item.kind !== "OTE");
+  const anchor = rung.instructions.find((item) => !isOutputKind(item.kind));
   return anchor ? { rungId: rung.id, anchorId: anchor.id } : null;
 }
 
@@ -190,8 +197,8 @@ export function insertInstruction(
   const rung = getRung(project, rungId);
   let updated: PracticeInstruction[];
 
-  if (item.kind === "OTE") {
-    if (rung.instructions.filter((existing) => existing.kind === "OTE").length +
+  if (isOutputKind(item.kind)) {
+    if (rung.instructions.filter((existing) => isOutputKind(existing.kind)).length +
         (rung.emptyOutputBranches?.length ?? 0) >= MAX_PARALLEL_OUTPUTS) {
       throw new Error("Máximo " + MAX_PARALLEL_OUTPUTS + " bobinas OTE en paralelo por rung.");
     }
@@ -199,7 +206,7 @@ export function insertInstruction(
     updated = [...rung.instructions, item];
   } else {
     if (contactCount(rung) >= MAX_PRACTICE_CONTACTS) throw new Error("Máximo " + MAX_PRACTICE_CONTACTS + " contactos por rung.");
-    const limit = rung.instructions.filter((part) => part.kind !== "OTE").length;
+    const limit = rung.instructions.filter((part) => !isOutputKind(part.kind)).length;
     const at = Math.min(Math.max(0, position), limit);
     updated = [...rung.instructions.slice(0, at), item, ...rung.instructions.slice(at)];
   }
@@ -207,7 +214,7 @@ export function insertInstruction(
   // In Studio 5000, adding a main-line contact immediately after the last
   // contact enclosed by an OR extends the upper AND path, not the outer rung.
   // Preserve existing end IDs for insertions already INSIDE an extended group.
-  const nextBranches = item.kind === "OTE" ? rung.parallelBranches :
+  const nextBranches = isOutputKind(item.kind) ? rung.parallelBranches :
     rung.parallelBranches?.map((branch) => {
       const endId = branch.endId ?? branch.anchorId;
       const last = rung.instructions.findIndex((part) => part.id === endId);
@@ -223,7 +230,7 @@ export function insertInstruction(
 /** Create an empty output-side OR lane without inserting an instruction. */
 export function createEmptyOutputBranch(project: PracticeProject, rungId: string): PracticeProject {
   const rung = getRung(project, rungId);
-  const outputCount = rung.instructions.filter((item) => item.kind === "OTE").length;
+  const outputCount = rung.instructions.filter((item) => isOutputKind(item.kind)).length;
   if (outputCount === 0) throw new Error("Selecciona primero una bobina OTE del rung.");
   if (outputCount + (rung.emptyOutputBranches?.length ?? 0) >= MAX_PARALLEL_OUTPUTS) {
     throw new Error("Máximo " + MAX_PARALLEL_OUTPUTS + " ramas de salida por rung.");
@@ -259,7 +266,7 @@ export function removeEmptyOutputBranch(
 export function fillEmptyOutputBranch(
   project: PracticeProject, rungId: string, branchId: string, item: PracticeInstruction,
 ): PracticeProject {
-  if (item.kind !== "OTE") throw new Error("La rama de salida admite una bobina OTE.");
+  if (!isOutputKind(item.kind)) throw new Error("La rama de salida admite OTE, OTL u OTU.");
   const rung = getRung(project, rungId);
   if (!(rung.emptyOutputBranches ?? []).includes(branchId)) {
     throw new Error("Selecciona una rama de salida vacía.");
@@ -276,7 +283,7 @@ export function moveInstructionToEmptyOutputBranch(
   targetRungId: string, branchId: string,
 ): PracticeProject {
   const source = findInstruction(project, instructionId);
-  if (!source || source.instruction.kind !== "OTE") {
+  if (!source || !isOutputKind(source.instruction.kind)) {
     throw new Error("Solo se puede colocar una bobina OTE en esta rama.");
   }
   const target = getRung(project, targetRungId);
@@ -289,7 +296,7 @@ export function moveInstructionToEmptyOutputBranch(
   // Release the reserved slot before applying the move's output capacity check.
   const released = removeEmptyOutputBranch(project, targetRungId, branchId);
   return moveInstruction(released, instructionId, targetRungId,
-    target.instructions.filter((item) => item.kind !== "OTE").length);
+    target.instructions.filter((item) => !isOutputKind(item.kind)).length);
 }
 
 /** Create an independent OR lane even when this contact has other OR lanes. */
@@ -297,7 +304,7 @@ export function createParallelBranch(
   project: PracticeProject, rungId: string, anchorId: string,
 ): PracticeProject {
   const rung = getRung(project, rungId);
-  if (!rung.instructions.some((item) => item.id === anchorId && item.kind !== "OTE")) {
+  if (!rung.instructions.some((item) => item.id === anchorId && !isOutputKind(item.kind))) {
     throw new Error("Selecciona un contacto principal válido para crear el OR.");
   }
   const previous = rung.parallelBranches ?? [];
@@ -330,11 +337,11 @@ export function addParallelContact(
   branchId?: string,
 ): PracticeProject {
   ensureNewInstruction(project, instruction);
-  if (instruction.kind === "OTE") {
-    throw new Error("Las ramas OR solo admiten XIC y XIO en esta etapa.");
+  if (isOutputKind(instruction.kind)) {
+    throw new Error("Las ramas OR solo admiten XIC, XIO u ONS.");
   }
   const rung = getRung(project, rungId);
-  if (!rung.instructions.some((item) => item.id === anchorId && item.kind !== "OTE")) {
+  if (!rung.instructions.some((item) => item.id === anchorId && !isOutputKind(item.kind))) {
     throw new Error("Selecciona un contacto principal válido para crear el OR.");
   }
   if (contactCount(rung) >= MAX_PRACTICE_CONTACTS) throw new Error("Máximo " + MAX_PRACTICE_CONTACTS + " contactos por rung.");
@@ -451,7 +458,7 @@ export function removeInstruction(project: PracticeProject, id: string): Practic
       "Este contacto tiene varias ramas OR. Elimina o reubica las ramas primero.",
     );
     const promoted = paired[0]?.instructions ?? [];
-    const main = rung.instructions.filter((item) => item.kind !== "OTE");
+    const main = rung.instructions.filter((item) => !isOutputKind(item.kind));
     const removedAt = main.findIndex((item) => item.id === id);
     return {
       ...rung,
@@ -487,9 +494,9 @@ export function moveInstruction(
     throw new Error("Este contacto inicia un OR con varios contactos superiores. Reorganiza el grupo antes de mover su inicio.");
   }
 
-  if (source.instruction.kind === "OTE") {
+  if (isOutputKind(source.instruction.kind)) {
     if (sameRung) return project;
-    if (target.instructions.filter((item) => item.kind === "OTE").length +
+    if (target.instructions.filter((item) => isOutputKind(item.kind)).length +
         (target.emptyOutputBranches?.length ?? 0) >= MAX_PARALLEL_OUTPUTS) {
       throw new Error("Máximo " + MAX_PARALLEL_OUTPUTS + " bobinas OTE en paralelo por rung.");
     }
@@ -505,7 +512,7 @@ export function moveInstruction(
         .filter((branch) => branch.anchorId !== instructionId)
         .map((branch) => {
           const priorMain = rung.instructions
-            .filter((item) => item.kind !== "OTE");
+            .filter((item) => !isOutputKind(item.kind));
           const removedAt = priorMain.findIndex((item) => item.id === instructionId);
           const endId = !sameRung && branch.endId === instructionId
             ? (removedAt > 0 ? priorMain[removedAt - 1].id : branch.anchorId)
@@ -515,7 +522,7 @@ export function moveInstruction(
         }),
     }) };
 
-  const originalContactCount = target.instructions.filter((item) => item.kind !== "OTE").length;
+  const originalContactCount = target.instructions.filter((item) => !isOutputKind(item.kind)).length;
   const originalAt = Math.min(Math.max(0, position), originalContactCount);
   const adjusted = sameRung && source.lane === "main" && source.position < originalAt
     ? originalAt - 1 : originalAt;
@@ -542,9 +549,9 @@ export function moveToParallel(
 ): PracticeProject {
   const source = findInstruction(project, instructionId);
   if (!source) throw new Error("No se encontró la instrucción.");
-  if (source.instruction.kind === "OTE") throw new Error("La OTE no puede entrar en una rama OR.");
+  if (isOutputKind(source.instruction.kind)) throw new Error("La OTE no puede entrar en una rama OR.");
   const target = getRung(project, targetRungId);
-  if (!target.instructions.some((item) => item.id === anchorId && item.kind !== "OTE")) {
+  if (!target.instructions.some((item) => item.id === anchorId && !isOutputKind(item.kind))) {
     throw new Error("El contacto de referencia no existe.");
   }
   if (instructionId === anchorId) throw new Error("El contacto no puede ser paralelo a sí mismo.");
@@ -570,7 +577,7 @@ export function moveToParallel(
       ...rung,
       instructions: rung.instructions.filter((item) => item.id !== instructionId),
       parallelBranches: (rung.parallelBranches ?? []).map((branch) => {
-        const main = rung.instructions.filter((item) => item.kind !== "OTE");
+        const main = rung.instructions.filter((item) => !isOutputKind(item.kind));
         const removedAt = main.findIndex((item) => item.id === instructionId);
         return {
           ...branch,
@@ -600,7 +607,7 @@ export interface PaletteInsertionTarget {
 
 /** Main contact IDs covered by a shared OR group (start through reunion). */
 export function getOrMainContactIds(rung: PracticeRung, anchorId: string): string[] {
-  const contacts = rung.instructions.filter((item) => item.kind !== "OTE");
+  const contacts = rung.instructions.filter((item) => !isOutputKind(item.kind));
   const start = contacts.findIndex((item) => item.id === anchorId);
   if (start < 0) return [];
   const branch = (rung.parallelBranches ?? []).find((item) => item.anchorId === anchorId);
@@ -622,9 +629,9 @@ export function getPaletteInsertionTarget(
   const rungId = location?.rungId ?? selectedRungId;
   const rung = project.rungs.find((item) => item.id === rungId);
   if (!rung) return null;
-  const contactLength = rung.instructions.filter((item) => item.kind !== "OTE").length;
-  if (kind === "OTE") return { rungId: rung.id, position: contactLength };
-  if (location && location.instruction.kind !== "OTE") {
+  const contactLength = rung.instructions.filter((item) => !isOutputKind(item.kind)).length;
+  if (isOutputKind(kind)) return { rungId: rung.id, position: contactLength };
+  if (location && !isOutputKind(location.instruction.kind)) {
     if (location.lane === "parallel") return {
       rungId: rung.id, anchorId: location.anchorId, branchId: location.branchId,
       position: location.position + 1,
