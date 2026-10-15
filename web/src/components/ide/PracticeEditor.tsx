@@ -394,28 +394,7 @@ export function PracticeEditor({
       onKeyDown={handleEditorKeyDown}
       className="flex h-full min-h-0 flex-col bg-white text-slate-800 outline-none"
     >
-      <InstructionPalette
-        selectedInstruction={selectedTool}
-        onSelectEditable={handlePaletteClick}
-        onSelectDemo={onSelectDemoTool}
-        onDragStart={onPaletteDragStart}
-        onDragEnd={onPaletteDragEnd}
-        onInsertRung={insertSelectedRungBelow}
-        onInsertParallel={insertSelectedParallelBranch}
-        canInsertParallel={Boolean(parallelTarget)}
-      />
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-[#f4f6f8] px-4 py-2">
-        <div>
-          <h2 className="text-xs font-semibold">PracticeRoutine.LAD</h2>
-          <p className="mt-1 text-[11px] text-slate-500">
-            Primer ícono: nuevo rung debajo · Segundo: rama OR · Selecciona el conductor de una rama y pulsa Supr para eliminarla.
-          </p>
-        </div>
-        <span className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">
-ETAPA A · VERIFICACIÓN
-        </span>
-      </header>
-      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-[#f8fafc] px-3 py-2 text-xs">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-[#e9eef4] px-2.5 py-1.5 text-xs">
         <button type="button" onClick={() => verifyPracticeRoutine("build")}
           title="Verificar todo PracticeRoutine sin ejecutar"
           className="flex items-center gap-1.5 rounded border border-slate-300 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-slate-100">
@@ -435,12 +414,19 @@ ETAPA A · VERIFICACIÓN
                 : "border-red-200 bg-red-50 text-red-800")}>
           {buildStatus}
         </span>
-        <span className="text-slate-500">
-          Herramienta: <strong className="text-sky-800">{selectedTool}</strong>
-          {EDITABLE.has(selectedTool) ? " · Clic para insertar según selección o arrastrar" : " · Solo demo visual"}
-        </span>
+        <span className="hidden min-w-0 truncate text-slate-500 md:inline">Herramienta: <strong className="text-sky-800">{selectedTool}</strong></span>
         <span className="ml-auto text-slate-500">{project.rungs.length} rungs · {project.tags.length} tags</span>
       </div>
+      <InstructionPalette
+        selectedInstruction={selectedTool}
+        onSelectEditable={handlePaletteClick}
+        onSelectDemo={onSelectDemoTool}
+        onDragStart={onPaletteDragStart}
+        onDragEnd={onPaletteDragEnd}
+        onInsertRung={insertSelectedRungBelow}
+        onInsertParallel={insertSelectedParallelBranch}
+        canInsertParallel={Boolean(parallelTarget)}
+      />
 
       <div className="min-h-0 flex-1 overflow-auto bg-white" ref={viewportRef}>
         <div className="min-h-full bg-white" style={{ width: canvasWidth }}>
