@@ -35,7 +35,7 @@ export interface WrappedRungLayout {
  * and indivisible. A single exceptionally wide OR group remains scrollable,
  * avoiding broken bypass paths.
  */
-export function getWrappedRungLayout(rung: PracticeRung, viewport = 760): WrappedRungLayout {
+export function getWrappedRungLayout(rung: PracticeRung, viewport = 760, showDropLane = false): WrappedRungLayout {
   const base = getRungGeometry(rung, viewport);
   const maxGroupSpan = Math.max(0, ...base.groups.map((group) => group.right - group.left));
   const width = Math.max(MIN_RUNG_WIDTH, viewport,
@@ -73,7 +73,7 @@ export function getWrappedRungLayout(rung: PracticeRung, viewport = 760): Wrappe
   let top = 0;
   packed.forEach((sourceGroups, index) => {
     const maxLanes = Math.max(0, ...sourceGroups.map((item) => item.branchLanes.length));
-    const height = getPracticeRungHeight(maxLanes) + (index < packed.length - 1 ? 29 : 0);
+    const height = getPracticeRungHeight(maxLanes, showDropLane) + (index < packed.length - 1 ? 29 : 0);
     const actual: WrappedGroup[] = [];
     let nextLeft = lead;
     sourceGroups.forEach((group) => {
@@ -107,7 +107,7 @@ export function findWrappedLadderDropTarget(
 ): VisualLadderDropTarget | null {
   const rung = project.rungs.find((item) => item.id === rungId);
   if (!rung || !Number.isFinite(x) || !Number.isFinite(y)) return null;
-  const layout = getWrappedRungLayout(rung, viewport);
+  const layout = getWrappedRungLayout(rung, viewport, true);
   const row = layout.rows.find((candidate) =>
     y >= candidate.top && y <= candidate.top + candidate.height);
   if (!row) return null;
