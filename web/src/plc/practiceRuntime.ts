@@ -1,4 +1,4 @@
-import { isOutputKind, isTimerKind, type PracticeProject, type PracticeTag, type PracticeInstruction } from "./practiceDocument.ts";
+import { isOutputKind, isTimerKind, isValidTimerPreset, type PracticeProject, type PracticeTag, type PracticeInstruction } from "./practiceDocument.ts";
 
 /**
  * Event-driven Ladder evaluation (Phase 2C): top-to-bottom rung order, left-to-
@@ -61,10 +61,25 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
       previous.PRE < 0 || previous.ACC < 0) throw new Error("TIMER requiere PRE/ACC válidos.");
     return previous;
   }
-  function updateTimer(name: string, kind: "TON" | "TOF" | "RTO" | "RES", enabled: boolean) {
-    const t = timer(name);
+  function updateTimer(instruction: PracticeInstruction, enabled: boolean) {
+    const name = instruction.tag;
+    const kind = instruction.kind;
+    const stored = timer(name);
+    const source = instruction.preset;
+    let pre = stored.PRE;
+    if (kind !== "RES" && source?.mode === "literal") pre = source.value;
+    if (kind !== "RES" && source?.mode === "tag") {
+      const external = project.tags.find((item) => item.name === source.tag);
+      if (!external || external.type !== "DINT" || typeof external.value !== "number") {
+        throw new Error("PRE debe referenciar un DINT válido: " + source.tag);
+      }
+      pre = external.value;
+    }
+    if (!isValidTimerPreset(pre)) {
+      throw new Error("PRE requiere un entero no negativo válido (ms) para " + name);
+    }
+    const t = { ...stored, PRE: pre };
     const acc = Math.min(2147483647, Math.max(0, Math.round(t.ACC)));
-    const pre = Math.round(t.PRE);
     let value = { ...t };
     if (kind === "RES") {
       if (enabled) value = { ...t, ACC: 0, EN: false, TT: false, DN: false };
@@ -181,7 +196,7 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
 
     for (const instruction of rung.instructions.filter((item) => isOutputKind(item.kind))) {
       if (isTimerKind(instruction.kind)) {
-        const output = updateTimer(instruction.tag, instruction.kind, power);
+        const output = updateTimer(instruction, power);
         instructionFlow[instruction.id] = { powerIn: power, condition: power,
           powerOut: power, value: output.DN };
         continue;
