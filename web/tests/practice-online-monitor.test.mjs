@@ -104,7 +104,7 @@ test("monitor accounts for OR branch and rung power using the snapshot, not reco
   const rung = getOnlineMonitorReadout(frame.project, frame, "running",
     { kind: "rung", rungId: "rung-1" });
   assert.equal(by(rung.fields, "Resultado rung"), "Energizado");
-  assert.equal(by(rung.fields, "Bobinas OTE"), "1");
+  assert.equal(by(rung.fields, "Salidas OTE/OTL/OTU"), "1");
   assert.equal(getOnlineMonitorReadout(p, frame, "running",
     { kind: "rung", rungId: "unknown" }), null);
 });
