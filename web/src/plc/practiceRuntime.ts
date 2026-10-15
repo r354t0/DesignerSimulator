@@ -87,15 +87,15 @@ export function evaluateSeriesScan(project: PracticeProject): SeriesScan {
         throw new Error("Las ramas OR deben compartir una unión válida en la línea principal.");
       }
       const end = ends.length ? ends[0] : mainIndex;
-      const input = power;
-      let mainPower = input;
+      const input: boolean = power;
+      let mainPower: boolean = input;
       for (let index = mainIndex; index <= end; index++) {
         if (index > mainIndex && branchesByAnchor.has(main[index].id)) {
           throw new Error("No se admiten grupos OR superpuestos en esta versión.");
         }
         mainPower = evalContact(main[index], mainPower);
       }
-      let mergedPower = mainPower;
+      let mergedPower: boolean = mainPower;
       for (const branch of branches) {
         branchInput[branch.id] = input;
         let lanePower = input;
