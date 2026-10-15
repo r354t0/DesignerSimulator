@@ -20,6 +20,9 @@ export interface WrappedRow {
   height: number;
   groups: WrappedGroup[];
 }
+export const OUTPUT_BRANCH_STEP = 88;
+export const outputBranchY = (coilY: number, index: number) => coilY + index * OUTPUT_BRANCH_STEP;
+
 export interface WrappedRungLayout {
   width: number;
   height: number;
@@ -27,6 +30,7 @@ export interface WrappedRungLayout {
   groups: WrappedGroup[];
   coilX: number;
   coilY: number;
+  outputYs: number[];
   wrapped: boolean;
 }
 
@@ -73,7 +77,11 @@ export function getWrappedRungLayout(rung: PracticeRung, viewport = 760, showDro
   let top = 0;
   packed.forEach((sourceGroups, index) => {
     const maxLanes = Math.max(0, ...sourceGroups.map((item) => item.branchLanes.length));
-    const height = getPracticeRungHeight(maxLanes, showDropLane) + (index < packed.length - 1 ? 29 : 0);
+    const outputs = index === packed.length - 1
+      ? rung.instructions.filter((item) => item.kind === "OTE").length : 0;
+    const outputExtension = Math.max(0, outputs - 1) * OUTPUT_BRANCH_STEP;
+    const height = Math.max(getPracticeRungHeight(maxLanes, showDropLane),
+      getPracticeRungHeight(0) + outputExtension) + (index < packed.length - 1 ? 29 : 0);
     const actual: WrappedGroup[] = [];
     let nextLeft = lead;
     sourceGroups.forEach((group) => {
@@ -95,9 +103,12 @@ export function getWrappedRungLayout(rung: PracticeRung, viewport = 760, showDro
     rows.push({ index, top, mainY: top + PRACTICE_MAIN_Y, height, groups: actual });
     top += height;
   });
+  const coilY = rows.at(-1)!.mainY;
   return {
     width, height: top, rows, groups,
-    coilX, coilY: rows.at(-1)!.mainY, wrapped: rows.length > 1,
+    coilX, coilY, outputYs: rung.instructions.filter((item) => item.kind === "OTE")
+      .map((_, index) => outputBranchY(coilY, index)),
+    wrapped: rows.length > 1,
   };
 }
 
@@ -115,10 +126,12 @@ export function findWrappedLadderDropTarget(
   const contacts = rung.instructions.filter((item) => item.kind !== "OTE");
 
   if (kind === "OTE") {
-    if (rung.instructions.some((item) => item.kind === "OTE") && !moving) return null;
     if (row.index !== layout.rows.length - 1) return null;
     return { kind, lane: "main", position: contacts.length,
-      x: layout.coilX, y: layout.coilY };
+      x: layout.coilX,
+      y: layout.outputYs.at(-1) !== undefined
+        ? layout.outputYs.at(-1)! + (moving ? 0 : OUTPUT_BRANCH_STEP)
+        : layout.coilY };
   }
 
   if (y - row.top >= 126) {
