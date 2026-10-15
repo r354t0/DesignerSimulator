@@ -64,6 +64,8 @@ export interface PracticeRung {
   id: string;
   instructions: PracticeInstruction[];
   parallelBranches?: ParallelBranch[];
+  /** Output-side OR lanes created before an OTE is placed on them. */
+  emptyOutputBranches?: string[];
 }
 export interface PracticeProject {
   tags: PracticeTag[];
@@ -215,6 +217,55 @@ export function insertInstruction(
   return { ...project, rungs: project.rungs.map((part) =>
     part.id === rungId ? { ...part, instructions: updated, parallelBranches: nextBranches } : part,
   ) };
+}
+
+/** Create an empty output-side OR lane without inserting an instruction. */
+export function createEmptyOutputBranch(project: PracticeProject, rungId: string): PracticeProject {
+  const rung = getRung(project, rungId);
+  const outputCount = rung.instructions.filter((item) => item.kind === "OTE").length;
+  if (outputCount === 0) throw new Error("Selecciona primero una bobina OTE del rung.");
+  if (outputCount + (rung.emptyOutputBranches?.length ?? 0) >= MAX_PARALLEL_OUTPUTS) {
+    throw new Error("Máximo " + MAX_PARALLEL_OUTPUTS + " ramas de salida por rung.");
+  }
+  let serial = 1;
+  const used = rung.emptyOutputBranches ?? [];
+  while (used.includes("output-or-" + serial)) serial++;
+  const branchId = "output-or-" + serial;
+  return { ...project, rungs: project.rungs.map((part) =>
+    part.id === rungId ? {
+      ...part, emptyOutputBranches: [...used, branchId],
+    } : part,
+  ) };
+}
+
+/** Delete just the empty output lane, preserving every other coil and rung. */
+export function removeEmptyOutputBranch(
+  project: PracticeProject, rungId: string, branchId: string,
+): PracticeProject {
+  const rung = getRung(project, rungId);
+  if (!(rung.emptyOutputBranches ?? []).includes(branchId)) {
+    throw new Error("No existe la rama de salida seleccionada.");
+  }
+  return { ...project, rungs: project.rungs.map((part) =>
+    part.id === rungId ? {
+      ...part, emptyOutputBranches: (part.emptyOutputBranches ?? [])
+        .filter((item) => item !== branchId),
+    } : part,
+  ) };
+}
+
+/** Explicitly place a new OTE into a previously empty output-side OR lane. */
+export function fillEmptyOutputBranch(
+  project: PracticeProject, rungId: string, branchId: string, item: PracticeInstruction,
+): PracticeProject {
+  if (item.kind !== "OTE") throw new Error("La rama de salida admite una bobina OTE.");
+  const rung = getRung(project, rungId);
+  if (!(rung.emptyOutputBranches ?? []).includes(branchId)) {
+    throw new Error("Selecciona una rama de salida vacía.");
+  }
+  // Allocate and remove the empty slot as a single immutable project update.
+  const inserted = insertInstruction(project, rungId, rung.instructions.length, item);
+  return removeEmptyOutputBranch(inserted, rungId, branchId);
 }
 
 /** Create an independent OR lane even when this contact has other OR lanes. */
