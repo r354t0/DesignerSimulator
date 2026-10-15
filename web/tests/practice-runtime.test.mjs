@@ -103,12 +103,12 @@ test("STOP resets OTE-written outputs but preserves inputs and unrelated BOOL va
   assert.strictEqual(stopSeriesScan(stopped), stopped);
 });
 
-test("Stage 2B rejects populated and empty OR lanes instead of silently ignoring them", () => {
+test("Stage 2C executes populated OR lanes and rejects empty ones until fixed", () => {
   let p = series();
   p = createParallelBranch(p, "rung-1", "start");
-  assert.deepEqual(getUnsupportedSeriesRungs(p), ["rung-1"]);
-  assert.throws(() => evaluateSeriesScan(p), /Etapa C/);
-  assert.equal(buildPracticeProject(p).success, false); // empty OR is already a Build error
+  assert.deepEqual(getUnsupportedSeriesRungs(p), []);
+  assert.throws(() => evaluateSeriesScan(p), /rama OR está vacía/);
+  assert.equal(buildPracticeProject(p).success, false);
   const branchId = p.rungs[0].parallelBranches[0].id;
   const patched = { ...p, rungs: p.rungs.map((rung) => ({
     ...rung, parallelBranches: rung.parallelBranches?.map((branch) => ({
@@ -117,7 +117,11 @@ test("Stage 2B rejects populated and empty OR lanes instead of silently ignoring
     })),
   })) };
   assert.equal(buildPracticeProject(patched).success, true);
-  assert.throws(() => evaluateSeriesScan(patched), /Etapa C/);
+  const live = evaluateSeriesScan(setTagValue(patched, "Auto_Mode", true));
+  assert.equal(get(live.project, "Motor_Run"), true);
+  assert.equal(live.branchPower[branchId], true);
+  assert.equal(live.instructionFlow.start.powerOut, false);
+  assert.equal(live.joinedPower.start, true);
 });
 
 test("invalid BOOL reference and unsupported opcode fail fast", () => {
