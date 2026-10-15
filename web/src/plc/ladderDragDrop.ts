@@ -185,7 +185,7 @@ export function findVisualLadderDropTarget(
   }
 
   if (y < 13 || y > 125) return null;
-  if (moving?.isOutputKind(instruction.kind) && moving.rungId === rungId) {
+  if (moving && isOutputKind(moving.instruction.kind) && moving.rungId === rungId) {
     return { kind, lane: "main", position: rung.instructions.length - 1,
       x: geometry.coilX, y: PRACTICE_MAIN_Y };
   }
