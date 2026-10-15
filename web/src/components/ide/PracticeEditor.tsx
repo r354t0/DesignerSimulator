@@ -241,9 +241,9 @@ export function PracticeEditor({
   };
 
   const currentBitMenuTarget = bitMenu ? getBitMenuTarget(project, bitMenu.id, running) : null;
-  const changeContextBit = (value: boolean) => {
+  const toggleContextBit = () => {
     if (!currentBitMenuTarget?.editable) return;
-    update(() => setTagValue(project, currentBitMenuTarget.tagName, value));
+    update(() => setTagValue(project, currentBitMenuTarget.tagName, !currentBitMenuTarget.value));
     setBitMenu(null);
   };
 
@@ -874,14 +874,9 @@ export function PracticeEditor({
             <span className="ml-2 font-mono text-sky-700">{Number(currentBitMenuTarget.value)}</span>
           </div>
           <button type="button" role="menuitem" disabled={!currentBitMenuTarget.editable}
-            onClick={() => changeContextBit(true)}
+            onClick={toggleContextBit}
             className="w-full rounded px-2 py-1.5 text-left text-xs hover:bg-sky-50 disabled:cursor-not-allowed disabled:text-slate-400">
-            Establecer bit = 1 (TRUE)
-          </button>
-          <button type="button" role="menuitem" disabled={!currentBitMenuTarget.editable}
-            onClick={() => changeContextBit(false)}
-            className="w-full rounded px-2 py-1.5 text-left text-xs hover:bg-sky-50 disabled:cursor-not-allowed disabled:text-slate-400">
-            Establecer bit = 0 (FALSE)
+            Invertir valor del bit ({Number(currentBitMenuTarget.value)} → {Number(!currentBitMenuTarget.value)})
           </button>
           {currentBitMenuTarget.reason && (
             <p className="border-t border-slate-200 px-2 py-2 text-[11px] text-amber-800">
