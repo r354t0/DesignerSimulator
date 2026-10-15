@@ -1,9 +1,9 @@
-import type { PracticeProject, PracticeTag } from "./practiceDocument.ts";
+import type { PracticeProject, PracticeTag, PracticeInstruction } from "./practiceDocument.ts";
 
-/** One deterministic, non-timed, event-driven Ladder evaluation (Stage 2B).
- * PLC-like scan order is top to bottom, left to right. Each OTE writes its BOOL
- * immediately, making the new value available to subsequent rungs.
- * Multi-path OR evaluation and scan-cycle scheduling are separate stages.
+/**
+ * Event-driven Ladder evaluation (Phase 2C): top-to-bottom rung order, left-to-
+ * right main contacts, plus independent parallel OR branches grouped by their
+ * shared anchor. This is one scan *pass*, not a timer-driven PLC scan.
  */
 export interface SeriesInstructionFlow {
   powerIn: boolean;
@@ -15,46 +15,73 @@ export interface SeriesScan {
   project: PracticeProject;
   instructionFlow: Record<string, SeriesInstructionFlow>;
   rungPower: Record<string, boolean>;
+  /** Power entering a parallel group, before its main contact and OR lanes. */
+  branchInput: Record<string, boolean>;
+  /** Power leaving each independent series OR lane, before the reunion. */
+  branchPower: Record<string, boolean>;
+  /** Power after OR reunion, keyed by main-line anchor contact ID. */
+  joinedPower: Record<string, boolean>;
   writes: Record<string, boolean>;
 }
 
-export function getUnsupportedSeriesRungs(project: PracticeProject): string[] {
-  return project.rungs
-    .filter((rung) => (rung.parallelBranches?.length ?? 0) > 0)
-    .map((rung) => rung.id);
+/** Kept as an API alias for existing Stage 2B clients; OR is now supported. */
+export function getUnsupportedSeriesRungs(_project: PracticeProject): string[] {
+  return [];
 }
 
 export function evaluateSeriesScan(project: PracticeProject): SeriesScan {
-  if (getUnsupportedSeriesRungs(project).length) {
-    throw new Error("La ejecución de ramas OR corresponde a la Etapa C.");
-  }
-
   const tagValues = new Map<string, boolean>();
+  const constantTags = new Set<string>();
   for (const tag of project.tags) {
     if (tag.type === "BOOL" && typeof tag.value === "boolean") {
       tagValues.set(tag.name, tag.value);
+      if (tag.constant) constantTags.add(tag.name);
     }
   }
+
   const instructionFlow: Record<string, SeriesInstructionFlow> = {};
   const rungPower: Record<string, boolean> = {};
+  const branchInput: Record<string, boolean> = {};
+  const branchPower: Record<string, boolean> = {};
+  const joinedPower: Record<string, boolean> = {};
   const writes: Record<string, boolean> = {};
+
+  const evalContact = (instruction: PracticeInstruction, powerIn: boolean): boolean => {
+    const value = tagValues.get(instruction.tag);
+    if (value === undefined) {
+      throw new Error("Tag BOOL inexistente o incompatible: " + instruction.tag);
+    }
+    if (instruction.kind !== "XIC" && instruction.kind !== "XIO") {
+      throw new Error("Instrucción todavía no ejecutable: " + instruction.kind);
+    }
+    const condition = instruction.kind === "XIC" ? value : !value;
+    const powerOut = powerIn && condition;
+    instructionFlow[instruction.id] = { powerIn, condition, powerOut, value };
+    return powerOut;
+  };
 
   for (const rung of project.rungs) {
     let power = true;
-    for (const instruction of rung.instructions) {
-      const value = tagValues.get(instruction.tag);
-      if (value === undefined) {
-        throw new Error("Tag BOOL inexistente o incompatible: " + instruction.tag);
+    const branchesByAnchor = new Map<string, NonNullable<typeof rung.parallelBranches>>();
+    for (const branch of rung.parallelBranches ?? []) {
+      const anchor = rung.instructions.find((item) => item.id === branch.anchorId);
+      if (!anchor || anchor.kind === "OTE") {
+        throw new Error("La rama OR no tiene contacto principal válido: " + branch.id);
       }
-      if (instruction.kind === "XIC" || instruction.kind === "XIO") {
-        const condition = instruction.kind === "XIC" ? value : !value;
-        const powerIn = power;
-        power = power && condition;
-        instructionFlow[instruction.id] = {
-          powerIn, condition, powerOut: power, value,
-        };
-      } else if (instruction.kind === "OTE") {
-        if (project.tags.find((tag) => tag.name === instruction.tag)?.constant) {
+      if (branch.instructions.length === 0) {
+        throw new Error("La rama OR está vacía: " + branch.id);
+      }
+      const group = branchesByAnchor.get(branch.anchorId) ?? [];
+      group.push(branch);
+      branchesByAnchor.set(branch.anchorId, group);
+    }
+
+    for (const instruction of rung.instructions) {
+      if (instruction.kind === "OTE") {
+        if (!tagValues.has(instruction.tag)) {
+          throw new Error("Tag BOOL inexistente o incompatible: " + instruction.tag);
+        }
+        if (constantTags.has(instruction.tag)) {
           throw new Error("OTE intenta escribir un tag constante: " + instruction.tag);
         }
         tagValues.set(instruction.tag, power);
@@ -62,9 +89,23 @@ export function evaluateSeriesScan(project: PracticeProject): SeriesScan {
         instructionFlow[instruction.id] = {
           powerIn: power, condition: power, powerOut: power, value: power,
         };
-      } else {
-        throw new Error("Instrucción todavía no ejecutable: " + instruction.kind);
+        continue;
       }
+
+      const input = power;
+      const mainOutput = evalContact(instruction, input);
+      let mergedPower = mainOutput;
+      for (const branch of branchesByAnchor.get(instruction.id) ?? []) {
+        branchInput[branch.id] = input;
+        let lanePower = input;
+        for (const contact of branch.instructions) {
+          lanePower = evalContact(contact, lanePower);
+        }
+        branchPower[branch.id] = lanePower;
+        mergedPower ||= lanePower;
+      }
+      joinedPower[instruction.id] = mergedPower;
+      power = mergedPower;
     }
     rungPower[rung.id] = power;
   }
@@ -78,7 +119,8 @@ export function evaluateSeriesScan(project: PracticeProject): SeriesScan {
           Object.hasOwn(writes, tag.name) ? { ...tag, value: writes[tag.name] } : tag),
       }
     : project;
-  return { project: nextProject, instructionFlow, rungPower, writes };
+  return { project: nextProject, instructionFlow, rungPower,
+    branchInput, branchPower, joinedPower, writes };
 }
 
 /** On structural edits, de-energize outputs from both the old and new programs.
