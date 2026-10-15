@@ -490,9 +490,17 @@ export function moveToParallel(
     rungs: project.rungs.map((rung) => rung.id === source.rungId ? {
       ...rung,
       instructions: rung.instructions.filter((item) => item.id !== instructionId),
-      parallelBranches: (rung.parallelBranches ?? []).map((branch) => ({
-        ...branch, instructions: branch.instructions.filter((item) => item.id !== instructionId),
-      })),
+      parallelBranches: (rung.parallelBranches ?? []).map((branch) => {
+        const main = rung.instructions.filter((item) => item.kind !== "OTE");
+        const removedAt = main.findIndex((item) => item.id === instructionId);
+        return {
+          ...branch,
+          endId: source.lane === "main" && branch.endId === instructionId
+            ? (removedAt > 0 ? main[removedAt - 1].id : branch.anchorId)
+            : branch.endId,
+          instructions: branch.instructions.filter((item) => item.id !== instructionId),
+        };
+      }),
     } : rung),
   };
   return addParallelContact(stripped, targetRungId, anchorId, source.instruction, at, targetBranchId);
