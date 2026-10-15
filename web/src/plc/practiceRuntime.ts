@@ -222,6 +222,24 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
     branchInput, branchPower, joinedPower, writes };
 }
 
+/** Nonretentive timer structures reset on STOP; RTO and its ACC/DN persist. */
+export function resetNonretentiveTimers(project: PracticeProject): PracticeProject {
+  const names = new Set(project.rungs.flatMap((rung) =>
+    rung.instructions.filter((item) => item.kind === "TON" || item.kind === "TOF")
+      .map((item) => item.tag)));
+  if (!project.tags.some((tag) => names.has(tag.name) && tag.type === "TIMER" &&
+      typeof tag.value === "object" &&
+      (tag.value.ACC !== 0 || tag.value.EN !== false ||
+       tag.value.TT !== false || tag.value.DN !== false))) return project;
+  return {
+    ...project,
+    tags: project.tags.map((tag): PracticeTag => names.has(tag.name) &&
+      tag.type === "TIMER" && typeof tag.value === "object"
+      ? { ...tag, value: { ...tag.value, ACC: 0, EN: false, TT: false, DN: false } }
+      : tag),
+  };
+}
+
 /** On structural edits, de-energize outputs from both the old and new programs.
  * This also handles removing or reassigning an OTE while it was energized.
  */
@@ -233,11 +251,12 @@ export function stopAfterSeriesLogicEdit(
     [...previous.rungs, ...next.rungs].flatMap((rung) =>
       rung.instructions.filter((item) => item.kind === "OTE").map((item) => item.tag)),
   );
-  if (!next.tags.some((tag) =>
-    tag.type === "BOOL" && !tag.constant && outputs.has(tag.name) && tag.value !== false)) return next;
+  const stopped = resetNonretentiveTimers(next);
+  if (!stopped.tags.some((tag) =>
+    tag.type === "BOOL" && !tag.constant && outputs.has(tag.name) && tag.value !== false)) return stopped;
   return {
-    ...next,
-    tags: next.tags.map((tag): PracticeTag =>
+    ...stopped,
+    tags: stopped.tags.map((tag): PracticeTag =>
       tag.type === "BOOL" && !tag.constant && outputs.has(tag.name)
         ? { ...tag, value: false } : tag),
   };
@@ -247,8 +266,9 @@ export function stopAfterSeriesLogicEdit(
 export function stopSeriesScan(project: PracticeProject): PracticeProject {
   const targets = new Set(project.rungs.flatMap((rung) =>
     rung.instructions.filter((instruction) => instruction.kind === "OTE").map((item) => item.tag)));
-  if (!project.tags.some((tag) => targets.has(tag.name) && tag.value !== false)) return project;
-  return { ...project, tags: project.tags.map((tag): PracticeTag =>
+  const stopped = resetNonretentiveTimers(project);
+  if (!stopped.tags.some((tag) => targets.has(tag.name) && tag.value !== false)) return stopped;
+  return { ...stopped, tags: stopped.tags.map((tag): PracticeTag =>
     tag.type === "BOOL" && targets.has(tag.name) && !tag.constant
       ? { ...tag, value: false } : tag) };
 }
