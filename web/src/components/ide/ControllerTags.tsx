@@ -157,6 +157,14 @@ export function ControllerTags({
     }
   };
 
+  const commitNewTagOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!newName.trim()) return;
+    createNew();
+  };
+
   const toggleExpand = (name: string) => setExpanded((previous) =>
     previous.includes(name) ? previous.filter((x) => x !== name) : [...previous, name]);
 
@@ -307,14 +315,14 @@ export function ControllerTags({
         <td className={cellClass}>
           <input aria-label="Nombre del nuevo tag" placeholder="<Nuevo tag>" value={newName}
             onChange={(event) => setNewName(event.target.value)}
-            onKeyDown={(event) => { if (event.key === "Enter") createNew(); }}
+            onKeyDown={commitNewTagOnEnter}
             className="w-full bg-white px-1 py-1 text-[11px] font-mono outline outline-1 outline-slate-300 focus:outline-sky-500"/>
         </td>
         <td className={cellClass}>{editSelect(newType, "Tipo de nuevo tag", TAG_TYPES, setNewType)}</td>
         <td className={cellClass}>
           <input aria-label="Descripción del nuevo tag" placeholder="Descripción opcional" value={newDescription}
             onChange={(event) => setNewDescription(event.target.value)}
-            onKeyDown={(event) => { if (event.key === "Enter") createNew(); }}
+            onKeyDown={commitNewTagOnEnter}
             className="w-full bg-transparent px-1 text-[11px] outline-none focus:bg-white"/>
         </td>
         <td className={cellClass}>{editSelect(newAccess, "Acceso externo de nuevo tag", TAG_EXTERNAL_ACCESS, setNewAccess)}</td>
