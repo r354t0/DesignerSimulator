@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  evaluateSeriesScan, getUnsupportedSeriesRungs, stopSeriesScan,
+  evaluateSeriesScan, getUnsupportedSeriesRungs, stopAfterSeriesLogicEdit, stopSeriesScan,
 } from "../src/plc/practiceRuntime.ts";
 import {
   initialPracticeProject, insertInstruction, createRung, createParallelBranch,
@@ -133,4 +133,23 @@ test("invalid BOOL reference and unsupported opcode fail fast", () => {
       ? { ...i, kind: "MOV" } : i),
   })) };
   assert.throws(() => evaluateSeriesScan(damaged), /no ejecutable/);
+});
+
+
+test("structural edits during RUN turn off both removed and newly introduced outputs", () => {
+  let before = series();
+  before = setTagValue(before, "Start_PB", true);
+  before = evaluateSeriesScan(before).project;
+  const next = { ...before, rungs: before.rungs.map((rung) => ({
+    ...rung,
+    instructions: rung.instructions.map((item) => item.kind === "OTE"
+      ? { ...item, tag: "Lamp_Run" } : item),
+  })) };
+  const edited = setTagValue(next, "Lamp_Run", true);
+  const stopped = stopAfterSeriesLogicEdit(before, edited);
+  assert.equal(get(stopped, "Motor_Run"), false);
+  assert.equal(get(stopped, "Lamp_Run"), false);
+  assert.equal(get(stopped, "Start_PB"), true);
+  assert.equal(stopped.rungs[0].instructions.at(-1).tag, "Lamp_Run");
+  assert.strictEqual(stopAfterSeriesLogicEdit(stopped, stopped), stopped);
 });
