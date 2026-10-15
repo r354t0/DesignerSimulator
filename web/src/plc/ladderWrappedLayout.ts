@@ -5,7 +5,7 @@ import {
   type LadderGroupGeometry, type VisualLadderDropTarget,
 } from "./ladderDragDrop.ts";
 import {
-  MAX_PRACTICE_CONTACTS, isOutputKind, contactCount, findInstruction,
+  MAX_PRACTICE_CONTACTS, isOutputKind, isTimerKind, contactCount, findInstruction,
   type EditableKind, type PracticeProject, type PracticeRung,
 } from "./practiceDocument.ts";
 
@@ -67,11 +67,13 @@ export function getWrappedRungLayout(
   const last = packed.at(-1)!;
   const lastRequiredRight = last.reduce((value, group, i) =>
     value + (i ? gap : 0) + (group.right - group.left), lead);
-  // Reserve room for OTE on the last line. Move the final group down so the
+  // Reserve space for TIMER blocks or coils on the last line. Move the final group down so the
   // continuation contains real contacts instead of a lonely output coil.
-  if (lastRequiredRight > coilX - 64 && last.length > 1) {
+  const hasTimer = rung.instructions.some((item) => isTimerKind(item.kind));
+  const terminalClearance = hasTimer ? 155 : 64;
+  if (lastRequiredRight > coilX - terminalClearance && last.length > 1) {
     packed.push([last.pop()!]);
-  } else if (lastRequiredRight > coilX - 64 && last.length === 1) {
+  } else if (lastRequiredRight > coilX - terminalClearance && last.length === 1) {
     packed.push([]);
   }
 
