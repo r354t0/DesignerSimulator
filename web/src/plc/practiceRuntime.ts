@@ -1,4 +1,4 @@
-import { isOutputKind, type PracticeProject, type PracticeTag, type PracticeInstruction } from "./practiceDocument.ts";
+import { isOutputKind, isTimerKind, type PracticeProject, type PracticeTag, type PracticeInstruction } from "./practiceDocument.ts";
 
 /**
  * Event-driven Ladder evaluation (Phase 2C): top-to-bottom rung order, left-to-
@@ -44,7 +44,47 @@ export function getUnsupportedSeriesRungs(_project: PracticeProject): string[] {
   return [];
 }
 
-export function evaluateSeriesScan(project: PracticeProject): SeriesScan {
+export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): SeriesScan {
+  if (!Number.isFinite(elapsedMs) || elapsedMs < 0) throw new Error("Tiempo de scan inválido.");
+  const delta = Math.max(0, Math.round(elapsedMs));
+  const timers = new Map<string, { PRE: number; ACC: number; EN: boolean; TT: boolean; DN: boolean }>();
+  for (const tag of project.tags) {
+    if (tag.type === "TIMER" && typeof tag.value === "object") {
+      timers.set(tag.name, tag.value as { PRE: number; ACC: number; EN: boolean; TT: boolean; DN: boolean });
+    }
+  }
+  const timerUpdates = new Map<string, { PRE: number; ACC: number; EN: boolean; TT: boolean; DN: boolean }>();
+  function timer(tagName: string) {
+    const previous = timers.get(tagName);
+    if (!previous) throw new Error("Tag TIMER inexistente o incompatible: " + tagName);
+    if (![previous.PRE, previous.ACC].every(Number.isFinite) ||
+      previous.PRE < 0 || previous.ACC < 0) throw new Error("TIMER requiere PRE/ACC válidos.");
+    return previous;
+  }
+  function updateTimer(name: string, kind: "TON" | "TOF" | "RTO" | "RES", enabled: boolean) {
+    const t = timer(name);
+    const acc = Math.min(2147483647, Math.max(0, Math.round(t.ACC)));
+    const pre = Math.round(t.PRE);
+    let value = { ...t };
+    if (kind === "RES") {
+      if (enabled) value = { ...t, ACC: 0, EN: false, TT: false, DN: false };
+    } else if (kind === "TON") {
+      value = !enabled ? { ...t, ACC: 0, EN: false, TT: false, DN: false }
+        : { ...t, ACC: Math.min(pre, acc + delta), EN: true,
+          TT: acc + delta < pre, DN: acc + delta >= pre };
+    } else if (kind === "TOF") {
+      value = enabled ? { ...t, ACC: 0, EN: true, TT: false, DN: true }
+        : { ...t, ACC: Math.min(pre, acc + (t.DN ? delta : 0)), EN: false,
+          TT: t.DN && acc + delta < pre, DN: t.DN && acc + delta < pre };
+    } else {
+      value = enabled ? { ...t, ACC: Math.min(pre, acc + delta), EN: true,
+        TT: acc + delta < pre, DN: acc + delta >= pre }
+        : { ...t, ACC: acc, EN: false, TT: false, DN: t.DN };
+    }
+    timers.set(name, value);
+    timerUpdates.set(name, value);
+    return value;
+  }
   const tagValues = new Map<string, boolean>();
   const constantTags = new Set<string>();
   for (const tag of project.tags) {
@@ -62,8 +102,10 @@ export function evaluateSeriesScan(project: PracticeProject): SeriesScan {
   const writes: Record<string, boolean> = {};
 
   const evalContact = (instruction: PracticeInstruction, powerIn: boolean): boolean => {
-    const value = tagValues.get(instruction.tag);
-    if (value === undefined) {
+    const [root, member] = instruction.tag.split(".");
+    const value = member ? timer(root)[member as "EN" | "TT" | "DN"] :
+      tagValues.get(instruction.tag);
+    if (typeof value !== "boolean") {
       throw new Error("Tag BOOL inexistente o incompatible: " + instruction.tag);
     }
     let condition: boolean;
@@ -138,6 +180,12 @@ export function evaluateSeriesScan(project: PracticeProject): SeriesScan {
     }
 
     for (const instruction of rung.instructions.filter((item) => isOutputKind(item.kind))) {
+      if (isTimerKind(instruction.kind)) {
+        const output = updateTimer(instruction.tag, instruction.kind, power);
+        instructionFlow[instruction.id] = { powerIn: power, condition: power,
+          powerOut: power, value: output.DN };
+        continue;
+      }
       if (!tagValues.has(instruction.tag)) {
         throw new Error("Tag BOOL inexistente o incompatible: " + instruction.tag);
       }
@@ -159,12 +207,15 @@ export function evaluateSeriesScan(project: PracticeProject): SeriesScan {
   }
 
   const changed = project.tags.some((tag) =>
-    Object.hasOwn(writes, tag.name) && tag.value !== writes[tag.name]);
+    (Object.hasOwn(writes, tag.name) && tag.value !== writes[tag.name]) ||
+    (timerUpdates.has(tag.name) && Object.entries(timerUpdates.get(tag.name)!).some(
+      ([member, value]) => (tag.value as Record<string, number | boolean>)[member] !== value)));
   const nextProject = changed
     ? {
         ...project,
         tags: project.tags.map((tag): PracticeTag =>
-          Object.hasOwn(writes, tag.name) ? { ...tag, value: writes[tag.name] } : tag),
+          Object.hasOwn(writes, tag.name) ? { ...tag, value: writes[tag.name] } :
+          timerUpdates.has(tag.name) ? { ...tag, value: timerUpdates.get(tag.name)! } : tag),
       }
     : project;
   return { project: nextProject, instructionFlow, rungPower,
