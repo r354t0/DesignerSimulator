@@ -24,6 +24,25 @@ export interface LadderBuildResult {
 }
 
 /**
+ * Tracks changes that affect compilable logic. Runtime BOOL/numeric values
+ * and display-only descriptions are intentionally excluded: editing a value
+ * in Monitor Tags should not invalidate a successful static Build.
+ */
+export function getPracticeBuildSignature(project: PracticeProject): string {
+  return JSON.stringify({
+    tags: project.tags.map(({ name, type, constant }) => ({ name, type, constant })),
+    rungs: project.rungs.map((rung) => ({
+      id: rung.id,
+      instructions: rung.instructions.map(({ id, kind, tag }) => ({ id, kind, tag })),
+      branches: (rung.parallelBranches ?? []).map(({ id, anchorId, instructions }) => ({
+        id, anchorId, instructions: instructions.map(({ id: instructionId, kind, tag }) =>
+          ({ id: instructionId, kind, tag })),
+      })),
+    })),
+  });
+}
+
+/**
  * Static verification only. It checks structure, supported opcodes and
  * operand compatibility; it does NOT evaluate a PLC scan or verify that a
  * machine's intended control philosophy is logically correct.
