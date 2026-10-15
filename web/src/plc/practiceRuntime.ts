@@ -1,4 +1,4 @@
-import { isOutputKind, isTimerKind, isValidTimerPreset, type PracticeProject, type PracticeTag, type PracticeInstruction } from "./practiceDocument.ts";
+import { isCounterKind, isOutputKind, isTimerKind, isValidTimerPreset, type PracticeProject, type PracticeTag, type PracticeInstruction } from "./practiceDocument.ts";
 
 /**
  * Event-driven Ladder evaluation (Phase 2C): top-to-bottom rung order, left-to-
@@ -33,16 +33,42 @@ export function prescanBitInstructions(project: PracticeProject): PracticeProjec
   const memory = new Set(project.rungs.flatMap((rung) => [
     ...rung.instructions, ...(rung.parallelBranches ?? []).flatMap((b) => b.instructions),
   ]).filter((item) => item.kind === "ONS").map((item) => item.tag));
-  if (!project.tags.some((tag) => memory.has(tag.name) && tag.type === "BOOL" &&
-      tag.value !== true)) return project;
+  const countInputs = new Map<string, { cu: boolean; cd: boolean }>();
+  for (const rung of project.rungs) {
+    for (const instruction of rung.instructions) {
+      if (instruction.kind !== "CTU" && instruction.kind !== "CTD") continue;
+      const status = countInputs.get(instruction.tag) ?? { cu: false, cd: false };
+      if (instruction.kind === "CTU") status.cu = true;
+      else status.cd = true;
+      countInputs.set(instruction.tag, status);
+    }
+  }
+  if (!project.tags.some((tag) =>
+    (memory.has(tag.name) && tag.type === "BOOL" && tag.value !== true) ||
+    (tag.type === "COUNTER" && typeof tag.value === "object" &&
+      ((countInputs.get(tag.name)?.cu && tag.value.CU !== true) ||
+        (countInputs.get(tag.name)?.cd && tag.value.CD !== true))))) return project;
   return { ...project, tags: project.tags.map((tag): PracticeTag =>
-    memory.has(tag.name) && tag.type === "BOOL" ? { ...tag, value: true } : tag) };
+    memory.has(tag.name) && tag.type === "BOOL" ? { ...tag, value: true } :
+    tag.type === "COUNTER" && typeof tag.value === "object" && countInputs.has(tag.name)
+      ? { ...tag, value: { ...tag.value,
+          CU: countInputs.get(tag.name)!.cu ? true : tag.value.CU,
+          CD: countInputs.get(tag.name)!.cd ? true : tag.value.CD } }
+      : tag) };
 }
 
 /** Kept as an API alias for existing Stage 2B clients; OR is now supported. */
 export function getUnsupportedSeriesRungs(_project: PracticeProject): string[] {
   return [];
 }
+
+interface CounterState {
+  PRE: number; ACC: number; CU: boolean; CD: boolean;
+  DN: boolean; OV: boolean; UN: boolean;
+}
+const INT32_MAX = 2147483647;
+const INT32_MIN = -2147483648;
+const validDint = (n: number) => Number.isInteger(n) && n >= INT32_MIN && n <= INT32_MAX;
 
 export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): SeriesScan {
   if (!Number.isFinite(elapsedMs) || elapsedMs < 0) throw new Error("Tiempo de scan inválido.");
@@ -54,6 +80,48 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
     }
   }
   const timerUpdates = new Map<string, { PRE: number; ACC: number; EN: boolean; TT: boolean; DN: boolean }>();
+  const counters = new Map<string, CounterState>();
+  for (const tag of project.tags) {
+    if (tag.type === "COUNTER" && typeof tag.value === "object") {
+      counters.set(tag.name, tag.value as unknown as CounterState);
+    }
+  }
+  const counterUpdates = new Map<string, CounterState>();
+  function counter(name: string): CounterState {
+    const stored = counters.get(name);
+    if (!stored) throw new Error("Tag COUNTER inexistente o incompatible: " + name);
+    if (!validDint(stored.PRE) || !validDint(stored.ACC)) {
+      throw new Error("COUNTER requiere PRE/ACC DINT válidos: " + name);
+    }
+    return stored;
+  }
+  function updateCounter(instruction: PracticeInstruction, enabled: boolean): CounterState {
+    const previous = counter(instruction.tag);
+    let next = { ...previous };
+    if (instruction.kind === "RES") {
+      if (enabled) next = { ...previous, ACC: 0, CU: false, CD: false,
+        DN: false, OV: false, UN: false };
+    } else if (instruction.kind === "CTU") {
+      if (enabled && !previous.CU) {
+        const overflow = previous.ACC === INT32_MAX;
+        next.ACC = overflow ? INT32_MIN : previous.ACC + 1;
+        next.OV = previous.OV || overflow;
+      }
+      next.CU = enabled;
+      next.DN = next.ACC >= next.PRE;
+    } else if (instruction.kind === "CTD") {
+      if (enabled && !previous.CD) {
+        const underflow = previous.ACC === INT32_MIN;
+        next.ACC = underflow ? INT32_MAX : previous.ACC - 1;
+        next.UN = previous.UN || underflow;
+      }
+      next.CD = enabled;
+      next.DN = next.ACC >= next.PRE;
+    }
+    counters.set(instruction.tag, next);
+    counterUpdates.set(instruction.tag, next);
+    return next;
+  }
   function timer(tagName: string) {
     const previous = timers.get(tagName);
     if (!previous) throw new Error("Tag TIMER inexistente o incompatible: " + tagName);
@@ -118,8 +186,11 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
 
   const evalContact = (instruction: PracticeInstruction, powerIn: boolean): boolean => {
     const [root, member] = instruction.tag.split(".");
-    const value = member ? timer(root)[member as "EN" | "TT" | "DN"] :
-      tagValues.get(instruction.tag);
+    const value = member
+      ? counters.has(root)
+        ? counter(root)[member as "CU" | "CD" | "DN" | "OV" | "UN"]
+        : timer(root)[member as "EN" | "TT" | "DN"]
+      : tagValues.get(instruction.tag);
     if (typeof value !== "boolean") {
       throw new Error("Tag BOOL inexistente o incompatible: " + instruction.tag);
     }
@@ -195,6 +266,13 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
     }
 
     for (const instruction of rung.instructions.filter((item) => isOutputKind(item.kind))) {
+      if (isCounterKind(instruction.kind) ||
+          (instruction.kind === "RES" && counters.has(instruction.tag))) {
+        const output = updateCounter(instruction, power);
+        instructionFlow[instruction.id] = { powerIn: power, condition: power,
+          powerOut: power, value: output.DN };
+        continue;
+      }
       if (isTimerKind(instruction.kind)) {
         const output = updateTimer(instruction, power);
         instructionFlow[instruction.id] = { powerIn: power, condition: power,
@@ -224,13 +302,17 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
   const changed = project.tags.some((tag) =>
     (Object.hasOwn(writes, tag.name) && tag.value !== writes[tag.name]) ||
     (timerUpdates.has(tag.name) && Object.entries(timerUpdates.get(tag.name)!).some(
+      ([member, value]) => (tag.value as Record<string, number | boolean>)[member] !== value)) ||
+    (counterUpdates.has(tag.name) && Object.entries(counterUpdates.get(tag.name)!).some(
       ([member, value]) => (tag.value as Record<string, number | boolean>)[member] !== value)));
   const nextProject = changed
     ? {
         ...project,
         tags: project.tags.map((tag): PracticeTag =>
           Object.hasOwn(writes, tag.name) ? { ...tag, value: writes[tag.name] } :
-          timerUpdates.has(tag.name) ? { ...tag, value: timerUpdates.get(tag.name)! } : tag),
+          timerUpdates.has(tag.name) ? { ...tag, value: timerUpdates.get(tag.name)! } :
+          counterUpdates.has(tag.name)
+            ? { ...tag, value: { ...counterUpdates.get(tag.name)! } } : tag),
       }
     : project;
   return { project: nextProject, instructionFlow, rungPower,

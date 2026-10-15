@@ -2,15 +2,18 @@
  * Immutable PLC practice document. Contact paths can contain XIC/XIO/ONS,
  * output banks can contain OTE/OTL/OTU. Nested OR remains out of scope.
  */
-export type EditableKind = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" | "TON" | "TOF" | "RTO" | "RES";
+export type EditableKind = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" | "TON" | "TOF" | "RTO" | "CTU" | "CTD" | "RES";
 export type TimerKind = "TON" | "TOF" | "RTO" | "RES";
 export const isTimerKind = (kind: EditableKind): kind is TimerKind =>
   (["TON", "TOF", "RTO", "RES"] as readonly string[]).includes(kind);
+export type CounterKind = "CTU" | "CTD";
+export const isCounterKind = (kind: EditableKind): kind is CounterKind =>
+  kind === "CTU" || kind === "CTD";
 export const isTimerMemberOperand = (tag: string) =>
   /^[A-Za-z_][A-Za-z0-9_]*\.(EN|TT|DN)$/.test(tag);
-export type OutputKind = "OTE" | "OTL" | "OTU" | TimerKind;
+export type OutputKind = "OTE" | "OTL" | "OTU" | TimerKind | CounterKind;
 export type ContactKind = "XIC" | "XIO" | "ONS";
-export const OUTPUT_KINDS: readonly OutputKind[] = ["OTE", "OTL", "OTU", "TON", "TOF", "RTO", "RES"];
+export const OUTPUT_KINDS: readonly OutputKind[] = ["OTE", "OTL", "OTU", "TON", "TOF", "RTO", "CTU", "CTD", "RES"];
 export const CONTACT_KINDS: readonly ContactKind[] = ["XIC", "XIO", "ONS"];
 export const isOutputKind = (kind: EditableKind): kind is OutputKind =>
   (OUTPUT_KINDS as readonly string[]).includes(kind);
@@ -146,12 +149,19 @@ function ensureTag(project: PracticeProject, tag: string, kind: EditableKind): v
   if (extra !== undefined) throw new Error("Operando estructurado inválido.");
   const item = project.tags.find((entry) => entry.name === root);
   if (!item) throw new Error("Selecciona un tag existente.");
-  if (isTimerKind(kind)) {
+  if (kind === "RES") {
+    if (member || (item.type !== "TIMER" && item.type !== "COUNTER")) {
+      throw new Error("RES requiere un tag TIMER o COUNTER.");
+    }
+  } else if (isCounterKind(kind)) {
+    if (member || item.type !== "COUNTER") throw new Error(kind + " requiere tag COUNTER.");
+  } else if (isTimerKind(kind)) {
     if (member || item.type !== "TIMER") throw new Error(kind + " requiere tag TIMER.");
   } else if (member) {
-    if (item.type !== "TIMER" || !["EN", "TT", "DN"].includes(member) ||
-        (kind !== "XIC" && kind !== "XIO")) {
-      throw new Error(kind + " requiere un BOOL declarado (sin miembros TIMER).");
+    const timerMember = item.type === "TIMER" && ["EN", "TT", "DN"].includes(member);
+    const counterMember = item.type === "COUNTER" && ["CU", "CD", "DN", "OV", "UN"].includes(member);
+    if ((!timerMember && !counterMember) || (kind !== "XIC" && kind !== "XIO")) {
+      throw new Error(kind + " requiere un BOOL declarado o miembro de estado TIMER/COUNTER.");
     }
   } else if (item.type !== "BOOL") {
     throw new Error(kind + " requiere un tag BOOL.");

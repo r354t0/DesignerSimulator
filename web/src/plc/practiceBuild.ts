@@ -1,4 +1,4 @@
-import { MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, isOutputKind, isTimerKind, isValidTimerPreset, type EditableKind, type PracticeInstruction,
+import { MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, isOutputKind, isTimerKind, isCounterKind, isValidTimerPreset, type EditableKind, type PracticeInstruction,
   type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
 
 export type DiagnosticSeverity = "error" | "warning";
@@ -104,7 +104,7 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
     }
     seenInstructions.add(id);
 
-    if (!["XIC", "XIO", "OTE", "OTL", "OTU", "ONS", "TON", "TOF", "RTO", "RES"].includes(instruction.kind as EditableKind)) {
+    if (!["XIC", "XIO", "OTE", "OTL", "OTU", "ONS", "TON", "TOF", "RTO", "CTU", "CTD", "RES"].includes(instruction.kind as EditableKind)) {
       push("error", "UNSUPPORTED_INSTRUCTION",
         at + ": instrucción " + instruction.kind + " no admitida por el motor actual.",
         rung.id, rungIndex, id, branchId);
@@ -127,14 +127,19 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
         rung.id, rungIndex, id, branchId);
       return;
     }
-    const expectedType = isTimerKind(instruction.kind) ? "TIMER"
-      : member ? "TIMER" : "BOOL";
-    if (tag.type !== expectedType || (member &&
-      ((instruction.kind !== "XIC" && instruction.kind !== "XIO") ||
-        !["EN", "TT", "DN"].includes(member)))) {
+    const expectedType = instruction.kind === "RES" ? "TIMER o COUNTER"
+      : isCounterKind(instruction.kind) ? "COUNTER"
+      : isTimerKind(instruction.kind) ? "TIMER" : "BOOL";
+    const validMember = member &&
+      (instruction.kind === "XIC" || instruction.kind === "XIO") &&
+      ((tag.type === "TIMER" && ["EN", "TT", "DN"].includes(member)) ||
+        (tag.type === "COUNTER" && ["CU", "CD", "DN", "OV", "UN"].includes(member)));
+    const valid = member ? Boolean(validMember)
+      : instruction.kind === "RES" ? tag.type === "TIMER" || tag.type === "COUNTER"
+        : tag.type === expectedType;
+    if (!valid) {
       push("error", "INCOMPATIBLE_TAG",
-        at + ": " + instruction.kind + " requiere " +
-        (isTimerKind(instruction.kind) ? "TIMER" : "BOOL") +
+        at + ": " + instruction.kind + " requiere " + expectedType +
         " compatible.", rung.id, rungIndex, id, branchId);
     }
     if (isTimerKind(instruction.kind) && tag.type === "TIMER" &&
@@ -145,6 +150,17 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
           !Number.isInteger(acc) || (acc as number) < 0) {
         push("error", "INVALID_TIMER_PRESET",
           at + ": TIMER requiere PRE/ACC en milisegundos, enteros no negativos.",
+          rung.id, rungIndex, id, branchId);
+      }
+    }
+    if (isCounterKind(instruction.kind) && tag.type === "COUNTER") {
+      const value = tag.value as Record<string, number | boolean>;
+      const int32 = (n: number | boolean) => typeof n === "number" &&
+        Number.isInteger(n) && n >= -2147483648 && n <= 2147483647;
+      if (!int32(value.PRE) || !int32(value.ACC) ||
+          !["CU", "CD", "DN", "OV", "UN"].every((key) => typeof value[key] === "boolean")) {
+        push("error", "INVALID_COUNTER_STATE",
+          at + ": COUNTER requiere PRE/ACC DINT y CU/CD/DN/OV/UN BOOL.",
           rung.id, rungIndex, id, branchId);
       }
     }
@@ -313,7 +329,10 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
       entry.kind === "OTL" || entry.kind === "OTU");
     const timerPair = places.every((entry) => ["RTO", "RES"].includes(entry.kind))
       && places.filter((entry) => entry.kind === "RTO").length === 1;
-    if (places.length > 1 && !onlySetResetPair && !timerPair) {
+    const counterFamily = places.every((entry) => ["CTU", "CTD", "RES"].includes(entry.kind)) &&
+      ["CTU", "CTD", "RES"].every((kind) =>
+        places.filter((entry) => entry.kind === kind).length <= 1);
+    if (places.length > 1 && !onlySetResetPair && !timerPair && !counterFamily) {
       push("warning", "DUPLICATE_OUTPUT",
         "La variable «" + tag + "» es escrita por varias bobinas (rungs " +
         places.map((entry) => entry.rung).join(", ") + "). Revisa sobrescrituras.");

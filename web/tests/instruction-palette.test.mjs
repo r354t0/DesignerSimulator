@@ -35,7 +35,7 @@ test("no unsupported instruction falsely claims editable behavior", () => {
   }
 });
 
-test("timers are editable while counters remain demo-only", () => {
+test("timers and counters are editable in PracticeRoutine", () => {
   const tools = getPaletteCategory("timer-counter").tools;
   for (const name of ["TON", "TOF", "RTO", "RES"]) {
     const tool = tools.find((item) => item.id === name);
@@ -45,8 +45,8 @@ test("timers are editable while counters remain demo-only", () => {
   for (const name of ["CTU", "CTD"]) {
     const tool = tools.find((item) => item.id === name);
     assert.ok(tool);
-    assert.equal(tool.editable, false);
-    assert.equal(tool.previewOnly, true);
+    assert.equal(tool.editable, true);
+    assert.equal(Boolean(tool.previewOnly), false);
   }
 });
 

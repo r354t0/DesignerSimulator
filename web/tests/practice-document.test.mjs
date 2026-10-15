@@ -56,5 +56,5 @@ test("expanded contact limit supports multiple OR lanes plus main contacts", () 
   for (let i = 0; i < 32; i++) p = insertInstruction(p, "rung-1", i, contact("c-" + i));
   assert.equal(p.rungs[0].instructions.length, 32);
   assert.throws(() => insertInstruction(p, "rung-1", 32, contact("too-many")), /Máximo 32/);
-  assert.throws(() => insertInstruction(p, "rung-1", 0, contact("ctu", "CTU")), /aún no está habilitada/);
+  assert.throws(() => insertInstruction(p, "rung-1", 0, contact("equ", "EQU")), /aún no está habilitada/);
 });

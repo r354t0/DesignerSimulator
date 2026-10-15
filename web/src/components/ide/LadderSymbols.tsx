@@ -398,3 +398,46 @@ export function TimerBlock({
     </g>
   );
 }
+
+
+/** Compact counter output; PRE/ACC are signed pulse counts, not milliseconds. */
+export function CounterBlock({
+  x, y, kind, tag, preset, accumulated, cu, cd, dn, ov, un, selected, online, live,
+}: {
+  x: number; y: number; kind: "CTU" | "CTD" | "RES";
+  tag: string; preset: number; accumulated: number;
+  cu: boolean; cd: boolean; dn: boolean; ov: boolean; un: boolean;
+  selected?: boolean; online: boolean; live: boolean;
+}) {
+  const stroke = online && live ? HOT : BASE;
+  return (
+    <g>
+      <rect x={x - 68} y={y - 27} width={136} height={68} rx={3}
+        fill="#f9fafb" stroke={selected ? LADDER_SELECTION_BLUE : stroke}
+        strokeWidth={selected ? 2 : 1.5} />
+      <text x={x - 58} y={y - 14} fontSize={11} fontWeight="700"
+        fill="#1c354b">{kind}</text>
+      <text x={x + 58} y={y - 14} textAnchor="end" fontSize={10}
+        fill={selected ? LADDER_SELECTION_BLUE : "#34465a"}>
+        {ellipsizeSvgLabel(tag, 84)}
+      </text>
+      <path d={"M" + (x - 62) + " " + (y - 9) + "h124"}
+        stroke="#cbd5e1" strokeWidth={1} />
+      <text x={x - 57} y={y + 3} fontSize={10} fill="#556372">PRE</text>
+      <text x={x + 54} y={y + 3} textAnchor="end" fontSize={10}
+        fontFamily="monospace" fill="#1c354b">{preset}</text>
+      <text x={x - 57} y={y + 17} fontSize={10} fill="#556372">ACC</text>
+      <text x={x + 54} y={y + 17} textAnchor="end" fontSize={10}
+        fontFamily="monospace" fill="#1c354b">{accumulated}</text>
+      <text x={x} y={y + 34} textAnchor="middle" fontSize={8.4} fontWeight="600"
+        fill="#64748b">
+        <tspan fill={cu ? HOT : "#64748b"}>CU {Number(cu)}</tspan>
+        <tspan dx={4} fill={cd ? HOT : "#64748b"}>CD {Number(cd)}</tspan>
+        <tspan dx={4} fill={dn ? HOT : "#64748b"}>DN {Number(dn)}</tspan>
+        <tspan dx={4} fill={ov ? HOT : "#64748b"}>OV {Number(ov)}</tspan>
+        <tspan dx={4} fill={un ? HOT : "#64748b"}>UN {Number(un)}</tspan>
+      </text>
+      <title>{kind} · {tag} · PRE {preset} pulsos · ACC {accumulated} pulsos</title>
+    </g>
+  );
+}

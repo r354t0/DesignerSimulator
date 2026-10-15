@@ -1,8 +1,8 @@
-import { isTimerKind, type EditableKind, type PracticeTag } from "./practiceDocument.ts";
+import { isCounterKind, isTimerKind, type EditableKind, type PracticeTag } from "./practiceDocument.ts";
 
 export interface TagPickerRow {
   name: string;
-  type: "BOOL" | "DINT" | "TIMER";
+  type: "BOOL" | "DINT" | "TIMER" | "COUNTER";
   description: string;
   selectable: boolean;
   depth: number;
@@ -30,10 +30,13 @@ export function getTagPickerRows(
   const rows: TagPickerRow[] = [];
   const boolContact = kind === "XIC" || kind === "XIO";
   for (const tag of roots) {
-    if (isTimerKind(kind)) {
-      if (tag.type === "TIMER" && matches(tag.name, tag.description)) {
-        rows.push({ name: tag.name, type: "TIMER", description: tag.description,
-          selectable: true, depth: 0, expandable: false, expanded: false });
+    if (isTimerKind(kind) || isCounterKind(kind)) {
+      const valid = kind === "RES"
+        ? tag.type === "TIMER" || tag.type === "COUNTER"
+        : isCounterKind(kind) ? tag.type === "COUNTER" : tag.type === "TIMER";
+      if (valid && matches(tag.name, tag.description)) {
+        rows.push({ name: tag.name, type: tag.type as "TIMER" | "COUNTER",
+          description: tag.description, selectable: true, depth: 0, expandable: false, expanded: false });
       }
       continue;
     }
@@ -44,19 +47,21 @@ export function getTagPickerRows(
       }
       continue;
     }
-    if (!boolContact || tag.type !== "TIMER") continue;
-    const members = (["PRE", "ACC", "EN", "TT", "DN"] as const).map((member) => ({
+    if (!boolContact || (tag.type !== "TIMER" && tag.type !== "COUNTER")) continue;
+    const members = (tag.type === "COUNTER"
+      ? ["PRE", "ACC", "CU", "CD", "DN", "OV", "UN"]
+      : ["PRE", "ACC", "EN", "TT", "DN"]).map((member) => ({
       name: tag.name + "." + member,
       type: ["PRE", "ACC"].includes(member) ? "DINT" as const : "BOOL" as const,
       description: member + " · " + tag.description,
-      selectable: member === "EN" || member === "TT" || member === "DN",
+      selectable: !["PRE", "ACC"].includes(member),
       depth: 1, expandable: false, expanded: false,
     }));
     const parentMatches = matches(tag.name, tag.description);
     const hits = term ? members.filter((member) => matches(member.name, member.description)) : members;
     if (term && !parentMatches && !hits.length) continue;
     const open = Boolean(term) || expanded.includes(tag.name);
-    rows.push({ name: tag.name, type: "TIMER", description: tag.description,
+    rows.push({ name: tag.name, type: tag.type, description: tag.description,
       selectable: false, depth: 0, expandable: true, expanded: open });
     if (open) rows.push(...(parentMatches ? members : hits));
   }

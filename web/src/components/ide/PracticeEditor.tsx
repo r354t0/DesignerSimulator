@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, FileCode2, GripVertical, Hammer, Pause, Play, Square, StepForward, XCircle } from "lucide-react";
-import { Coil, Contact, TimerBlock, LadderRails, Wire, type Instruction } from "./LadderSymbols";
+import { Coil, Contact, TimerBlock, CounterBlock, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
 import { TimerPresetEditor, type TimerPresetAnchor } from "./TimerPresetEditor";
@@ -42,6 +42,7 @@ import {
   removeRung,
   isOutputKind,
   isTimerKind,
+  isCounterKind,
   setInstructionTimerPreset,
   type EditableKind,
   type PracticeProject,
@@ -670,7 +671,7 @@ export function PracticeEditor({
           {project.rungs.map((rung, rungIndex) => {
             const contacts = rung.instructions.filter((part) => !isOutputKind(part.kind));
             const outputs = rung.instructions.filter((part) => isOutputKind(part.kind));
-            const hasTimerOutputs = outputs.some((part) => isTimerKind(part.kind));
+            const hasTimerOutputs = outputs.some((part) => isTimerKind(part.kind) || isCounterKind(part.kind));
             const emptyOutputBranches = rung.emptyOutputBranches ?? [];
             const layout = getWrappedRungLayout(
               rung, canvasWidth, Boolean(draggingKind || moving),
@@ -1025,7 +1026,36 @@ export function PracticeEditor({
                                   const assignedTag = project.tags.find((tag) => tag.name === output.tag);
                                   return (
                                     <g key={output.id}>
-                                      {isTimerKind(output.kind) ? (
+                                      {(isCounterKind(output.kind) ||
+                                        (output.kind === "RES" && assignedTag?.type === "COUNTER")) ? (
+                                        <>
+                                          <Wire x1={coilX - 142} y1={coilRowY}
+                                            x2={coilX - 120} y2={coilRowY} live={rungLive}/>
+                                          <CounterBlock x={coilX - 52} y={coilRowY}
+                                            kind={output.kind as "CTU" | "CTD" | "RES"}
+                                            tag={output.tag || "??"}
+                                            preset={assignedTag?.type === "COUNTER" &&
+                                              typeof assignedTag.value === "object"
+                                                ? Number(assignedTag.value.PRE) : 0}
+                                            accumulated={assignedTag?.type === "COUNTER" &&
+                                              typeof assignedTag.value === "object"
+                                                ? Number(assignedTag.value.ACC) : 0}
+                                            cu={assignedTag?.type === "COUNTER" &&
+                                              typeof assignedTag.value === "object" && assignedTag.value.CU === true}
+                                            cd={assignedTag?.type === "COUNTER" &&
+                                              typeof assignedTag.value === "object" && assignedTag.value.CD === true}
+                                            dn={assignedTag?.type === "COUNTER" &&
+                                              typeof assignedTag.value === "object" && assignedTag.value.DN === true}
+                                            ov={assignedTag?.type === "COUNTER" &&
+                                              typeof assignedTag.value === "object" && assignedTag.value.OV === true}
+                                            un={assignedTag?.type === "COUNTER" &&
+                                              typeof assignedTag.value === "object" && assignedTag.value.UN === true}
+                                            selected={selected === output.id}
+                                            online={running} live={rungLive}/>
+                                          <Wire x1={coilX + 16} y1={coilRowY}
+                                            x2={width - 30} y2={coilRowY} live={rungLive}/>
+                                        </>
+                                      ) : isTimerKind(output.kind) ? (
                                         <>
                                           <Wire x1={coilX - 142} y1={coilRowY}
                                             x2={coilX - 120} y2={coilRowY} live={rungLive}/>
