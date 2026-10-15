@@ -97,9 +97,22 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
   }
   function updateCounter(instruction: PracticeInstruction, enabled: boolean): CounterState {
     const previous = counter(instruction.tag);
-    let next = { ...previous };
+    let pre = previous.PRE;
+    if (instruction.kind !== "RES" && instruction.preset) {
+      const source = instruction.preset;
+      if (source.mode === "literal") pre = source.value;
+      else if (source.mode === "tag") {
+        const tag = project.tags.find((item) => item.name === source.tag);
+        if (tag?.type !== "DINT" || typeof tag.value !== "number") {
+          throw new Error("PRE del contador requiere una variable DINT: " + source.tag);
+        }
+        pre = tag.value;
+      }
+    }
+    if (!validDint(pre)) throw new Error("PRE del contador requiere un DINT válido.");
+    let next = { ...previous, PRE: pre };
     if (instruction.kind === "RES") {
-      if (enabled) next = { ...previous, ACC: 0, CU: false, CD: false,
+      if (enabled) next = { ...next, ACC: 0, CU: false, CD: false,
         DN: false, OV: false, UN: false };
     } else if (instruction.kind === "CTU") {
       if (enabled && !previous.CU) {
@@ -108,7 +121,7 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
         next.OV = previous.OV || overflow;
       }
       next.CU = enabled;
-      next.DN = next.ACC >= next.PRE;
+      next.DN = next.ACC >= pre;
     } else if (instruction.kind === "CTD") {
       if (enabled && !previous.CD) {
         const underflow = previous.ACC === INT32_MIN;
@@ -116,7 +129,7 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
         next.UN = previous.UN || underflow;
       }
       next.CD = enabled;
-      next.DN = next.ACC >= next.PRE;
+      next.DN = next.ACC >= pre;
     }
     counters.set(instruction.tag, next);
     counterUpdates.set(instruction.tag, next);

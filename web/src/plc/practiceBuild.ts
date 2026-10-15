@@ -1,4 +1,4 @@
-import { MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, isOutputKind, isTimerKind, isCounterKind, isValidTimerPreset, type EditableKind, type PracticeInstruction,
+import { MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, isOutputKind, isTimerKind, isCounterKind, isValidTimerPreset, isValidCounterPreset, type EditableKind, type PracticeInstruction,
   type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
 
 export type DiagnosticSeverity = "error" | "warning";
@@ -191,6 +191,36 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
       } else {
         push("error", "INVALID_TIMER_PRESET",
           at + ": modo PRE no admitido.", rung.id, rungIndex, id, branchId);
+      }
+    }
+    if (isCounterKind(instruction.kind) && instruction.preset) {
+      const source = instruction.preset;
+      if (source.mode === "literal") {
+        if (!isValidCounterPreset(source.value)) {
+          push("error", "INVALID_COUNTER_PRESET",
+            at + ": PRE del contador requiere un DINT entero de -2147483648 a 2147483647 pulsos.",
+            rung.id, rungIndex, id, branchId);
+        }
+      } else if (source.mode === "tag") {
+        const reference = tags.get(source.tag);
+        if (!reference) {
+          push("error", "UNKNOWN_COUNTER_PRESET_TAG",
+            at + ": no existe la variable PRE «" + source.tag + "».",
+            rung.id, rungIndex, id, branchId);
+        } else if (reference.type !== "DINT") {
+          push("error", "INCOMPATIBLE_COUNTER_PRESET_TAG",
+            at + ": PRE del contador debe referenciar un DINT.",
+            rung.id, rungIndex, id, branchId);
+        } else if (typeof reference.value !== "number" ||
+          !isValidCounterPreset(reference.value)) {
+          push("error", "INVALID_COUNTER_PRESET",
+            at + ": PRE DINT del contador tiene valor inválido.",
+            rung.id, rungIndex, id, branchId);
+        }
+      } else {
+        push("error", "INVALID_COUNTER_PRESET",
+          at + ": origen PRE del contador no admitido.",
+          rung.id, rungIndex, id, branchId);
       }
     }
     if (instruction.kind === "RES" && instruction.preset) {

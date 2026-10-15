@@ -69,7 +69,7 @@ function tagInUse(project: PracticeProject, name: string): boolean {
 }
 
 /** An empty tag means that the symbol exists but has not been assigned an operand yet. */
-/** Optional PRE override. Without one, the TIMER tag's PRE member is used. */
+/** Optional PRE override. Without one, the TIMER/COUNTER tag's PRE member is used. */
 export type TimerPresetSource =
   | { mode: "literal"; value: number }
   | { mode: "tag"; tag: string };
@@ -84,29 +84,44 @@ export function isValidTimerPreset(value: number): boolean {
   return Number.isInteger(value) && value >= 0 && value <= MAX_TIMER_PRESET;
 }
 
-/** Update one timer's PRE source without writing directly into its tag. */
-export function setInstructionTimerPreset(
+export const MIN_COUNTER_PRESET = -2147483648;
+export function isValidCounterPreset(value: number): boolean {
+  return Number.isInteger(value) && value >= MIN_COUNTER_PRESET && value <= MAX_TIMER_PRESET;
+}
+
+/** Set the PRE operand for a timer (ms) or a counter (signed pulses). */
+export function setInstructionPreset(
   project: PracticeProject, instructionId: string, preset: TimerPresetSource | undefined,
 ): PracticeProject {
   const found = findInstruction(project, instructionId);
-  if (!found || !["TON", "TOF", "RTO"].includes(found.instruction.kind)) {
-    throw new Error("Selecciona una instrucción TON, TOF o RTO.");
+  if (!found || !["TON", "TOF", "RTO", "CTU", "CTD"].includes(found.instruction.kind)) {
+    throw new Error("Selecciona una instrucción TON, TOF, RTO, CTU o CTD.");
   }
-  if (preset?.mode === "literal" && !isValidTimerPreset(preset.value)) {
-    throw new Error("PRE debe ser un entero entre 0 y " + MAX_TIMER_PRESET + " ms.");
+  const isCounter = isCounterKind(found.instruction.kind);
+  const valid = isCounter ? isValidCounterPreset : isValidTimerPreset;
+  if (preset?.mode === "literal" && !valid(preset.value)) {
+    throw new Error(isCounter
+      ? "PRE requiere un entero DINT entre -2147483648 y 2147483647 pulsos."
+      : "PRE debe ser un entero entre 0 y " + MAX_TIMER_PRESET + " ms.");
   }
   if (preset?.mode === "tag") {
     const tag = project.tags.find((item) => item.name === preset.tag);
     if (!tag || tag.type !== "DINT") throw new Error("PRE requiere un tag DINT existente.");
-    if (typeof tag.value !== "number" || !isValidTimerPreset(tag.value)) {
-      throw new Error("La variable DINT debe contener un PRE no negativo.");
+    if (typeof tag.value !== "number" || !valid(tag.value)) {
+      throw new Error(isCounter
+        ? "La variable DINT debe contener un PRE de 32 bits válido."
+        : "La variable DINT debe contener un PRE no negativo.");
     }
   }
   return { ...project, rungs: project.rungs.map((rung) => ({
-    ...rung, instructions: rung.instructions.map((item) => item.id === instructionId
+    ...rung,
+    instructions: rung.instructions.map((item) => item.id === instructionId
       ? { ...item, preset } : item),
   })) };
 }
+
+/** Legacy API retained for previously implemented timer instructions. */
+export const setInstructionTimerPreset = setInstructionPreset;
 export interface ParallelBranch {
   id: string;
   anchorId: string;
@@ -841,6 +856,7 @@ export function setTagValue(
   }
   assertValidTagValue(tag.type, value);
   if (tag.type === "DINT" && project.rungs.some((rung) => allInstructions(rung).some((item) =>
+    ["TON", "TOF", "RTO"].includes(item.kind) &&
     item.preset?.mode === "tag" && item.preset.tag === name)) &&
       !isValidTimerPreset(value as number)) {
     throw new Error("DINT usado como PRE requiere un entero no negativo en milisegundos.");

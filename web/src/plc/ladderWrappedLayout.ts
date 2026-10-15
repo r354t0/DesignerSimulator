@@ -5,7 +5,7 @@ import {
   type LadderGroupGeometry, type VisualLadderDropTarget,
 } from "./ladderDragDrop.ts";
 import {
-  MAX_PRACTICE_CONTACTS, isOutputKind, isTimerKind, contactCount, findInstruction,
+  MAX_PRACTICE_CONTACTS, isOutputKind, isTimerKind, isCounterKind, contactCount, findInstruction,
   type EditableKind, type PracticeProject, type PracticeRung,
 } from "./practiceDocument.ts";
 
@@ -67,10 +67,10 @@ export function getWrappedRungLayout(
   const last = packed.at(-1)!;
   const lastRequiredRight = last.reduce((value, group, i) =>
     value + (i ? gap : 0) + (group.right - group.left), lead);
-  // Reserve space for TIMER blocks or coils on the last line. Move the final group down so the
-  // continuation contains real contacts instead of a lonely output coil.
-  const hasTimer = rung.instructions.some((item) => isTimerKind(item.kind));
-  const terminalClearance = hasTimer ? 155 : 64;
+  // Timer and counter blocks need identical horizontal clearance.
+  const hasStructuredOutput = rung.instructions.some((item) =>
+    isTimerKind(item.kind) || isCounterKind(item.kind));
+  const terminalClearance = hasStructuredOutput ? 155 : 64;
   if (lastRequiredRight > coilX - terminalClearance && last.length > 1) {
     packed.push([last.pop()!]);
   } else if (lastRequiredRight > coilX - terminalClearance && last.length === 1) {
@@ -87,11 +87,11 @@ export function getWrappedRungLayout(
         (rung.emptyOutputBranches?.length ?? 0) + (previewOutput ? 1 : 0)
       : 0;
     const outputExtension = Math.max(0, outputs - 1) * OUTPUT_BRANCH_STEP;
-    // TIMER blocks extend 41px below the conductor rather than a coil's ~8px.
-    // Give them a local bottom margin; ordinary Bit rungs stay compact.
-    const timerBottomClearance = index === packed.length - 1 && hasTimer ? 17 : 0;
+    // Timer/counter blocks end 41px beneath the final output center; preserve
+    // a 22px margin beneath their frame and status bits, even with OR outputs.
+    const structuredBottomClearance = index === packed.length - 1 && hasStructuredOutput ? 32 : 0;
     const height = Math.max(getPracticeRungHeight(maxLanes, showDropLane),
-      getPracticeRungHeight(0) + outputExtension + timerBottomClearance
+      getPracticeRungHeight(0) + outputExtension + structuredBottomClearance
     ) + (index < packed.length - 1 ? 29 : 0);
     const actual: WrappedGroup[] = [];
     let nextLeft = lead;

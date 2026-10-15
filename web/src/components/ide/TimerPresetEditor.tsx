@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { createPortal } from "react-dom";
 import { Check, RotateCcw } from "lucide-react";
 import {
-  getAssignableTimerPresetTags, parseTimerPresetInput,
+  getAssignablePresetTags, parsePresetInput,
 } from "../../plc/timerPresetInput";
 import type {
   PracticeInstruction, PracticeTag, TimerPresetSource,
@@ -27,12 +27,15 @@ export function TimerPresetEditor({
   onSave: (value: TimerPresetSource | undefined) => void;
   onClose: () => void;
 }) {
-  const timer = tags.find((tag) => tag.name === instruction.tag);
-  const timerPre = timer?.type === "TIMER" && typeof timer.value === "object"
-    ? Number(timer.value.PRE) : 0;
+  const isCounter = instruction.kind === "CTU" || instruction.kind === "CTD";
+  const kind = isCounter ? "counter" : "timer";
+  const unit = isCounter ? "pulsos" : "ms";
+  const rootTag = tags.find((tag) => tag.name === instruction.tag);
+  const rootPre = rootTag?.type === (isCounter ? "COUNTER" : "TIMER") &&
+    typeof rootTag.value === "object" ? Number(rootTag.value.PRE) : 0;
   const initialValue = instruction.preset?.mode === "literal"
     ? String(instruction.preset.value)
-    : instruction.preset?.mode === "tag" ? instruction.preset.tag : String(timerPre);
+    : instruction.preset?.mode === "tag" ? instruction.preset.tag : String(rootPre);
   const [draft, setDraft] = useState(initialValue);
   const [searching, setSearching] = useState(false);
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
@@ -40,14 +43,14 @@ export function TimerPresetEditor({
   const dirtyRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const dintTags = useMemo(() => getAssignableTimerPresetTags(tags), [tags]);
+  const dintTags = useMemo(() => getAssignablePresetTags(tags, kind), [tags, kind]);
   const shown = searching
     ? dintTags.filter((tag) =>
       tag.name.toLowerCase().includes(draft.trim().toLowerCase()))
     : dintTags;
 
   const apply = (value: string) => {
-    const result = parseTimerPresetInput(value, tags);
+    const result = parsePresetInput(value, tags, kind);
     if (!result.ok) {
       setError(result.message);
       inputRef.current?.focus();
@@ -58,7 +61,7 @@ export function TimerPresetEditor({
   };
 
   const finish = () => {
-    // Simply leaving the field should never convert TIMER.PRE into a fixed
+    // Simply leaving the field should never convert TIMER/COUNTER.PRE into a fixed
     // number, nor rebuild an unchanged operand.
     if (!dirtyRef.current) { onClose(); return true; }
     return apply(draft);
@@ -123,14 +126,14 @@ export function TimerPresetEditor({
       className="rounded-md border border-sky-400 bg-white p-3 text-slate-900 shadow-2xl"
     >
       <label htmlFor="timer-pre-inline-input" className="block text-xs font-semibold">
-        PRE · {instruction.kind} · ms
+        PRE · {instruction.kind} · {unit}
       </label>
       <input
         id="timer-pre-inline-input"
         ref={inputRef}
         type="text"
         role="combobox"
-        aria-label="Valor PRE en milisegundos o variable DINT"
+        aria-label={"Valor PRE en " + unit + " o variable DINT"}
         aria-autocomplete="list"
         aria-expanded={true}
         autoComplete="off"
@@ -169,7 +172,7 @@ export function TimerPresetEditor({
               {instruction.preset?.mode === "tag" && instruction.preset.tag === tag.name &&
                 <Check size={12} className="shrink-0 text-emerald-700" />}
             </span>
-            <span className="shrink-0 text-slate-500">{String(tag.value)} ms</span>
+            <span className="shrink-0 text-slate-500">{String(tag.value)} {unit}</span>
           </button>
         )) : (
           <p className="p-3 text-xs text-slate-500">
@@ -180,7 +183,7 @@ export function TimerPresetEditor({
       <button type="button"
         onClick={() => onSave(undefined)}
         className="mt-2 flex items-center gap-1 text-xs text-sky-700 hover:underline">
-        <RotateCcw size={12} /> Usar TIMER.PRE ({timerPre} ms)
+        <RotateCcw size={12} /> Usar {isCounter ? "COUNTER" : "TIMER"}.PRE ({rootPre} {unit})
       </button>
       {error && <p role="alert" className="mt-2 text-xs text-red-700">{error}</p>}
       <p className="mt-2 text-[11px] leading-4 text-slate-500">

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, FileCode2, GripVertical, Hammer, Pause, Play, Square, StepForward, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, GripVertical, Hammer, Pause, Play, Square, StepForward, XCircle } from "lucide-react";
 import { Coil, Contact, TimerBlock, CounterBlock, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
@@ -43,7 +43,7 @@ import {
   isOutputKind,
   isTimerKind,
   isCounterKind,
-  setInstructionTimerPreset,
+  setInstructionPreset,
   type EditableKind,
   type PracticeProject,
 } from "../../plc/practiceDocument";
@@ -1034,6 +1034,9 @@ export function PracticeEditor({
                                           <CounterBlock x={coilX - 52} y={coilRowY}
                                             kind={output.kind as "CTU" | "CTD" | "RES"}
                                             tag={output.tag || "??"}
+                                            presetLabel={output.preset?.mode === "literal"
+                                              ? String(output.preset.value)
+                                              : output.preset?.mode === "tag" ? output.preset.tag : undefined}
                                             preset={assignedTag?.type === "COUNTER" &&
                                               typeof assignedTag.value === "object"
                                                 ? Number(assignedTag.value.PRE) : 0}
@@ -1147,7 +1150,7 @@ export function PracticeEditor({
                       dragButton(output, coilX, outputYs[index]),
                       tagDragButton(output, coilX, outputYs[index]),
                     ])}
-                    {outputs.filter((item) => ["TON", "TOF", "RTO"].includes(item.kind))
+                    {outputs.filter((item) => ["TON", "TOF", "RTO", "CTU", "CTD"].includes(item.kind))
                       .map((item) => {
                         const index = outputs.findIndex((output) => output.id === item.id);
                         return (
@@ -1194,6 +1197,20 @@ export function PracticeEditor({
             );
           })}
 
+          {/* Final program delimiter, like Studio 5000. No instructional text
+              occupies the bottom of the Ladder workspace. */}
+          <div role="group" aria-label="Fin de la rutina Ladder"
+            className="relative bg-white" style={{ width: canvasWidth, height: 90 }}>
+            <svg width={canvasWidth} height={90} viewBox={"0 0 " + canvasWidth + " 90"}
+              aria-hidden="true" className="block">
+              <path d={"M63 0 V74 M" + (canvasWidth - 30) + " 0 V74" +
+                " M63 53 H" + (canvasWidth - 30)}
+                fill="none" stroke="#64748b" strokeWidth="1.25" />
+              <text x={9} y={49} fontSize={11} fontFamily="Arial, sans-serif"
+                fill="#94a3b8">(End)</text>
+            </svg>
+          </div>
+
           {tagSelector && (
             <PracticeTagSelector
               key={tagSelector.instructionId + "-" + tagSelector.mode}
@@ -1208,21 +1225,17 @@ export function PracticeEditor({
               {error}
             </p>
           )}
-          <p className="mb-5 flex items-center gap-1 px-4 text-xs text-slate-500">
-            <FileCode2 size={14} /> Arrastra el número izquierdo para mover un rung completo (o Alt+↑/↓). Clic en etiqueta: buscar tag; doble clic: tabla de variables; arrastre: copiar tag. Clic en conductor OR + Supr: borrar rama.
-            RUN ejecuta scans periódicos; PAUSE congela las salidas y SCAN realiza una sola evaluación.
-          </p>
         </div>
       </div>
 
       {editingPreset && editingPresetId && editingPresetAnchor &&
-        ["TON", "TOF", "RTO"].includes(editingPreset.kind) && (
+        ["TON", "TOF", "RTO", "CTU", "CTD"].includes(editingPreset.kind) && (
           <TimerPresetEditor key={editingPresetId}
             instruction={editingPreset}
             anchor={editingPresetAnchor}
             tags={project.tags}
             onSave={(preset) => {
-              if (update(() => setInstructionTimerPreset(project, editingPresetId, preset))) {
+              if (update(() => setInstructionPreset(project, editingPresetId, preset))) {
                 setEditingPresetId(null);
               }
             }}
