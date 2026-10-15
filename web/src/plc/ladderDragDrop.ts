@@ -10,8 +10,8 @@ export const PRACTICE_BRANCH_Y = 160;
 export const PRACTICE_BRANCH_GAP = 85;
 // Preserve the symbol baseline while adding clearance BELOW its glyph/ONS label.
 // The former 98px row clipped the ONS text at y=81+20 and crowded the rung below.
-export const PRACTICE_MAIN_HEIGHT = 122;
-export const PRACTICE_OR_HEIGHT = 202;
+export const PRACTICE_MAIN_HEIGHT = 112;
+export const PRACTICE_OR_HEIGHT = 190;
 export const branchLaneY = (index: number) => PRACTICE_BRANCH_Y + index * PRACTICE_BRANCH_GAP;
 
 /** Height of the visible rung: expand only for actual OR lanes or a drag preview. */
