@@ -1,4 +1,4 @@
-import { findInstruction, setTagValue, type PracticeProject } from "./practiceDocument.ts";
+import { findInstruction, setTagValue, isOutputKind, type PracticeProject } from "./practiceDocument.ts";
 
 /**
  * Bit changes from an instruction's context menu are intended for monitored
@@ -30,9 +30,14 @@ export function getBitMenuTarget(
   if (tag.constant) return { instructionId, tagName, value: tag.value,
     editable: false, reason: "El tag está definido como constante." };
   const outputOwned = project.rungs.some((rung) => rung.instructions.some((item) =>
-    item.kind === "OTE" && item.tag === tag.name));
-  if (outputOwned) return { instructionId, tagName, value: tag.value,
-    editable: false, reason: "El tag es una salida controlada por OTE durante RUN." };
+    isOutputKind(item.kind) && item.tag === tag.name));
+  const onsOwned = project.rungs.some((rung) =>
+    [...rung.instructions, ...(rung.parallelBranches ?? []).flatMap((branch) => branch.instructions)]
+      .some((item) => item.kind === "ONS" && item.tag === tag.name));
+  if (outputOwned || onsOwned) return { instructionId, tagName, value: tag.value,
+    editable: false, reason: outputOwned
+      ? "El tag es una salida controlada por OTE/OTL/OTU durante RUN."
+      : "El tag es la memoria interna de ONS durante RUN." };
   return { instructionId, tagName, value: tag.value, editable: true };
 }
 
