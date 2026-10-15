@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   initialPracticeProject, insertInstruction, createEmptyOutputBranch,
-  removeEmptyOutputBranch, fillEmptyOutputBranch, setTagValue,
+  removeEmptyOutputBranch, fillEmptyOutputBranch, moveInstructionToEmptyOutputBranch,
+  createRung, setTagValue,
 } from "../src/plc/practiceDocument.ts";
 import { buildPracticeProject, getPracticeBuildSignature } from "../src/plc/practiceBuild.ts";
 import { getWrappedRungLayout, findWrappedLadderDropTarget } from "../src/plc/ladderWrappedLayout.ts";
@@ -97,4 +98,16 @@ test("a reserved eighth empty output lane can be filled but a ninth output is re
   assert.equal(p.rungs[0].emptyOutputBranches.length, 6);
   assert.equal(buildPracticeProject(p).diagnostics.filter((d) => d.code === "OUTPUT_LIMIT").length, 0);
   assert.throws(() => createEmptyOutputBranch(p, "rung-1"), /Máximo 8/);
+});
+
+
+test("drag an existing OTE from a second rung into an empty output OR lane", () => {
+  let p = createRung(createEmptyOutputBranch(populated(), "rung-1"), "rung-2");
+  p = insertInstruction(p, "rung-2", 0, ote("other", "Lamp_Run"));
+  const moved = moveInstructionToEmptyOutputBranch(p, "other", "rung-1", "output-or-1");
+  assert.equal(moved.rungs[0].emptyOutputBranches.length, 0);
+  assert.deepEqual(moved.rungs[0].instructions.map((item) => item.id), ["start", "motor", "other"]);
+  assert.equal(moved.rungs[1].instructions.length, 0);
+  assert.equal(p.rungs[0].emptyOutputBranches.length, 1, "input model must stay unchanged");
+  assert.throws(() => moveInstructionToEmptyOutputBranch(p, "motor", "rung-1", "output-or-1"), /ya pertenece/);
 });
