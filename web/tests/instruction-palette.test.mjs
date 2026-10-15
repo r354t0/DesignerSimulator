@@ -15,11 +15,11 @@ test("Studio-style palette contains every visible category in a stable order", (
   assert.ok(PALETTE_CATEGORIES.every((category) => category.label && category.tools.length));
 });
 
-test("Favorites and Bit expose the same core contacts and coil", () => {
+test("Favorites and Bit expose all enabled Bit instructions", () => {
   for (const categoryId of ["favorites", "bit"]) {
     const category = getPaletteCategory(categoryId);
     assert.deepEqual(category.tools.filter((tool) => tool.editable).map((tool) => tool.id),
-      ["XIC", "XIO", "OTE"]);
+      ["XIC", "XIO", "OTE", "OTL", "OTU", "ONS"]);
   }
 });
 
