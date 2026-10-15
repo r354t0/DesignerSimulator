@@ -1,5 +1,6 @@
 import type {
   EditableKind, PracticeInstruction, PracticeProject, PracticeRung,
+  MAX_PRACTICE_CONTACTS,
 } from "./practiceDocument.ts";
 
 export type DiagnosticSeverity = "error" | "warning";
@@ -153,9 +154,9 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
     if (instructions.length === 0 && branches.length === 0) {
       push("warning", "EMPTY_RUNG", at + ": rung vacío.", rung.id, rungIndex);
     } else {
-      if (count > 8) {
+      if (count > MAX_PRACTICE_CONTACTS) {
         push("error", "CONTACT_LIMIT",
-          at + ": supera el máximo de 8 contactos que admite esta versión.",
+          at + ": supera el máximo de " + MAX_PRACTICE_CONTACTS + " contactos que admite esta versión.",
           rung.id, rungIndex);
       }
       if (coils.length === 0) {
