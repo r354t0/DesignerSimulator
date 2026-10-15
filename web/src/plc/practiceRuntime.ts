@@ -81,6 +81,27 @@ export function evaluateSeriesScan(project: PracticeProject): SeriesScan {
   return { project: nextProject, instructionFlow, rungPower, writes };
 }
 
+/** On structural edits, de-energize outputs from both the old and new programs.
+ * This also handles removing or reassigning an OTE while it was energized.
+ */
+export function stopAfterSeriesLogicEdit(
+  previous: PracticeProject,
+  next: PracticeProject,
+): PracticeProject {
+  const outputs = new Set(
+    [...previous.rungs, ...next.rungs].flatMap((rung) =>
+      rung.instructions.filter((item) => item.kind === "OTE").map((item) => item.tag)),
+  );
+  if (!next.tags.some((tag) =>
+    tag.type === "BOOL" && !tag.constant && outputs.has(tag.name) && tag.value !== false)) return next;
+  return {
+    ...next,
+    tags: next.tags.map((tag): PracticeTag =>
+      tag.type === "BOOL" && !tag.constant && outputs.has(tag.name)
+        ? { ...tag, value: false } : tag),
+  };
+}
+
 /** Stop drives the simulated OTE-written outputs low, without touching inputs. */
 export function stopSeriesScan(project: PracticeProject): PracticeProject {
   const targets = new Set(project.rungs.flatMap((rung) =>
