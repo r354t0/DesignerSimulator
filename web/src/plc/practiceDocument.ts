@@ -2,7 +2,11 @@
  * Immutable PLC practice document. Contact paths can contain XIC/XIO/ONS,
  * output banks can contain OTE/OTL/OTU. Nested OR remains out of scope.
  */
-export type EditableKind = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" | "TON" | "TOF" | "RTO" | "CTU" | "CTD" | "RES";
+export type CompareKind = "EQU" | "NEQ" | "LES" | "LEQ" | "GRT" | "GEQ";
+export const COMPARE_KINDS: readonly CompareKind[] = ["EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ"];
+export const isCompareKind = (kind: string): kind is CompareKind =>
+  (COMPARE_KINDS as readonly string[]).includes(kind);
+export type EditableKind = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" | "TON" | "TOF" | "RTO" | "CTU" | "CTD" | "RES" | CompareKind;
 export type TimerKind = "TON" | "TOF" | "RTO" | "RES";
 export const isTimerKind = (kind: EditableKind): kind is TimerKind =>
   (["TON", "TOF", "RTO", "RES"] as readonly string[]).includes(kind);
@@ -12,9 +16,9 @@ export const isCounterKind = (kind: EditableKind): kind is CounterKind =>
 export const isTimerMemberOperand = (tag: string) =>
   /^[A-Za-z_][A-Za-z0-9_]*\.(EN|TT|DN)$/.test(tag);
 export type OutputKind = "OTE" | "OTL" | "OTU" | TimerKind | CounterKind;
-export type ContactKind = "XIC" | "XIO" | "ONS";
+export type ContactKind = "XIC" | "XIO" | "ONS" | CompareKind;
 export const OUTPUT_KINDS: readonly OutputKind[] = ["OTE", "OTL", "OTU", "TON", "TOF", "RTO", "CTU", "CTD", "RES"];
-export const CONTACT_KINDS: readonly ContactKind[] = ["XIC", "XIO", "ONS"];
+export const CONTACT_KINDS: readonly ContactKind[] = ["XIC", "XIO", "ONS", ...COMPARE_KINDS];
 export const isOutputKind = (kind: EditableKind): kind is OutputKind =>
   (OUTPUT_KINDS as readonly string[]).includes(kind);
 export const isContactKind = (kind: EditableKind): kind is ContactKind =>
@@ -65,7 +69,11 @@ function validateTagName(project: PracticeProject, name: string, excludeName?: s
 function tagInUse(project: PracticeProject, name: string): boolean {
   return project.rungs.some((rung) => allInstructions(rung).some((item) =>
     item.tag === name || item.tag.startsWith(name + ".") ||
-    (item.preset?.mode === "tag" && item.preset.tag === name)));
+    (item.preset?.mode === "tag" && item.preset.tag === name) ||
+    (item.compareA?.mode === "tag" &&
+      (item.compareA.tag === name || item.compareA.tag.startsWith(name + "."))) ||
+    (item.compareB?.mode === "tag" &&
+      (item.compareB.tag === name || item.compareB.tag.startsWith(name + ".")))));
 }
 
 /** An empty tag means that the symbol exists but has not been assigned an operand yet. */
@@ -73,11 +81,14 @@ function tagInUse(project: PracticeProject, name: string): boolean {
 export type TimerPresetSource =
   | { mode: "literal"; value: number }
   | { mode: "tag"; tag: string };
+export type NumericOperand = { mode: "literal"; value: number } | { mode: "tag"; tag: string };
 export interface PracticeInstruction {
   id: string;
   kind: EditableKind;
   tag: string;
   preset?: TimerPresetSource;
+  compareA?: NumericOperand;
+  compareB?: NumericOperand;
 }
 export const MAX_TIMER_PRESET = 2147483647;
 export function isValidTimerPreset(value: number): boolean {
@@ -159,6 +170,10 @@ function allInstructions(rung: PracticeRung): PracticeInstruction[] {
 }
 
 function ensureTag(project: PracticeProject, tag: string, kind: EditableKind): void {
+  if (isCompareKind(kind)) {
+    if (tag) throw new Error("Las comparaciones utilizan operandos Source A y Source B.");
+    return;
+  }
   if (!tag) return;
   const [root, member, extra] = tag.split(".");
   if (extra !== undefined) throw new Error("Operando estructurado inválido.");
@@ -800,22 +815,42 @@ export function editTag(
       ...rung,
       instructions: rung.instructions.map((item) =>
         item.tag === previousName || item.tag.startsWith(previousName + ".") ||
-          item.preset?.mode === "tag" && item.preset.tag === previousName
+          (item.preset?.mode === "tag" && item.preset.tag === previousName) ||
+          (item.compareA?.mode === "tag" &&
+            (item.compareA.tag === previousName || item.compareA.tag.startsWith(previousName + "."))) ||
+          (item.compareB?.mode === "tag" &&
+            (item.compareB.tag === previousName || item.compareB.tag.startsWith(previousName + ".")))
           ? { ...item,
               tag: item.tag === previousName || item.tag.startsWith(previousName + ".")
                 ? nextName + item.tag.slice(previousName.length) : item.tag,
               preset: item.preset?.mode === "tag" && item.preset.tag === previousName
                 ? { mode: "tag" as const, tag: nextName } : item.preset,
+              compareA: item.compareA?.mode === "tag" &&
+                (item.compareA.tag === previousName || item.compareA.tag.startsWith(previousName + "."))
+                ? { mode: "tag" as const, tag: nextName + item.compareA.tag.slice(previousName.length) } : item.compareA,
+              compareB: item.compareB?.mode === "tag" &&
+                (item.compareB.tag === previousName || item.compareB.tag.startsWith(previousName + "."))
+                ? { mode: "tag" as const, tag: nextName + item.compareB.tag.slice(previousName.length) } : item.compareB,
             } : item),
       parallelBranches: rung.parallelBranches?.map((branch) => ({
         ...branch, instructions: branch.instructions.map((item) =>
           item.tag === previousName || item.tag.startsWith(previousName + ".") ||
-          item.preset?.mode === "tag" && item.preset.tag === previousName
+          (item.preset?.mode === "tag" && item.preset.tag === previousName) ||
+          (item.compareA?.mode === "tag" &&
+            (item.compareA.tag === previousName || item.compareA.tag.startsWith(previousName + "."))) ||
+          (item.compareB?.mode === "tag" &&
+            (item.compareB.tag === previousName || item.compareB.tag.startsWith(previousName + ".")))
           ? { ...item,
               tag: item.tag === previousName || item.tag.startsWith(previousName + ".")
                 ? nextName + item.tag.slice(previousName.length) : item.tag,
               preset: item.preset?.mode === "tag" && item.preset.tag === previousName
                 ? { mode: "tag" as const, tag: nextName } : item.preset,
+              compareA: item.compareA?.mode === "tag" &&
+                (item.compareA.tag === previousName || item.compareA.tag.startsWith(previousName + "."))
+                ? { mode: "tag" as const, tag: nextName + item.compareA.tag.slice(previousName.length) } : item.compareA,
+              compareB: item.compareB?.mode === "tag" &&
+                (item.compareB.tag === previousName || item.compareB.tag.startsWith(previousName + "."))
+                ? { mode: "tag" as const, tag: nextName + item.compareB.tag.slice(previousName.length) } : item.compareB,
             } : item),
       })),
     })),

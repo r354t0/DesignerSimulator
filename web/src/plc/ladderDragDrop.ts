@@ -29,7 +29,7 @@ export const COIL_RIGHT_INSET = 89;
 export const LAST_CONTACT_TO_COIL = 117;
 
 export function isEditableKind(value: string): value is EditableKind {
-  return ["XIC", "XIO", "ONS", "OTE", "OTL", "OTU", "TON", "TOF", "RTO", "CTU", "CTD", "RES"].includes(value);
+  return ["XIC", "XIO", "ONS", "OTE", "OTL", "OTU", "TON", "TOF", "RTO", "CTU", "CTD", "RES", "EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ"].includes(value);
 }
 
 export interface LadderGroupGeometry {

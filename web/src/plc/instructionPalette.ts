@@ -61,9 +61,12 @@ export const PALETTE_CATEGORIES: readonly PaletteCategory[] = [
     tool("SSV", "Set System Value"), tool("IOT", "Immediate Output"),
   ] },
   { id: "compare", label: "Compare", tools: [
-    tool("EQU", "Equal"), tool("NEQ", "Not Equal"), tool("LES", "Less Than"),
-    tool("LEQ", "Less Than or Equal"), tool("GRT", "Greater Than"),
-    tool("GEQ", "Greater Than or Equal"), tool("LIM", "Limit Test"),
+    tool("EQU", "Equal · Source A = Source B", true),
+    tool("NEQ", "Not Equal · Source A ≠ Source B", true),
+    tool("LES", "Less Than · Source A < Source B", true),
+    tool("LEQ", "Less Than or Equal · Source A ≤ Source B", true),
+    tool("GRT", "Greater Than · Source A > Source B", true),
+    tool("GEQ", "Greater Than or Equal · Source A ≥ Source B", true), tool("LIM", "Limit Test"),
   ] },
   { id: "move-logical", label: "Move/Logical", tools: [
     tool("MOV", "Move"), tool("MVM", "Masked Move"), tool("COP", "Copy"),
@@ -91,6 +94,6 @@ export function getPaletteCategory(id: PaletteCategoryId): PaletteCategory {
 
 export function isImplementedPaletteInstruction(
   id: string,
-): id is "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" | "TON" | "TOF" | "RTO" | "CTU" | "CTD" | "RES" {
-  return ["XIC", "XIO", "OTE", "OTL", "OTU", "ONS", "TON", "TOF", "RTO", "CTU", "CTD", "RES"].includes(id);
+): id is "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" | "TON" | "TOF" | "RTO" | "CTU" | "CTD" | "RES" | "EQU" | "NEQ" | "LES" | "LEQ" | "GRT" | "GEQ" {
+  return ["XIC", "XIO", "OTE", "OTL", "OTU", "ONS", "TON", "TOF", "RTO", "CTU", "CTD", "RES", "EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ"].includes(id);
 }

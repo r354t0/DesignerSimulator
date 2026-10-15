@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, GripVertical, Hammer, Pause, Play, Square, StepForward, XCircle } from "lucide-react";
-import { Coil, Contact, TimerBlock, CounterBlock, LadderRails, Wire, type Instruction } from "./LadderSymbols";
+import { Coil, Contact, TimerBlock, CounterBlock, ComparisonBlock, LadderRails, Wire, type Instruction } from "./LadderSymbols";
+import { CompareOperandEditor, type CompareOperandAnchor } from "./CompareOperandEditor";
+import { numericOperandLabel, setComparisonOperand } from "../../plc/practiceCompare";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
 import { TimerPresetEditor, type TimerPresetAnchor } from "./TimerPresetEditor";
@@ -43,6 +45,7 @@ import {
   isOutputKind,
   isTimerKind,
   isCounterKind,
+  isCompareKind,
   setInstructionPreset,
   type EditableKind,
   type PracticeProject,
@@ -89,6 +92,9 @@ export function PracticeEditor({
   const [tagSelector, setTagSelector] = useState<TagSelectorState | null>(null);
   const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
   const [editingPresetAnchor, setEditingPresetAnchor] = useState<TimerPresetAnchor | null>(null);
+  const [editingCompare, setEditingCompare] = useState<{
+    id: string; side: "A" | "B"; anchor: CompareOperandAnchor;
+  } | null>(null);
   const [bitMenu, setBitMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLElement | null>(null);
@@ -304,6 +310,7 @@ export function PracticeEditor({
     setMoving(null);
     setTagSelector(null);
     setEditingPresetId(null);
+    setEditingCompare(null);
     setBitMenu(null);
     setSelected(null);
     setSelectedOrBranch(null);
@@ -683,16 +690,42 @@ export function PracticeEditor({
             const rungLive = running && Boolean(runtimeView?.rungPower[rung.id]);
             const drawContact = (item: typeof contacts[number], x: number, centerY: number) => {
               const flow = runtimeView?.instructionFlow[item.id];
+              if (isCompareKind(item.kind)) return (
+                <ComparisonBlock key={item.id} x={x} y={centerY} kind={item.kind}
+                  sourceA={numericOperandLabel(item.compareA)}
+                  sourceB={numericOperandLabel(item.compareB)}
+                  selected={selected === item.id} online={running}
+                  condition={flow?.condition ?? false} live={flow?.powerOut ?? false}/>
+              );
               return (
-              <g key={item.id}>
-                <Contact x={x} y={centerY} kind={item.kind as "XIC" | "XIO" | "ONS"}
+                <Contact key={item.id} x={x} y={centerY} kind={item.kind as "XIC" | "XIO" | "ONS"}
                   tag={item.tag || "??"} comment={project.tags.find((tag) => tag.name === item.tag)?.description}
                   labelWidth={96} selected={selected === item.id}
                   value={flow?.value ?? false} online={running} powerIn={flow?.powerIn ?? false}
                   flowOut={flow?.powerOut ?? false} />
-              </g>
               );
             };
+            const compareHotspots = (item: typeof contacts[number], x: number, centerY: number) =>
+              (["A", "B"] as const).map((side, index) => (
+                <button key={"compare-" + item.id + "-" + side} type="button"
+                  aria-label={"Editar Source " + side + " de " + item.kind}
+                  title={"Source " + side + ": número o variable DINT/REAL"}
+                  className="absolute z-30 cursor-text rounded border border-transparent bg-transparent hover:border-sky-500 hover:bg-sky-100/25 focus-visible:outline-2 focus-visible:outline-sky-500"
+                  style={{ left: x - 23, top: centerY + (index === 0 ? -6 : 9),
+                    width: 60, height: 14 }}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    setSelected(item.id);
+                    setSelectedRungId(null);
+                    setSelectedOrBranch(null);
+                    setEditingPresetId(null);
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    setEditingCompare({ id: item.id, side,
+                      anchor: { left: rect.left, top: rect.top, bottom: rect.bottom } });
+                  }}>
+                  <span className="sr-only">Editar Source {side}</span>
+                </button>
+              ));
             const dragButton = (item: typeof contacts[number], x: number, centerY: number) => (
               <button key={"drag-" + item.id} type="button" draggable
                 aria-label={"Mover instrucción " + item.kind + " " + item.tag}
@@ -869,19 +902,21 @@ export function PracticeEditor({
                                   <Wire x1={before} y1={row.mainY} x2={group.left} y2={row.mainY}
                                     live={inputPower} />
                                   <Wire x1={group.left} y1={row.mainY}
-                                    x2={group.mainCenters[0] - 22} y2={row.mainY} live={inputPower} />
+                                    x2={group.mainCenters[0] - (isCompareKind(mainItems[0]?.kind) ? 41 : 22)} y2={row.mainY} live={inputPower} />
                                   {mainItems.map((contact, mainIndex) => {
                                     const center = group.mainCenters[mainIndex];
                                     const following = mainIndex + 1 < mainItems.length
-                                      ? group.mainCenters[mainIndex + 1] - 22 : group.right;
+                                      ? group.mainCenters[mainIndex + 1] -
+                                        (isCompareKind(mainItems[mainIndex + 1].kind) ? 41 : 22)
+                                      : group.right;
                                     const power = running &&
                                       Boolean(runtimeView?.instructionFlow[contact.id]?.powerOut);
                                     return (
                                       <g key={contact.id}>
                                         {drawContact(contact, center, row.mainY)}
-                                        <Wire x1={center + 22} y1={row.mainY}
+                                        <Wire x1={center + (isCompareKind(contact.kind) ? 41 : 22)} y1={row.mainY}
                                           x2={following} y2={row.mainY} live={power} />
-                                        <line x1={center + 22} y1={row.mainY}
+                                        <line x1={center + (isCompareKind(contact.kind) ? 41 : 22)} y1={row.mainY}
                                           x2={following} y2={row.mainY}
                                           stroke="transparent" strokeWidth="16" pointerEvents="stroke"
                                           role="button" tabIndex={0}
@@ -926,18 +961,20 @@ export function PracticeEditor({
                                                 {branch.instructions.map((part, partIndex) => {
                                                   const center = lane.centers[partIndex];
                                                   const previous = partIndex === 0
-                                                    ? group.left : lane.centers[partIndex - 1] + 22;
+                                                    ? group.left : lane.centers[partIndex - 1] +
+                                                    (isCompareKind(branch.instructions[partIndex - 1].kind) ? 41 : 22);
                                                   return (
                                                     <g key={part.id}>
                                                       <Wire x1={previous} y1={laneY}
-                                                        x2={center - 22} y2={laneY}
+                                                        x2={center - (isCompareKind(part.kind) ? 41 : 22)} y2={laneY}
                                                         live={running &&
                                                           Boolean(runtimeView?.instructionFlow[part.id]?.powerIn)} />
                                                       {drawContact(part, center, laneY)}
                                                     </g>
                                                   );
                                                 })}
-                                                <Wire x1={lane.centers.at(-1)! + 22} y1={laneY}
+                                                <Wire x1={lane.centers.at(-1)! +
+                                                  (isCompareKind(branch.instructions.at(-1)!.kind) ? 41 : 22)} y1={laneY}
                                                   x2={group.right} y2={laneY}
                                                   live={running && Boolean(runtimeView?.branchPower[branch.id])} />
                                               </>
@@ -1135,13 +1172,17 @@ export function PracticeEditor({
                       return [
                         ...mainItems.flatMap((contact, index) => [
                           dragButton(contact, group.mainCenters[index], group.mainY),
-                          tagDragButton(contact, group.mainCenters[index], group.mainY),
+                          ...(isCompareKind(contact.kind)
+                            ? compareHotspots(contact, group.mainCenters[index], group.mainY)
+                            : [tagDragButton(contact, group.mainCenters[index], group.mainY)]),
                         ]),
                         ...branches.flatMap((branch, laneIndex) => {
                           const lane = group.branchLanes[laneIndex];
                           return branch.instructions.flatMap((part, partIndex) => [
                             dragButton(part, lane.centers[partIndex], lane.y),
-                            tagDragButton(part, lane.centers[partIndex], lane.y),
+                            ...(isCompareKind(part.kind)
+                              ? compareHotspots(part, lane.centers[partIndex], lane.y)
+                              : [tagDragButton(part, lane.centers[partIndex], lane.y)]),
                           ]);
                         }),
                       ];
@@ -1228,6 +1269,22 @@ export function PracticeEditor({
         </div>
       </div>
 
+      {editingCompare && (() => {
+        const found = findInstruction(project, editingCompare.id);
+        if (!found || !isCompareKind(found.instruction.kind)) return null;
+        return <CompareOperandEditor
+          key={editingCompare.id + "-" + editingCompare.side}
+          kind={found.instruction.kind} side={editingCompare.side}
+          operand={editingCompare.side === "A" ? found.instruction.compareA : found.instruction.compareB}
+          tags={project.tags} anchor={editingCompare.anchor}
+          onSave={(operand) => {
+            if (update(() => setComparisonOperand(project, editingCompare.id, editingCompare.side, operand))) {
+              setEditingCompare(null);
+            }
+          }}
+          onClose={() => setEditingCompare(null)}
+        />;
+      })()}
       {editingPreset && editingPresetId && editingPresetAnchor &&
         ["TON", "TOF", "RTO", "CTU", "CTD"].includes(editingPreset.kind) && (
           <TimerPresetEditor key={editingPresetId}

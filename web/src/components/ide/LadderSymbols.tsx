@@ -441,3 +441,41 @@ export function CounterBlock({
     </g>
   );
 }
+
+
+/** Studio-inspired comparison contact with two editable numeric operands. */
+export function ComparisonBlock({
+  x, y, kind, sourceA, sourceB, condition = false, selected = false, online = false, live = false,
+}: {
+  x: number; y: number;
+  kind: "EQU" | "NEQ" | "LES" | "LEQ" | "GRT" | "GEQ";
+  sourceA: string; sourceB: string;
+  condition?: boolean; selected?: boolean; online?: boolean; live?: boolean;
+}) {
+  const frame = selected ? LADDER_SELECTION_BLUE : online && live ? HOT : BASE;
+  return (
+    <g>
+      <rect x={x - 41} y={y - 27} width={82} height={68} rx={3}
+        fill="#f9fafb" stroke={frame} strokeWidth={selected ? 2 : 1.5}/>
+      <text x={x - 33} y={y - 14} fontSize={11} fontWeight="700" fill="#1c354b">
+        {kind}
+      </text>
+      <text x={x + 33} y={y - 14} textAnchor="end" fontSize={10}
+        fontWeight="700" fill={online && condition ? HOT : "#64748b"}>
+        {online ? Number(condition) : ""}
+      </text>
+      <path d={"M" + (x - 35) + " " + (y - 8) + "h70"} stroke="#cbd5e1" strokeWidth={1}/>
+      <text x={x - 34} y={y + 5} fontSize={9} fill="#556372">A</text>
+      <text x={x + 34} y={y + 5} fontSize={9} textAnchor="end"
+        fontFamily="monospace" fill="#1c354b">
+        {ellipsizeSvgLabel(sourceA, 58)}
+      </text>
+      <text x={x - 34} y={y + 20} fontSize={9} fill="#556372">B</text>
+      <text x={x + 34} y={y + 20} fontSize={9} textAnchor="end"
+        fontFamily="monospace" fill="#1c354b">
+        {ellipsizeSvgLabel(sourceB, 58)}
+      </text>
+      <title>{kind}: A = {sourceA}, B = {sourceB}{online ? " · Resultado " + Number(condition) : ""}</title>
+    </g>
+  );
+}

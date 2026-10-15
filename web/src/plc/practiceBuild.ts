@@ -1,4 +1,5 @@
-import { MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, isOutputKind, isTimerKind, isCounterKind, isValidTimerPreset, isValidCounterPreset, type EditableKind, type PracticeInstruction,
+import { validateNumericOperand } from "./practiceCompare.ts";
+import { isCompareKind, MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, isOutputKind, isTimerKind, isCounterKind, isValidTimerPreset, isValidCounterPreset, type EditableKind, type PracticeInstruction,
   type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
 
 export type DiagnosticSeverity = "error" | "warning";
@@ -32,11 +33,12 @@ export function getPracticeBuildSignature(project: PracticeProject): string {
     tags: project.tags.map(({ name, type, constant }) => ({ name, type, constant })),
     rungs: project.rungs.map((rung) => ({
       id: rung.id,
-      instructions: rung.instructions.map(({ id, kind, tag, preset }) => ({ id, kind, tag, preset })),
+      instructions: rung.instructions.map(({ id, kind, tag, preset, compareA, compareB }) =>
+        ({ id, kind, tag, preset, compareA, compareB })),
       emptyOutputBranches: rung.emptyOutputBranches ?? [],
       branches: (rung.parallelBranches ?? []).map(({ id, anchorId, endId, instructions }) => ({
-        id, anchorId, endId, instructions: instructions.map(({ id: instructionId, kind, tag, preset }) =>
-          ({ id: instructionId, kind, tag, preset })),
+        id, anchorId, endId, instructions: instructions.map(({ id: instructionId, kind, tag, preset, compareA, compareB }) =>
+          ({ id: instructionId, kind, tag, preset, compareA, compareB })),
       })),
     })),
   });
@@ -104,7 +106,7 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
     }
     seenInstructions.add(id);
 
-    if (!["XIC", "XIO", "OTE", "OTL", "OTU", "ONS", "TON", "TOF", "RTO", "CTU", "CTD", "RES"].includes(instruction.kind as EditableKind)) {
+    if (!["XIC", "XIO", "OTE", "OTL", "OTU", "ONS", "TON", "TOF", "RTO", "CTU", "CTD", "RES", "EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ"].includes(instruction.kind as EditableKind)) {
       push("error", "UNSUPPORTED_INSTRUCTION",
         at + ": instrucción " + instruction.kind + " no admitida por el motor actual.",
         rung.id, rungIndex, id, branchId);
@@ -112,6 +114,22 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
     if (lane === "parallel" && isOutputKind(instruction.kind)) {
       push("error", "COIL_IN_BRANCH",
         at + ": una rama OR de contactos no admite OTE, OTL ni OTU.", rung.id, rungIndex, id, branchId);
+    }
+    if (isCompareKind(instruction.kind)) {
+      if (instruction.tag || instruction.preset) {
+        push("error", "INVALID_COMPARE_OPERAND",
+          at + ": utiliza Source A y Source B, no una etiqueta BOOL o PRE.",
+          rung.id, rungIndex, id, branchId);
+      }
+      for (const [side, operand] of [["A", instruction.compareA], ["B", instruction.compareB]] as const) {
+        const reason = validateNumericOperand(project.tags, operand);
+        if (reason) {
+          push("error", "INVALID_COMPARE_OPERAND",
+            at + ": " + instruction.kind + " Source " + side + ": " + reason,
+            rung.id, rungIndex, id, branchId);
+        }
+      }
+      return;
     }
     if (!instruction.tag) {
       push("error", "MISSING_TAG",
