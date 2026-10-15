@@ -76,26 +76,27 @@ export function evaluateSeriesScan(project: PracticeProject): SeriesScan {
       branchesByAnchor.set(branch.anchorId, group);
     }
 
-    for (const instruction of rung.instructions) {
-      if (instruction.kind === "OTE") {
-        if (!tagValues.has(instruction.tag)) {
-          throw new Error("Tag BOOL inexistente o incompatible: " + instruction.tag);
-        }
-        if (constantTags.has(instruction.tag)) {
-          throw new Error("OTE intenta escribir un tag constante: " + instruction.tag);
-        }
-        tagValues.set(instruction.tag, power);
-        writes[instruction.tag] = power;
-        instructionFlow[instruction.id] = {
-          powerIn: power, condition: power, powerOut: power, value: power,
-        };
-        continue;
+    const main = rung.instructions.filter((item) => item.kind !== "OTE");
+    let mainIndex = 0;
+    while (mainIndex < main.length) {
+      const anchor = main[mainIndex];
+      const branches = branchesByAnchor.get(anchor.id) ?? [];
+      const ends = branches.map((branch) =>
+        branch.endId ? main.findIndex((item) => item.id === branch.endId) : mainIndex);
+      if (ends.some((index) => index < mainIndex) || new Set(ends).size > 1) {
+        throw new Error("Las ramas OR deben compartir una unión válida en la línea principal.");
       }
-
+      const end = ends.length ? ends[0] : mainIndex;
       const input = power;
-      const mainOutput = evalContact(instruction, input);
-      let mergedPower = mainOutput;
-      for (const branch of branchesByAnchor.get(instruction.id) ?? []) {
+      let mainPower = input;
+      for (let index = mainIndex; index <= end; index++) {
+        if (index > mainIndex && branchesByAnchor.has(main[index].id)) {
+          throw new Error("No se admiten grupos OR superpuestos en esta versión.");
+        }
+        mainPower = evalContact(main[index], mainPower);
+      }
+      let mergedPower = mainPower;
+      for (const branch of branches) {
         branchInput[branch.id] = input;
         let lanePower = input;
         for (const contact of branch.instructions) {
@@ -104,8 +105,23 @@ export function evaluateSeriesScan(project: PracticeProject): SeriesScan {
         branchPower[branch.id] = lanePower;
         mergedPower ||= lanePower;
       }
-      joinedPower[instruction.id] = mergedPower;
+      joinedPower[anchor.id] = mergedPower;
       power = mergedPower;
+      mainIndex = end + 1;
+    }
+
+    for (const instruction of rung.instructions.filter((item) => item.kind === "OTE")) {
+      if (!tagValues.has(instruction.tag)) {
+        throw new Error("Tag BOOL inexistente o incompatible: " + instruction.tag);
+      }
+      if (constantTags.has(instruction.tag)) {
+        throw new Error("OTE intenta escribir un tag constante: " + instruction.tag);
+      }
+      tagValues.set(instruction.tag, power);
+      writes[instruction.tag] = power;
+      instructionFlow[instruction.id] = {
+        powerIn: power, condition: power, powerOut: power, value: power,
+      };
     }
     rungPower[rung.id] = power;
   }
