@@ -300,7 +300,7 @@ export default function App() {
         <span>VirtualPLC</span>
         <span className="text-slate-600">|</span>
         <span>{online ? "Monitoreo DEMO · Sin controlador físico" : "Sin conexión a controlador"}</span>
-        <span className="ml-auto">Etapa 2D · Scan Cycle periódico · XIC/XIO/OTE con AND/OR</span>
+        <span className="ml-auto">Etapa 2E · Monitor Online · Scan Cycle AND/OR</span>
       </footer>
     </div>
   );
