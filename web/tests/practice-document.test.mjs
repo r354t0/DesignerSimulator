@@ -50,10 +50,10 @@ test("tag creation validates identifier, duplicate names and truncates descripti
   assert.equal(createTag(changed, "X".repeat(40), "a".repeat(150)).tags.at(-1)?.description.length, 120);
 });
 
-test("contact limit is eight and unsupported tools cannot be inserted", () => {
+test("expanded contact limit supports multiple OR lanes plus main contacts", () => {
   let p = initialPracticeProject();
-  for (let i = 0; i < 8; i++) p = insertInstruction(p, "rung-1", i, contact("c-" + i));
-  assert.equal(p.rungs[0].instructions.length, 8);
-  assert.throws(() => insertInstruction(p, "rung-1", 9, contact("too-many")), /Máximo 8/);
+  for (let i = 0; i < 32; i++) p = insertInstruction(p, "rung-1", i, contact("c-" + i));
+  assert.equal(p.rungs[0].instructions.length, 32);
+  assert.throws(() => insertInstruction(p, "rung-1", 32, contact("too-many")), /Máximo 32/);
   assert.throws(() => insertInstruction(p, "rung-1", 0, contact("ton", "TON")), /aún no está habilitada/);
 });
