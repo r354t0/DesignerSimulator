@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, FileCode2, Hammer, Play, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, FileCode2, Hammer, Play, Square, XCircle } from "lucide-react";
 import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
 import { resolveLadderDeleteAction } from "../../plc/ladderShortcuts";
 import { buildPracticeProject, getPracticeBuildSignature, type BuildDiagnostic, type LadderBuildResult } from "../../plc/practiceBuild";
+import { evaluateSeriesScan, getUnsupportedSeriesRungs } from "../../plc/practiceRuntime";
 import {
   findVisualLadderDropTarget,
   getRungGeometry,
@@ -40,6 +41,9 @@ interface Props {
   selectedTool: Instruction;
   draggingKind: EditableKind | null;
   onChange: (next: PracticeProject) => void;
+  running: boolean;
+  onStart: () => void;
+  onStop: () => void;
   nextId: (prefix: string) => string;
   onSelectPaletteTool: (kind: "XIC" | "XIO" | "OTE") => void;
   onSelectDemoTool: (kind: Instruction) => void;
@@ -49,7 +53,7 @@ interface Props {
 interface InternalDrag { id: string; kind: EditableKind }
 
 export function PracticeEditor({
-  project, selectedTool, draggingKind, onChange, nextId,
+  project, selectedTool, draggingKind, onChange, running, onStart, onStop, nextId,
   onSelectPaletteTool, onSelectDemoTool, onPaletteDragStart, onPaletteDragEnd,
 }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
@@ -145,8 +149,10 @@ export function PracticeEditor({
   };
 
   const buildIsStale = Boolean(buildRecord && buildRecord.signature !== getPracticeBuildSignature(project));
+  // Pure evaluation also provides live power-flow data for visual monitoring.
+  const runtimeView = running ? evaluateSeriesScan(project) : null;
   const currentBuild = buildRecord?.result ?? null;
-  const buildStatus = !buildRecord ? "Sin verificar" :
+  const buildStatus = running ? "RUN · serie" : !buildRecord ? "Sin verificar" :
     buildIsStale ? "Build pendiente" :
       buildRecord.result.success ? "Build correcto" : "Build con errores";
 
@@ -155,13 +161,37 @@ export function PracticeEditor({
    * check. Stage A deliberately never claims to run a PLC scan.
    */
   const verifyPracticeRoutine = (requestedBy: "build" | "run") => {
-    const result = buildPracticeProject(project);
+    let result = buildPracticeProject(project);
+    if (requestedBy === "run" && result.success) {
+      const unsupported = getUnsupportedSeriesRungs(project);
+      if (unsupported.length) {
+        const additional: BuildDiagnostic[] = unsupported.map((rungId, index) => ({
+          id: "runtime-or-" + index,
+          severity: "error",
+          code: "OR_STAGE_C_PENDING",
+          message: "Rung " + project.rungs.findIndex((rung) => rung.id === rungId) +
+            ": las ramas OR se ejecutarán a partir de la Etapa C.",
+          rungId,
+          rungIndex: project.rungs.findIndex((rung) => rung.id === rungId),
+        }));
+        result = {
+          ...result, success: false, errors: result.errors + additional.length,
+          diagnostics: [...result.diagnostics, ...additional],
+        };
+      }
+    }
+
+    // RUN always verifies afresh. A failed verification cannot start the motor.
+    if (requestedBy === "run") {
+      if (result.success) onStart();
+      else if (running) onStop();
+    }
     setBuildRecord({ signature: getPracticeBuildSignature(project), result, requestedBy });
     setBuildOutputOpen(true);
     setBuildMessage(requestedBy === "run"
       ? result.success
-        ? "Build correcto. Programa validado; la ejecución Ladder se habilitará en la Etapa B."
-        : "RUN no iniciado: corrige los errores del Build y vuelve a pulsar RUN."
+        ? "Build correcto. Ejecución en serie XIC/XIO/OTE activa (Etapa B)."
+        : "RUN no iniciado: corrige los errores o elimina las ramas OR hasta la Etapa C."
       : result.success
         ? "Build finalizado correctamente. Programa verificado."
         : "Build finalizado con errores. Revisa los diagnósticos.");
@@ -404,10 +434,17 @@ export function PracticeEditor({
           className="flex items-center gap-1.5 rounded border border-emerald-700 bg-emerald-700 px-2.5 py-1.5 font-semibold text-white hover:bg-emerald-800">
           <Play size={14} /> RUN
         </button>
+        <button type="button" onClick={onStop} disabled={!running}
+          title="Detener el motor de práctica y desactivar las salidas OTE"
+          className="flex items-center gap-1.5 rounded border border-slate-300 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40">
+          <Square size={13} /> STOP
+        </button>
         <span aria-live="polite"
           className={"rounded border px-2 py-1 text-[11px] font-semibold " +
-            (!buildRecord || buildIsStale
-              ? "border-amber-200 bg-amber-50 text-amber-800"
+            (running
+              ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+              : !buildRecord || buildIsStale
+                ? "border-amber-200 bg-amber-50 text-amber-800"
               : currentBuild?.success
                 ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                 : "border-red-200 bg-red-50 text-red-800")}>
@@ -443,14 +480,18 @@ export function PracticeEditor({
             const maxLanes = Math.max(0, ...groups.map((group) => group.branchLanes.length));
             const showDropLane = Boolean(draggingKind || moving);
             const svgHeight = getPracticeRungHeight(maxLanes, showDropLane);
-            const drawContact = (item: typeof contacts[number], x: number, centerY: number) => (
+            const rungLive = running && Boolean(runtimeView?.rungPower[rung.id]);
+            const drawContact = (item: typeof contacts[number], x: number, centerY: number) => {
+              const flow = runtimeView?.instructionFlow[item.id];
+              return (
               <g key={item.id}>
                 <Contact x={x} y={centerY} kind={item.kind as "XIC" | "XIO"}
                   tag={item.tag || "??"} comment={project.tags.find((tag) => tag.name === item.tag)?.description}
                   labelWidth={96} selected={selected === item.id}
-                  value={false} online={false} powerIn={false} />
+                  value={flow?.value ?? false} online={running} powerIn={flow?.powerIn ?? false} />
               </g>
-            );
+              );
+            };
             const dragButton = (item: typeof contacts[number], x: number, centerY: number) => (
               <button key={"drag-" + item.id} type="button" draggable
                 aria-label={"Mover instrucción " + item.kind + " " + item.tag}
@@ -542,7 +583,7 @@ export function PracticeEditor({
                     <svg width={width} height={svgHeight} viewBox={"0 0 " + width + " " + svgHeight}
                       role="group" aria-label={"Rung editable " + rungIndex} className="block">
                       <rect width={width} height={svgHeight} fill="transparent" pointerEvents="all" />
-                      <LadderRails leftX={63} rightX={width - 30} top={0} bottom={svgHeight} />
+                      <LadderRails leftX={63} rightX={width - 30} top={0} bottom={svgHeight} live={running} />
 
                       {groups.map((group, index) => {
                         const item = contacts[index];
@@ -551,8 +592,10 @@ export function PracticeEditor({
                         const from = index === 0 ? 64 : groups[index - 1].right;
                         return (
                           <g key={item.id}>
-                            <Wire x1={from} y1={y} x2={group.x - 22} y2={y} />
-                            <Wire x1={group.x + 22} y1={y} x2={group.right} y2={y} />
+                            <Wire x1={from} y1={y} x2={group.x - 22} y2={y}
+                              live={running && Boolean(runtimeView?.instructionFlow[item.id]?.powerIn)} />
+                            <Wire x1={group.x + 22} y1={y} x2={group.right} y2={y}
+                              live={running && Boolean(runtimeView?.instructionFlow[item.id]?.powerOut)} />
                             {drawContact(item, group.x, y)}
                             {branches.length > 0 && (
                               <g>
@@ -637,14 +680,14 @@ export function PracticeEditor({
                         );
                       })}
                       <Wire x1={groups.at(-1)?.right ?? 64} y1={y}
-                        x2={output ? coilX - 24 : width - 30} y2={y} />
+                        x2={output ? coilX - 24 : width - 30} y2={y} live={rungLive} />
                       {output && (
                         <g>
                           <Coil x={coilX} y={y} tag={output.tag || "??"}
                             comment={project.tags.find((tag) => tag.name === output.tag)?.description}
                             labelWidth={96} selected={selected === output.id}
-                            online={false} live={false} />
-                          <Wire x1={coilX + 24} y1={y} x2={width - 30} y2={y} />
+                            online={running} live={rungLive} />
+                          <Wire x1={coilX + 24} y1={y} x2={width - 30} y2={y} live={rungLive} />
                         </g>
                       )}
                       {dropPreview?.rungId === rung.id && (
@@ -706,7 +749,7 @@ export function PracticeEditor({
           )}
           <p className="mb-5 flex items-center gap-1 px-4 text-xs text-slate-500">
             <FileCode2 size={14} /> Clic en etiqueta: buscar tag; doble clic: tabla de variables; arrastre: copiar tag. Clic en conductor OR + Supr: borrar rama.
-            Sin OR anidados ni ejecución de PracticeRoutine todavía.
+            RUN ejecuta la lógica en serie cuando Build es correcto; ramas OR pendientes de la Etapa C.
           </p>
         </div>
       </div>
