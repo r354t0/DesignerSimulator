@@ -1,8 +1,8 @@
 /**
  * Studio 5000-inspired instruction catalog used by the visual palette.
  *
- * Only XIC, XIO and OTE currently have editable behavior in PracticeRoutine.
- * Every other entry is discoverable but explicitly unavailable for insertion
+ * XIC, XIO, OTE, OTL, OTU and ONS are editable in PracticeRoutine.
+ * Other entries remain discoverable but unavailable for insertion
  * until its document model, graphic and execution behavior have been built.
  */
 export type PaletteCategoryId =
@@ -29,9 +29,9 @@ const tool = (id: string, title: string, editable = false, previewOnly = false):
 const xic = tool("XIC", "Examine If Closed · contacto normalmente abierto", true);
 const xio = tool("XIO", "Examine If Open · contacto normalmente cerrado", true);
 const ote = tool("OTE", "Output Energize · bobina de salida", true);
-const otl = tool("OTL", "Output Latch · salida enclavada");
-const otu = tool("OTU", "Output Unlatch · desenclavar salida");
-const ons = tool("ONS", "One Shot · flanco único");
+const otl = tool("OTL", "Output Latch · salida enclavada", true);
+const otu = tool("OTU", "Output Unlatch · desenclavar salida", true);
+const ons = tool("ONS", "One Shot · flanco único (requiere memoria BOOL)", true);
 const osr = tool("OSR", "One Shot Rising · flanco ascendente");
 const osf = tool("OSF", "One Shot Falling · flanco descendente");
 const ton = tool("TON", "Timer On Delay · disponible solo en MainRoutine DEMO", false, true);
@@ -89,6 +89,8 @@ export function getPaletteCategory(id: PaletteCategoryId): PaletteCategory {
   return PALETTE_CATEGORIES.find((category) => category.id === id) ?? PALETTE_CATEGORIES[0];
 }
 
-export function isImplementedPaletteInstruction(id: string): id is "XIC" | "XIO" | "OTE" {
-  return id === "XIC" || id === "XIO" || id === "OTE";
+export function isImplementedPaletteInstruction(
+  id: string,
+): id is "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" {
+  return ["XIC", "XIO", "OTE", "OTL", "OTU", "ONS"].includes(id);
 }
