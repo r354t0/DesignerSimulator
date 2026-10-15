@@ -112,6 +112,8 @@ function getRung(project: PracticeProject, id: string): PracticeRung {
 
 /** Maximum contacts across main and OR lanes; long networks may scroll horizontally. */
 export const MAX_PRACTICE_CONTACTS = 32;
+/** Number of independently-addressed OTEs supported at the end of one rung. */
+export const MAX_PARALLEL_OUTPUTS = 8;
 
 export function contactCount(rung: PracticeRung): number {
   return rung.instructions.filter((item) => item.kind !== "OTE").length +
@@ -187,9 +189,10 @@ export function insertInstruction(
   let updated: PracticeInstruction[];
 
   if (item.kind === "OTE") {
-    if (rung.instructions.some((existing) => existing.kind === "OTE")) {
-      throw new Error("El rung ya contiene una salida OTE.");
+    if (rung.instructions.filter((existing) => existing.kind === "OTE").length >= MAX_PARALLEL_OUTPUTS) {
+      throw new Error("Máximo " + MAX_PARALLEL_OUTPUTS + " bobinas OTE en paralelo por rung.");
     }
+    // These OTEs are parallel outputs: none conditions the others.
     updated = [...rung.instructions, item];
   } else {
     if (contactCount(rung) >= MAX_PRACTICE_CONTACTS) throw new Error("Máximo " + MAX_PRACTICE_CONTACTS + " contactos por rung.");
@@ -410,10 +413,10 @@ export function moveInstruction(
   }
 
   if (source.instruction.kind === "OTE") {
-    if (target.instructions.some((item) => item.kind === "OTE" && item.id !== instructionId)) {
-      throw new Error("El rung de destino ya contiene una bobina OTE.");
-    }
     if (sameRung) return project;
+    if (target.instructions.filter((item) => item.kind === "OTE").length >= MAX_PARALLEL_OUTPUTS) {
+      throw new Error("Máximo " + MAX_PARALLEL_OUTPUTS + " bobinas OTE en paralelo por rung.");
+    }
   } else if (contactCount(target) + (sameRung ? 0 : movingCount) > MAX_PRACTICE_CONTACTS) {
     throw new Error("Máximo " + MAX_PRACTICE_CONTACTS + " contactos por rung.");
   }
