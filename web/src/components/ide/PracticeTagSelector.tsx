@@ -203,7 +203,7 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
           <div className="mt-3 overflow-hidden rounded border border-slate-200">{tableRows}</div>
         </div>
         <footer className="flex items-center justify-between border-t border-slate-200 px-4 py-3">
-          <span className="text-[11px] text-slate-500">{results.length} coincidencia(s) · Doble clic en etiqueta para abrir esta ventana</span>
+          <span className="text-[11px] text-slate-500">{rows.filter((item) => item.selectable).length} coincidencia(s) · Doble clic en etiqueta para abrir esta ventana</span>
           <button type="button" onClick={onClose}
             className="rounded border border-slate-300 px-3 py-1.5 text-xs hover:bg-slate-100">Cancelar</button>
         </footer>
