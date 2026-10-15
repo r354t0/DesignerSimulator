@@ -37,7 +37,7 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
                 ...tag, name: tag.name + "." + member, type: "BOOL" as const,
                 description: tag.description + " · " + member,
               })))];
-    return filterPracticeTags(options, query);
+    return filterPracticeTags(options, query, isTimerKind(kind));
   }, [tags, query, selector.kind]);
   const suggestions = selector.mode === "suggestions";
   const shown = suggestions ? results.slice(0, 8) : results;
