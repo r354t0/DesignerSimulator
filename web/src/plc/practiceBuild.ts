@@ -1,4 +1,4 @@
-import { MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, type EditableKind, type PracticeInstruction,
+import { MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, isOutputKind, type EditableKind, type PracticeInstruction,
   type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
 
 export type DiagnosticSeverity = "error" | "warning";
@@ -85,7 +85,8 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
   }
 
   const seenInstructions = new Set<string>();
-  const outputs = new Map<string, number[]>();
+  const outputs = new Map<string, { rung: number; kind: string }[]>();
+  const onsStorage = new Map<string, { rungId: string; rungIndex: number; id: string }[]>();
   let executableRungs = 0;
 
   function checkInstruction(
@@ -103,14 +104,14 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
     }
     seenInstructions.add(id);
 
-    if (!["XIC", "XIO", "OTE"].includes(instruction.kind as EditableKind)) {
+    if (!["XIC", "XIO", "OTE", "OTL", "OTU", "ONS"].includes(instruction.kind as EditableKind)) {
       push("error", "UNSUPPORTED_INSTRUCTION",
         at + ": instrucción " + instruction.kind + " no admitida por el motor actual.",
         rung.id, rungIndex, id, branchId);
     }
-    if (lane === "parallel" && instruction.kind === "OTE") {
+    if (lane === "parallel" && isOutputKind(instruction.kind)) {
       push("error", "COIL_IN_BRANCH",
-        at + ": una rama OR no puede contener una bobina OTE.", rung.id, rungIndex, id, branchId);
+        at + ": una rama OR de contactos no admite OTE, OTL ni OTU.", rung.id, rungIndex, id, branchId);
     }
     if (!instruction.tag) {
       push("error", "MISSING_TAG",
@@ -130,14 +131,24 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
         at + ": " + instruction.kind + " requiere BOOL; «" + tag.name +
         "» es " + tag.type + ".", rung.id, rungIndex, id, branchId);
     }
-    if (instruction.kind === "OTE") {
+    if (instruction.kind === "ONS") {
+      if (tag.constant) {
+        push("error", "CONSTANT_ONS_STORAGE",
+          at + ": ONS no puede escribir una memoria BOOL constante.",
+          rung.id, rungIndex, id, branchId);
+      }
+      const uses = onsStorage.get(tag.name) ?? [];
+      uses.push({ rungId: rung.id, rungIndex, id });
+      onsStorage.set(tag.name, uses);
+    }
+    if (isOutputKind(instruction.kind)) {
       if (tag.constant) {
         push("error", "CONSTANT_OUTPUT",
-          at + ": la bobina OTE no puede escribir el tag constante «" + tag.name + "».",
+          at + ": " + instruction.kind + " no puede escribir el tag constante «" + tag.name + "».",
           rung.id, rungIndex, id, branchId);
       }
       const places = outputs.get(tag.name) ?? [];
-      places.push(rungIndex);
+      places.push({ rung: rungIndex, kind: instruction.kind });
       outputs.set(tag.name, places);
     }
   }
@@ -146,8 +157,8 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
     const at = "Rung " + rungIndex;
     const instructions = rung.instructions;
     const branches = rung.parallelBranches ?? [];
-    const contacts = instructions.filter((instruction) => instruction.kind !== "OTE");
-    const coils = instructions.filter((instruction) => instruction.kind === "OTE");
+    const contacts = instructions.filter((instruction) => !isOutputKind(instruction.kind));
+    const coils = instructions.filter((instruction) => isOutputKind(instruction.kind));
     const count = contacts.length + branches.reduce((sum, branch) => sum + branch.instructions.length, 0);
 
     if (instructions.length === 0 && branches.length === 0) {
@@ -159,25 +170,25 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
           rung.id, rungIndex);
       }
       if (coils.length === 0) {
-        push("warning", "NO_OUTPUT", at + ": no contiene una salida OTE.", rung.id, rungIndex);
+        push("warning", "NO_OUTPUT", at + ": no contiene una salida OTE/OTL/OTU.", rung.id, rungIndex);
       } else {
         executableRungs++;
       }
       if (coils.length + (rung.emptyOutputBranches?.length ?? 0) > MAX_PARALLEL_OUTPUTS) {
         push("error", "OUTPUT_LIMIT",
-          at + ": supera el máximo de " + MAX_PARALLEL_OUTPUTS + " OTE en paralelo.",
+          at + ": supera el máximo de " + MAX_PARALLEL_OUTPUTS + " salidas por rung.",
           rung.id, rungIndex);
       }
       if (contacts.length === 0 && coils.length > 0) {
         push("warning", "UNCONDITIONAL_OUTPUT",
-          at + ": OTE sin contactos de condición (salida incondicional).",
+          at + ": salida sin contactos de condición (incondicional).",
           rung.id, rungIndex, coils[0].id);
       }
-      const firstCoilIndex = instructions.findIndex((item) => item.kind === "OTE");
+      const firstCoilIndex = instructions.findIndex((item) => isOutputKind(item.kind));
       if (firstCoilIndex !== -1 &&
-        instructions.slice(firstCoilIndex).some((item) => item.kind !== "OTE")) {
+        instructions.slice(firstCoilIndex).some((item) => !isOutputKind(item.kind))) {
         push("error", "COIL_NOT_LAST",
-          at + ": las salidas OTE deben situarse juntas al extremo derecho.",
+          at + ": las salidas OTE/OTL/OTU deben situarse juntas al extremo derecho.",
           rung.id, rungIndex, coils[0].id);
       }
     }
@@ -248,10 +259,25 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
   }
 
   for (const [tag, places] of outputs) {
-    if (places.length > 1) {
+    const onlySetResetPair = places.every((entry) =>
+      entry.kind === "OTL" || entry.kind === "OTU");
+    if (places.length > 1 && !onlySetResetPair) {
       push("warning", "DUPLICATE_OUTPUT",
-        "La variable «" + tag + "» es escrita por varias OTE (rungs " +
-        places.join(", ") + "). Revisa posibles sobrescrituras.");
+        "La variable «" + tag + "» es escrita por varias bobinas (rungs " +
+        places.map((entry) => entry.rung).join(", ") + "). Revisa sobrescrituras.");
+    }
+  }
+
+  for (const [tag, users] of onsStorage) {
+    if (users.length > 1) {
+      for (const user of users) push("error", "SHARED_ONS_STORAGE",
+        "La memoria ONS «" + tag + "» debe ser exclusiva para una sola instrucción.",
+        user.rungId, user.rungIndex, user.id);
+    }
+    if (outputs.has(tag)) {
+      for (const user of users) push("error", "ONS_STORAGE_CONFLICT",
+        "La memoria ONS «" + tag + "» no puede ser escrita por OTE, OTL ni OTU.",
+        user.rungId, user.rungIndex, user.id);
     }
   }
 
