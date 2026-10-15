@@ -5,7 +5,7 @@ import {
   type LadderGroupGeometry, type VisualLadderDropTarget,
 } from "./ladderDragDrop.ts";
 import {
-  MAX_PRACTICE_CONTACTS, contactCount, findInstruction,
+  MAX_PRACTICE_CONTACTS, isOutputKind, contactCount, findInstruction,
   type EditableKind, type PracticeProject, type PracticeRung,
 } from "./practiceDocument.ts";
 
@@ -81,7 +81,7 @@ export function getWrappedRungLayout(
   packed.forEach((sourceGroups, index) => {
     const maxLanes = Math.max(0, ...sourceGroups.map((item) => item.branchLanes.length));
     const outputs = index === packed.length - 1
-      ? rung.instructions.filter((item) => item.kind === "OTE").length +
+      ? rung.instructions.filter((item) => isOutputKind(item.kind)).length +
         (rung.emptyOutputBranches?.length ?? 0) + (previewOutput ? 1 : 0)
       : 0;
     const outputExtension = Math.max(0, outputs - 1) * OUTPUT_BRANCH_STEP;
@@ -111,10 +111,10 @@ export function getWrappedRungLayout(
   const coilY = rows.at(-1)!.mainY;
   return {
     width, height: top, rows, groups,
-    coilX, coilY, outputYs: rung.instructions.filter((item) => item.kind === "OTE")
+    coilX, coilY, outputYs: rung.instructions.filter((item) => isOutputKind(item.kind))
       .map((_, index) => outputBranchY(coilY, index)),
     emptyOutputYs: (rung.emptyOutputBranches ?? []).map((_, index) =>
-      outputBranchY(coilY, rung.instructions.filter((item) => item.kind === "OTE").length + index)),
+      outputBranchY(coilY, rung.instructions.filter((item) => isOutputKind(item.kind)).length + index)),
     wrapped: rows.length > 1,
   };
 }
@@ -126,14 +126,14 @@ export function findWrappedLadderDropTarget(
   const rung = project.rungs.find((item) => item.id === rungId);
   if (!rung || !Number.isFinite(x) || !Number.isFinite(y)) return null;
   const layout = getWrappedRungLayout(rung, viewport, true,
-    kind === "OTE" && !movingId && !(rung.emptyOutputBranches?.length));
+    isOutputKind(kind) && !movingId && !(rung.emptyOutputBranches?.length));
   const row = layout.rows.find((candidate) =>
     y >= candidate.top && y <= candidate.top + candidate.height);
   if (!row) return null;
   const moving = movingId ? findInstruction(project, movingId) : null;
-  const contacts = rung.instructions.filter((item) => item.kind !== "OTE");
+  const contacts = rung.instructions.filter((item) => !isOutputKind(item.kind));
 
-  if (kind === "OTE") {
+  if (isOutputKind(kind)) {
     if (row.index !== layout.rows.length - 1) return null;
     const emptyIndex = layout.emptyOutputYs.findIndex((laneY) =>
       Math.abs(laneY - y) <= OUTPUT_BRANCH_STEP / 2);
