@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, FileCode2, Hammer, Pause, Play, Square, StepForward, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, FileCode2, Hammer, Pause, Play, Square, StepForward, XCircle } from "lucide-react";
 import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
 import { resolveLadderDeleteAction } from "../../plc/ladderShortcuts";
 import { getBitMenuTarget, invertInstructionBit } from "../../plc/practiceBitMenu";
+import { getOnlineMonitorReadout, type MonitorSelection } from "../../plc/practiceOnlineMonitor";
 import { getWrappedRungLayout, findWrappedLadderDropTarget } from "../../plc/ladderWrappedLayout";
 import { buildPracticeProject, getPracticeBuildSignature, type BuildDiagnostic, type LadderBuildResult } from "../../plc/practiceBuild";
 import { getRunAction, type PracticeScanState, type ScanMode, SCAN_PERIODS_MS } from "../../plc/practiceScanCycle";
@@ -86,6 +87,7 @@ export function PracticeEditor({
     requestedBy: "build" | "run";
   } | null>(null);
   const [buildOutputOpen, setBuildOutputOpen] = useState(false);
+  const [onlineMonitorOpen, setOnlineMonitorOpen] = useState(false);
   const [buildMessage, setBuildMessage] = useState("");
 
   useEffect(() => {
@@ -407,6 +409,13 @@ export function PracticeEditor({
   const canvasWidth = Math.max(480, viewportWidth);
   const selectedLocation = selected ? findInstruction(project, selected) : null;
   const selectedRungForInsert = selectedLocation?.rungId ?? selectedOrBranch?.rungId ?? selectedRungId;
+  const monitorSelection: MonitorSelection = selected
+    ? { kind: "instruction", instructionId: selected }
+    : selectedOrBranch ? { kind: "branch", ...selectedOrBranch }
+      : selectedRungId ? { kind: "rung", rungId: selectedRungId } : null;
+  const onlineReadout = onlineMonitorOpen
+    ? getOnlineMonitorReadout(project, scanState.frame, scanMode, monitorSelection)
+    : null;
   const selectedBranchModel = selectedOrBranch
     ? project.rungs.find((rung) => rung.id === selectedOrBranch.rungId)
       ?.parallelBranches?.find((branch) => branch.id === selectedOrBranch.branchId)
@@ -554,7 +563,19 @@ export function PracticeEditor({
       </div>
       <div className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-[#f8fafc] px-3 py-0.5 text-[11px] text-slate-500">
         <span>Herramienta: <strong className="text-sky-800">{selectedTool}</strong></span>
-        <span>{project.rungs.length} rungs · {project.tags.length} tags</span>
+        <div className="flex items-center gap-2">
+          <button type="button" aria-pressed={onlineMonitorOpen}
+            title={onlineMonitorOpen ? "Cerrar monitor de la selección" : "Monitorear la instrucción o rama seleccionada"}
+            onClick={() => {
+              setOnlineMonitorOpen((open) => !open);
+              setBuildOutputOpen(false);
+            }}
+            className={"inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] " +
+              (onlineMonitorOpen ? "bg-sky-100 text-sky-800" : "text-slate-600 hover:bg-slate-200")}>
+            {onlineMonitorOpen ? <EyeOff size={13} /> : <Eye size={13} />} Monitor
+          </button>
+          <span>{project.rungs.length} rungs · {project.tags.length} tags</span>
+        </div>
       </div>
       <InstructionPalette
         selectedInstruction={selectedTool}
@@ -1015,6 +1036,59 @@ export function PracticeEditor({
             </p>
           )}
         </div>, document.body,
+      )}
+      {onlineMonitorOpen && (
+        <section aria-label="Monitor Online" className="flex shrink-0 flex-col gap-2 border-t-2 border-slate-300 bg-[#f4f7fa] px-3 py-2 text-slate-800">
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div className="flex min-w-0 items-center gap-2">
+              <Eye size={14} className="text-sky-700" />
+              <strong>Monitor Online</strong>
+              {onlineReadout && <span className="truncate font-medium text-slate-700">
+                {onlineReadout.label} · {onlineReadout.location}
+              </span>}
+            </div>
+            <div className="flex items-center gap-2 text-[11px]">
+              <span className={scanMode === "running" ? "text-emerald-700" :
+                scanMode === "paused" ? "text-amber-700" : "text-slate-500"}>
+                {scanMode === "running" ? "RUN" : scanMode === "paused" ? "PAUSE" : "STOP"}
+              </span>
+              <button type="button" onClick={() => setOnlineMonitorOpen(false)}
+                aria-label="Cerrar Monitor Online" title="Cerrar Monitor Online"
+                className="rounded p-0.5 text-slate-500 hover:bg-slate-200">
+                <ChevronDown size={15} />
+              </button>
+            </div>
+          </div>
+          {onlineReadout ? (
+            <>
+              {onlineReadout.fields.length > 0 && (
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3 lg:grid-cols-5">
+                  {onlineReadout.fields.map((field) => (
+                    <div key={field.label} className="min-w-0 text-[11px]">
+                      <div className="text-slate-500">{field.label}</div>
+                      <div className={"truncate font-mono font-medium " +
+                        (field.changed ? "text-amber-700" : "text-slate-800")}>
+                        {field.value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <p className="text-[11px] text-slate-600">
+                {onlineReadout.explanation}
+                {onlineReadout.pendingInputs > 0 && (
+                  <span className="ml-2 font-semibold text-amber-700">
+                    {onlineReadout.pendingInputs} entrada(s) pendiente(s) de scan
+                  </span>
+                )}
+              </p>
+            </>
+          ) : (
+            <p className="text-[11px] text-slate-600">
+              Selecciona un contacto, bobina, rama OR o número de rung para ver su estado en el último scan.
+            </p>
+          )}
+        </section>
       )}
       {buildOutputOpen && buildRecord && (
         <section aria-label="Resultados de Build" className="flex max-h-[224px] min-h-[110px] shrink-0 flex-col border-t-2 border-[#8294a8] bg-[#f4f7fa] text-slate-800">
