@@ -11,7 +11,8 @@ export function getInstructionSelectionFrame(commentLineCount: number, labelWidt
   const safeLineCount = Math.max(0, Math.min(2, Math.floor(commentLineCount) || 0));
   // Keep selection narrower than a 104px contact cell, avoiding adjacent blocks.
   const width = Math.max(72, Math.min(100, labelWidth + 4));
-  const top = safeLineCount === 0 ? -40 : safeLineCount === 1 ? -55 : -68;
+  // Reduce surplus top border on two-line comments, without obscuring text.
+  const top = safeLineCount === 0 ? -40 : safeLineCount === 1 ? -55 : -64;
   const bottom = 14;
   return {
     left: -width / 2,
