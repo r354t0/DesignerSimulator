@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
-import { Check, RotateCcw } from "lucide-react";
+import { Check, RotateCcw, X } from "lucide-react";
 import {
   getAssignablePresetTags, parsePresetInput,
 } from "../../plc/timerPresetInput";
@@ -125,9 +125,20 @@ export function TimerPresetEditor({
       style={{ position: "fixed", left, top, width, zIndex: 1400 }}
       className="rounded-md border border-sky-400 bg-white p-3 text-slate-900 shadow-2xl"
     >
-      <label htmlFor="timer-pre-inline-input" className="block text-xs font-semibold">
-        PRE · {instruction.kind} · {unit}
-      </label>
+      <div className="flex items-center justify-between gap-2">
+        <label htmlFor="timer-pre-inline-input" className="text-xs font-semibold">
+          PRE · {instruction.kind} · {unit}
+        </label>
+        <button
+          type="button"
+          aria-label="Cerrar editor PRE sin guardar"
+          title="Cerrar sin guardar (Esc)"
+          onClick={onClose}
+          className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-sky-500"
+        >
+          <X size={15} aria-hidden="true" />
+        </button>
+      </div>
       <input
         id="timer-pre-inline-input"
         ref={inputRef}
