@@ -1,4 +1,4 @@
-import { contactCount, findInstruction, type EditableKind, type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
+import { MAX_PRACTICE_CONTACTS, contactCount, findInstruction, type EditableKind, type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
 
 export const LADDER_DRAG_MIME = "application/x-designersimulator-ladder-instruction";
 export const LADDER_MOVE_MIME = "application/x-designersimulator-ladder-move";
@@ -128,7 +128,7 @@ export function findLadderDropTarget(
     if (rung.instructions.some((item) => item.kind === "OTE")) return null;
     return { kind, position: contacts.length, x: geometry.coilX };
   }
-  if (contactCount(rung) >= 8 || pointerX > geometry.coilX - 54) return null;
+  if (contactCount(rung) >= MAX_PRACTICE_CONTACTS || pointerX > geometry.coilX - 54) return null;
   const position = nearestSlot(geometry.mainSlots, pointerX);
   return { kind, position, x: geometry.mainSlots[position] };
 }
@@ -156,7 +156,7 @@ export function findVisualLadderDropTarget(
     if (!group || movingId === group.anchorId) return null;
     if (moving?.lane === "main" && project.rungs.some((r) =>
       r.parallelBranches?.some((b) => b.anchorId === movingId))) return null;
-    if (contactCount(rung) >= 8 && moving?.rungId !== rungId) return null;
+    if (contactCount(rung) >= MAX_PRACTICE_CONTACTS && moving?.rungId !== rungId) return null;
 
     // The first lower lane may be created by dropping on it when no branches
     // exist. When multiple lanes exist, each has its own snapped target.
