@@ -108,6 +108,9 @@ function getRung(project: PracticeProject, id: string): PracticeRung {
   return rung;
 }
 
+/** Maximum contacts across main and OR lanes; long networks may scroll horizontally. */
+export const MAX_PRACTICE_CONTACTS = 32;
+
 export function contactCount(rung: PracticeRung): number {
   return rung.instructions.filter((item) => item.kind !== "OTE").length +
     (rung.parallelBranches ?? []).reduce((sum, branch) => sum + branch.instructions.length, 0);
@@ -187,7 +190,7 @@ export function insertInstruction(
     }
     updated = [...rung.instructions, item];
   } else {
-    if (contactCount(rung) >= 8) throw new Error("Máximo 8 contactos por rung en esta etapa.");
+    if (contactCount(rung) >= MAX_PRACTICE_CONTACTS) throw new Error("Máximo " + MAX_PRACTICE_CONTACTS + " contactos por rung.");
     const limit = rung.instructions.filter((part) => part.kind !== "OTE").length;
     const at = Math.min(Math.max(0, position), limit);
     updated = [...rung.instructions.slice(0, at), item, ...rung.instructions.slice(at)];
@@ -243,7 +246,7 @@ export function addParallelContact(
   if (!rung.instructions.some((item) => item.id === anchorId && item.kind !== "OTE")) {
     throw new Error("Selecciona un contacto principal válido para crear el OR.");
   }
-  if (contactCount(rung) >= 8) throw new Error("Máximo 8 contactos por rung en esta etapa.");
+  if (contactCount(rung) >= MAX_PRACTICE_CONTACTS) throw new Error("Máximo " + MAX_PRACTICE_CONTACTS + " contactos por rung.");
 
   let currentProject = project;
   let chosen = (rung.parallelBranches ?? []).find((branch) =>
@@ -387,8 +390,8 @@ export function moveInstruction(
       throw new Error("El rung de destino ya contiene una bobina OTE.");
     }
     if (sameRung) return project;
-  } else if (contactCount(target) + (sameRung ? 0 : movingCount) > 8) {
-    throw new Error("Máximo 8 contactos por rung en esta etapa.");
+  } else if (contactCount(target) + (sameRung ? 0 : movingCount) > MAX_PRACTICE_CONTACTS) {
+    throw new Error("Máximo " + MAX_PRACTICE_CONTACTS + " contactos por rung.");
   }
 
   const stripped: PracticeProject = { ...project, rungs: project.rungs.map((rung) =>
@@ -440,8 +443,8 @@ export function moveToParallel(
     throw new Error("Mueve o elimina primero la rama asociada a este contacto.");
   }
   const sameRung = source.rungId === targetRungId;
-  if (!sameRung && contactCount(target) >= 8) {
-    throw new Error("Máximo 8 contactos por rung en esta etapa.");
+  if (!sameRung && contactCount(target) >= MAX_PRACTICE_CONTACTS) {
+    throw new Error("Máximo " + MAX_PRACTICE_CONTACTS + " contactos por rung.");
   }
 
   const previousBranch = target.parallelBranches?.find((branch) =>
