@@ -73,7 +73,7 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
       event.preventDefault();
       setActiveIndex((current) =>
         selectable.length === 0 ? 0 :
-        event.key === "ArrowDown" ? (current + 1) % selectable.length : (current - 1 + selectable.length) % selectable.length;
+        event.key === "ArrowDown" ? (current + 1) % selectable.length : (current - 1 + selectable.length) % selectable.length);
     }
     if (event.key === "Enter" && selectable.length) {
       event.preventDefault();
