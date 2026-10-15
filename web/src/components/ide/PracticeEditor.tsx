@@ -489,9 +489,9 @@ export function PracticeEditor({
           )}
           {project.rungs.map((rung, rungIndex) => {
             const contacts = rung.instructions.filter((part) => part.kind !== "OTE");
-            const output = rung.instructions.find((part) => part.kind === "OTE");
+            const outputs = rung.instructions.filter((part) => part.kind === "OTE");
             const layout = getWrappedRungLayout(rung, canvasWidth, Boolean(draggingKind || moving));
-            const { width, coilX, coilY, groups, rows } = layout;
+            const { width, coilX, coilY, outputYs, groups, rows } = layout;
             const svgHeight = layout.height;
             const rungLive = running && Boolean(runtimeView?.rungPower[rung.id]);
             const drawContact = (item: typeof contacts[number], x: number, centerY: number) => {
@@ -612,7 +612,7 @@ export function PracticeEditor({
                           ? Boolean(runtimeView?.joinedPower[outgoingId]) : incomingPower);
                         const lastRow = rowIndex === rows.length - 1;
                         const from = row.groups.at(-1)?.right ?? 64;
-                        const to = lastRow && output ? coilX - 24 : width - 30;
+                        const to = lastRow && outputs.length ? coilX - 75 : width - 30;
                         return (
                           <g key={"wrap-row-" + row.index}>
                             {/* A new continuation line begins at the left rail; the
@@ -758,14 +758,29 @@ export function PracticeEditor({
                                   "v20m-4 -5l4 5 4 -5"} />
                               </g>
                             )}
-                            {lastRow && output && (
+                            {lastRow && outputs.length > 0 && (
                               <g>
-                                <Coil x={coilX} y={coilY} tag={output.tag || "??"}
-                                  comment={project.tags.find((tag) => tag.name === output.tag)?.description}
-                                  labelWidth={96} selected={selected === output.id}
-                                  online={running} live={rungLive} />
-                                <Wire x1={coilX + 24} y1={coilY} x2={width - 30}
-                                  y2={coilY} live={rungLive} />
+                                {/* Both sides of the OTE bank share the same input
+                                    power: every output is a PARALLEL end branch. */}
+                                {outputs.length > 1 && (
+                                  <Wire x1={coilX - 75} y1={coilY}
+                                    x2={coilX - 75} y2={outputYs.at(-1)!} live={rungLive} />
+                                )}
+                                {outputs.map((output, index) => {
+                                  const coilRowY = outputYs[index];
+                                  return (
+                                    <g key={output.id}>
+                                      <Wire x1={coilX - 75} y1={coilRowY}
+                                        x2={coilX - 24} y2={coilRowY} live={rungLive} />
+                                      <Coil x={coilX} y={coilRowY} tag={output.tag || "??"}
+                                        comment={project.tags.find((tag) => tag.name === output.tag)?.description}
+                                        labelWidth={96} selected={selected === output.id}
+                                        online={running} live={rungLive} />
+                                      <Wire x1={coilX + 24} y1={coilRowY}
+                                        x2={width - 30} y2={coilRowY} live={rungLive} />
+                                    </g>
+                                  );
+                                })}
                               </g>
                             )}
                           </g>
@@ -809,8 +824,10 @@ export function PracticeEditor({
                         }),
                       ];
                     })}
-                    {output && dragButton(output, coilX, coilY)}
-                    {output && tagDragButton(output, coilX, coilY)}
+                    {outputs.flatMap((output, index) => [
+                      dragButton(output, coilX, outputYs[index]),
+                      tagDragButton(output, coilX, outputYs[index]),
+                    ])}
                   </div>
                 </div>
               </article>
