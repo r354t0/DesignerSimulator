@@ -87,8 +87,12 @@ export function getWrappedRungLayout(
         (rung.emptyOutputBranches?.length ?? 0) + (previewOutput ? 1 : 0)
       : 0;
     const outputExtension = Math.max(0, outputs - 1) * OUTPUT_BRANCH_STEP;
+    // TIMER blocks extend 41px below the conductor rather than a coil's ~8px.
+    // Give them a local bottom margin; ordinary Bit rungs stay compact.
+    const timerBottomClearance = index === packed.length - 1 && hasTimer ? 17 : 0;
     const height = Math.max(getPracticeRungHeight(maxLanes, showDropLane),
-      getPracticeRungHeight(0) + outputExtension) + (index < packed.length - 1 ? 29 : 0);
+      getPracticeRungHeight(0) + outputExtension + timerBottomClearance
+    ) + (index < packed.length - 1 ? 29 : 0);
     const actual: WrappedGroup[] = [];
     let nextLeft = lead;
     sourceGroups.forEach((group) => {
