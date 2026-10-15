@@ -498,7 +498,10 @@ export function PracticeEditor({
           {project.rungs.map((rung, rungIndex) => {
             const contacts = rung.instructions.filter((part) => part.kind !== "OTE");
             const outputs = rung.instructions.filter((part) => part.kind === "OTE");
-            const layout = getWrappedRungLayout(rung, canvasWidth, Boolean(draggingKind || moving));
+            const layout = getWrappedRungLayout(
+              rung, canvasWidth, Boolean(draggingKind || moving),
+              draggingKind === "OTE" && rung.instructions.filter((item) => item.kind === "OTE").length < 8,
+            );
             const { width, coilX, coilY, outputYs, groups, rows } = layout;
             const svgHeight = layout.height;
             const rungLive = running && Boolean(runtimeView?.rungPower[rung.id]);
