@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
-import { FileCode2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, FileCode2, Hammer, Play, XCircle } from "lucide-react";
 import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
 import { resolveLadderDeleteAction } from "../../plc/ladderShortcuts";
+import { buildPracticeProject, type BuildDiagnostic, type LadderBuildResult } from "../../plc/practiceBuild";
 import {
   findVisualLadderDropTarget,
   getRungGeometry,
@@ -64,6 +65,13 @@ export function PracticeEditor({
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLElement | null>(null);
   const [viewportWidth, setViewportWidth] = useState(760);
+  const [buildRecord, setBuildRecord] = useState<{
+    project: PracticeProject;
+    result: LadderBuildResult;
+    requestedBy: "build" | "run";
+  } | null>(null);
+  const [buildOutputOpen, setBuildOutputOpen] = useState(false);
+  const [buildMessage, setBuildMessage] = useState("");
 
   useEffect(() => {
     const node = viewportRef.current;
@@ -135,6 +143,44 @@ export function PracticeEditor({
         setDropPreview(null);
       }
     }
+  };
+
+  const buildIsStale = Boolean(buildRecord && buildRecord.project !== project);
+  const currentBuild = buildRecord?.result ?? null;
+  const buildStatus = !buildRecord ? "Sin verificar" :
+    buildIsStale ? "Build pendiente" :
+      buildRecord.result.success ? "Build correcto" : "Build con errores";
+
+  /**
+   * RUN always invokes the same Build verifier, even after a failed or stale
+   * check. Stage A deliberately never claims to run a PLC scan.
+   */
+  const verifyPracticeRoutine = (requestedBy: "build" | "run") => {
+    const result = buildPracticeProject(project);
+    setBuildRecord({ project, result, requestedBy });
+    setBuildOutputOpen(true);
+    setBuildMessage(requestedBy === "run"
+      ? result.success
+        ? "Build correcto. Programa validado; la ejecución Ladder se habilitará en la Etapa B."
+        : "RUN no iniciado: corrige los errores del Build y vuelve a pulsar RUN."
+      : result.success
+        ? "Build finalizado correctamente. Programa verificado."
+        : "Build finalizado con errores. Revisa los diagnósticos.");
+  };
+
+  const navigateToDiagnostic = (diagnostic: BuildDiagnostic) => {
+    if (!diagnostic.rungId) return;
+    const exists = project.rungs.some((rung) => rung.id === diagnostic.rungId);
+    if (!exists) return;
+    setSelected(diagnostic.instructionId ?? null);
+    setSelectedOrBranch(diagnostic.branchId
+      ? { rungId: diagnostic.rungId, branchId: diagnostic.branchId } : null);
+    setSelectedRungId(diagnostic.instructionId || diagnostic.branchId
+      ? null : diagnostic.rungId);
+    const row = Array.from(viewportRef.current?.querySelectorAll<HTMLElement>("[data-rung-id]") ?? [])
+      .find((element) => element.dataset.rungId === diagnostic.rungId);
+    row?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    editorRef.current?.focus({ preventScroll: true });
   };
 
   const insertAt = (rungId: string, position: number, kind: EditableKind,
@@ -366,10 +412,29 @@ export function PracticeEditor({
           </p>
         </div>
         <span className="rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[10px] font-semibold text-amber-800">
-          EDICIÓN · SIN EJECUCIÓN
+ETAPA A · VERIFICACIÓN
         </span>
       </header>
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-slate-200 bg-[#f8fafc] px-3 py-2 text-xs">
+        <button type="button" onClick={() => verifyPracticeRoutine("build")}
+          title="Verificar todo PracticeRoutine sin ejecutar"
+          className="flex items-center gap-1.5 rounded border border-slate-300 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-slate-100">
+          <Hammer size={14} /> Build
+        </button>
+        <button type="button" onClick={() => verifyPracticeRoutine("run")}
+          title="Ejecutar Build automáticamente; el motor de PLC se implementará en la Etapa B"
+          className="flex items-center gap-1.5 rounded border border-emerald-700 bg-emerald-700 px-2.5 py-1.5 font-semibold text-white hover:bg-emerald-800">
+          <Play size={14} /> RUN
+        </button>
+        <span aria-live="polite"
+          className={"rounded border px-2 py-1 text-[11px] font-semibold " +
+            (!buildRecord || buildIsStale
+              ? "border-amber-200 bg-amber-50 text-amber-800"
+              : currentBuild?.success
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-red-200 bg-red-50 text-red-800")}>
+          {buildStatus}
+        </span>
         <span className="text-slate-500">
           Herramienta: <strong className="text-sky-800">{selectedTool}</strong>
           {EDITABLE.has(selectedTool) ? " · Clic para insertar según selección o arrastrar" : " · Solo demo visual"}
@@ -456,6 +521,7 @@ export function PracticeEditor({
             return (
               <article
                 key={rung.id}
+                data-rung-id={rung.id}
                 className="group/practice-rung relative border-b border-slate-100 bg-white"
                 style={{ width: canvasWidth }}
                 aria-label={"Rung " + rungIndex}
@@ -659,6 +725,59 @@ export function PracticeEditor({
           </p>
         </div>
       </div>
+      {buildOutputOpen && buildRecord && (
+        <section aria-label="Resultados de Build" className="flex max-h-[224px] min-h-[110px] shrink-0 flex-col border-t-2 border-[#8294a8] bg-[#f4f7fa] text-slate-800">
+          <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-200 px-3 py-1.5 text-xs">
+            <Hammer size={14} />
+            <strong>Build Output</strong>
+            <span className="font-mono text-[11px] text-slate-500">PracticeRoutine.LAD</span>
+            <span className="ml-auto flex items-center gap-1 text-red-700">
+              <XCircle size={13} /> {currentBuild?.errors ?? 0} errores
+            </span>
+            <span className="flex items-center gap-1 text-amber-700">
+              <AlertTriangle size={13} /> {currentBuild?.warnings ?? 0} advertencias
+            </span>
+            <button type="button" aria-label="Ocultar resultados de Build"
+              onClick={() => setBuildOutputOpen(false)}
+              title="Ocultar Build Output" className="rounded p-1 hover:bg-slate-200">
+              <ChevronDown size={15}/>
+            </button>
+          </header>
+          <p role="status"
+            className={"shrink-0 px-3 py-1 text-[11px] " +
+              (buildIsStale ? "bg-amber-50 text-amber-800" : "text-slate-600")}>
+            {buildIsStale ? "Se modificó el proyecto desde el último Build. Vuelve a verificar antes de RUN."
+              : buildMessage}
+          </p>
+          <div className="min-h-0 flex-1 overflow-auto" role="list" aria-label="Diagnósticos de Build">
+            {currentBuild?.diagnostics.length === 0 ? (
+              <div className="flex items-center gap-2 px-3 py-3 text-xs text-emerald-800">
+                <CheckCircle2 size={15}/> Sin errores ni advertencias.
+              </div>
+            ) : currentBuild?.diagnostics.map((diagnostic) => (
+              <button key={diagnostic.id} type="button" role="listitem"
+                disabled={!diagnostic.rungId}
+                onClick={() => navigateToDiagnostic(diagnostic)}
+                title={diagnostic.rungId ? "Ir al rung o instrucción afectada" : diagnostic.message}
+                className="flex w-full items-start gap-2 border-b border-slate-200 px-3 py-2 text-left text-[11px] hover:bg-sky-50 disabled:cursor-default disabled:hover:bg-transparent">
+                {diagnostic.severity === "error"
+                  ? <XCircle size={14} className="mt-0.5 shrink-0 text-red-700"/>
+                  : <AlertTriangle size={14} className="mt-0.5 shrink-0 text-amber-700"/>}
+                <span className="shrink-0 font-mono text-slate-500">{diagnostic.code}</span>
+                <span className="min-w-0 flex-1">{diagnostic.message}</span>
+                {diagnostic.rungId && <span className="shrink-0 text-sky-700">Ir al rung →</span>}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+      {!buildOutputOpen && buildRecord && (
+        <button type="button" onClick={() => setBuildOutputOpen(true)}
+          className="flex shrink-0 items-center justify-between border-t border-slate-200 bg-[#edf2f7] px-3 py-1 text-left text-[11px] text-slate-700 hover:bg-slate-100">
+          <span>Build Output · {currentBuild?.errors ?? 0} errores · {currentBuild?.warnings ?? 0} advertencias{buildIsStale ? " · Pendiente" : ""}</span>
+          <ChevronUp size={15} />
+        </button>
+      )}
     </section>
   );
 }
