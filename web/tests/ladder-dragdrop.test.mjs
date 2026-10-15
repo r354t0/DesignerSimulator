@@ -28,12 +28,13 @@ test("contact insert slots are calculated before and after the existing contacts
   assert.equal(findLadderDropTarget(project, "rung-1", "XIO", 392, 760)?.position, 2);
 });
 
-test("OTE snaps to the right-hand coil terminal and respects one coil per rung", () => {
+test("OTE snaps to the right-hand coil terminal and permits parallel output coils", () => {
   let project = initialPracticeProject();
   assert.deepEqual(findLadderDropTarget(project, "rung-1", "OTE", 250, 760),
     { kind: "OTE", position: 0, x: 671 });
   project = insertInstruction(project, "rung-1", 0, { id: "output", kind: "OTE", tag: "Motor_Run" });
-  assert.equal(findLadderDropTarget(project, "rung-1", "OTE", 630, 760), null);
+  assert.deepEqual(findLadderDropTarget(project, "rung-1", "OTE", 630, 760),
+    { kind: "OTE", position: 0, x: 671 });
   assert.equal(findLadderDropTarget(project, "rung-1", "XIC", 110, 760)?.position, 0);
 });
 
