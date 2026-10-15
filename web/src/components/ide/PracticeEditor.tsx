@@ -5,7 +5,7 @@ import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
 import { resolveLadderDeleteAction } from "../../plc/ladderShortcuts";
 import { buildPracticeProject, getPracticeBuildSignature, type BuildDiagnostic, type LadderBuildResult } from "../../plc/practiceBuild";
-import { evaluateSeriesScan, getUnsupportedSeriesRungs } from "../../plc/practiceRuntime";
+import { evaluateSeriesScan } from "../../plc/practiceRuntime";
 import {
   findVisualLadderDropTarget,
   getRungGeometry,
@@ -152,7 +152,7 @@ export function PracticeEditor({
   // Pure evaluation also provides live power-flow data for visual monitoring.
   const runtimeView = running ? evaluateSeriesScan(project) : null;
   const currentBuild = buildRecord?.result ?? null;
-  const buildStatus = running ? "RUN · serie" : !buildRecord ? "Sin verificar" :
+  const buildStatus = running ? "RUN · AND/OR" : !buildRecord ? "Sin verificar" :
     buildIsStale ? "Build pendiente" :
       buildRecord.result.success ? "Build correcto" : "Build con errores";
 
@@ -161,27 +161,8 @@ export function PracticeEditor({
    * check. Stage A deliberately never claims to run a PLC scan.
    */
   const verifyPracticeRoutine = (requestedBy: "build" | "run") => {
-    let result = buildPracticeProject(project);
-    if (requestedBy === "run" && result.success) {
-      const unsupported = getUnsupportedSeriesRungs(project);
-      if (unsupported.length) {
-        const additional: BuildDiagnostic[] = unsupported.map((rungId, index) => ({
-          id: "runtime-or-" + index,
-          severity: "error",
-          code: "OR_STAGE_C_PENDING",
-          message: "Rung " + project.rungs.findIndex((rung) => rung.id === rungId) +
-            ": las ramas OR se ejecutarán a partir de la Etapa C.",
-          rungId,
-          rungIndex: project.rungs.findIndex((rung) => rung.id === rungId),
-        }));
-        result = {
-          ...result, success: false, errors: result.errors + additional.length,
-          diagnostics: [...result.diagnostics, ...additional],
-        };
-      }
-    }
-
-    // RUN always verifies afresh. A failed verification cannot start the motor.
+    const result = buildPracticeProject(project);
+    // RUN always performs a fresh Build, including for OR branch networks.
     if (requestedBy === "run") {
       if (result.success) onStart();
       else if (running) onStop();
@@ -190,8 +171,8 @@ export function PracticeEditor({
     setBuildOutputOpen(true);
     setBuildMessage(requestedBy === "run"
       ? result.success
-        ? "Build correcto. Ejecución en serie XIC/XIO/OTE activa (Etapa B)."
-        : "RUN no iniciado: corrige los errores o elimina las ramas OR hasta la Etapa C."
+        ? "Build correcto. Ejecución de XIC/XIO/OTE y ramas OR activa (Etapa C)."
+        : "RUN no iniciado: corrige los errores del Build antes de ejecutar."
       : result.success
         ? "Build finalizado correctamente. Programa verificado."
         : "Build finalizado con errores. Revisa los diagnósticos.");
@@ -600,9 +581,11 @@ export function PracticeEditor({
                             {branches.length > 0 && (
                               <g>
                                 <Wire x1={group.left} y1={y} x2={group.left}
-                                  y2={group.branchLanes.at(-1)!.y} />
+                                  y2={group.branchLanes.at(-1)!.y}
+                                  live={running && Boolean(runtimeView?.instructionFlow[item.id]?.powerIn)} />
                                 <Wire x1={group.right} y1={y} x2={group.right}
-                                  y2={group.branchLanes.at(-1)!.y} />
+                                  y2={group.branchLanes.at(-1)!.y}
+                                  live={running && Boolean(runtimeView?.joinedPower[item.id])} />
                                 {branches.map((branch, laneIndex) => {
                                   const lane = group.branchLanes[laneIndex];
                                   const laneY = lane.y;
@@ -618,7 +601,8 @@ export function PracticeEditor({
                                         )}
                                       {branch.instructions.length === 0 ? (
                                         <Wire x1={group.left} y1={laneY}
-                                          x2={group.right} y2={laneY} />
+                                          x2={group.right} y2={laneY}
+                                          live={running && Boolean(runtimeView?.branchInput[branch.id])} />
                                       ) : (
                                         <>
                                           {branch.instructions.map((part, partIndex) => {
@@ -628,13 +612,15 @@ export function PracticeEditor({
                                             return (
                                               <g key={part.id}>
                                                 <Wire x1={previous} y1={laneY}
-                                                  x2={center - 22} y2={laneY} />
+                                                  x2={center - 22} y2={laneY}
+                                                  live={running && Boolean(runtimeView?.instructionFlow[part.id]?.powerIn)} />
                                                 {drawContact(part, center, laneY)}
                                               </g>
                                             );
                                           })}
                                           <Wire x1={lane.centers.at(-1)! + 22} y1={laneY}
-                                            x2={group.right} y2={laneY} />
+                                            x2={group.right} y2={laneY}
+                                            live={running && Boolean(runtimeView?.branchPower[branch.id])} />
                                         </>
                                       )}
                                       {branch.instructions.length === 0 && (
@@ -749,7 +735,7 @@ export function PracticeEditor({
           )}
           <p className="mb-5 flex items-center gap-1 px-4 text-xs text-slate-500">
             <FileCode2 size={14} /> Clic en etiqueta: buscar tag; doble clic: tabla de variables; arrastre: copiar tag. Clic en conductor OR + Supr: borrar rama.
-            RUN ejecuta la lógica en serie cuando Build es correcto; ramas OR pendientes de la Etapa C.
+            RUN ejecuta XIC/XIO/OTE con AND y ramas OR; el scan periódico corresponde a la siguiente etapa.
           </p>
         </div>
       </div>
