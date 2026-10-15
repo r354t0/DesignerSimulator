@@ -1,4 +1,4 @@
-import { MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, isOutputKind, type EditableKind, type PracticeInstruction,
+import { MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, isOutputKind, isTimerKind, type EditableKind, type PracticeInstruction,
   type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
 
 export type DiagnosticSeverity = "error" | "warning";
@@ -104,7 +104,7 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
     }
     seenInstructions.add(id);
 
-    if (!["XIC", "XIO", "OTE", "OTL", "OTU", "ONS"].includes(instruction.kind as EditableKind)) {
+    if (!["XIC", "XIO", "OTE", "OTL", "OTU", "ONS", "TON", "TOF", "RTO", "RES"].includes(instruction.kind as EditableKind)) {
       push("error", "UNSUPPORTED_INSTRUCTION",
         at + ": instrucción " + instruction.kind + " no admitida por el motor actual.",
         rung.id, rungIndex, id, branchId);
@@ -119,17 +119,34 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
         rung.id, rungIndex, id, branchId);
       return;
     }
-    const tag = tags.get(instruction.tag);
+    const [root, member] = instruction.tag.split(".");
+    const tag = tags.get(root);
     if (!tag) {
       push("error", "UNKNOWN_TAG",
         at + ": no existe el tag «" + instruction.tag + "» en Controller Tags.",
         rung.id, rungIndex, id, branchId);
       return;
     }
-    if (tag.type !== "BOOL") {
+    const expectedType = isTimerKind(instruction.kind) ? "TIMER"
+      : member ? "TIMER" : "BOOL";
+    if (tag.type !== expectedType || (member &&
+      (isTimerKind(instruction.kind) || instruction.kind === "ONS" ||
+        !["EN", "TT", "DN"].includes(member)))) {
       push("error", "INCOMPATIBLE_TAG",
-        at + ": " + instruction.kind + " requiere BOOL; «" + tag.name +
-        "» es " + tag.type + ".", rung.id, rungIndex, id, branchId);
+        at + ": " + instruction.kind + " requiere " +
+        (isTimerKind(instruction.kind) ? "TIMER" : "BOOL") +
+        " compatible.", rung.id, rungIndex, id, branchId);
+    }
+    if (isTimerKind(instruction.kind) && tag.type === "TIMER" &&
+        typeof tag.value === "object") {
+      const preset = tag.value.PRE;
+      const acc = tag.value.ACC;
+      if (!Number.isInteger(preset) || (preset as number) < 0 ||
+          !Number.isInteger(acc) || (acc as number) < 0) {
+        push("error", "INVALID_TIMER_PRESET",
+          at + ": TIMER requiere PRE/ACC en milisegundos, enteros no negativos.",
+          rung.id, rungIndex, id, branchId);
+      }
     }
     if (instruction.kind === "ONS") {
       if (tag.constant) {
@@ -199,7 +216,7 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
     const emptyOutputs = rung.emptyOutputBranches ?? [];
     for (const branchId of emptyOutputs) {
       push("error", "EMPTY_OUTPUT_BRANCH",
-        at + ": rama OR de salida vacía; añade una OTE o elimina la rama.",
+        at + ": rama OR de salida vacía; añade una instrucción o elimina la rama.",
         rung.id, rungIndex, undefined, branchId);
     }
     if (new Set(emptyOutputs).size !== emptyOutputs.length) {
@@ -207,7 +224,7 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
         at + ": existen ramas de salida duplicadas.", rung.id, rungIndex);
     }
     const usedBranchIds = new Set<string>();
-    const mainContactIds = instructions.filter((item) => item.kind !== "OTE").map((item) => item.id);
+    const mainContactIds = instructions.filter((item) => !isOutputKind(item.kind)).map((item) => item.id);
     const coveredBy: string[] = [];
     for (const branch of branches) {
       if (usedBranchIds.has(branch.id)) {
@@ -261,7 +278,9 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
   for (const [tag, places] of outputs) {
     const onlySetResetPair = places.every((entry) =>
       entry.kind === "OTL" || entry.kind === "OTU");
-    if (places.length > 1 && !onlySetResetPair) {
+    const timerPair = places.every((entry) => ["RTO", "RES"].includes(entry.kind))
+      && places.filter((entry) => entry.kind === "RTO").length === 1;
+    if (places.length > 1 && !onlySetResetPair && !timerPair) {
       push("warning", "DUPLICATE_OUTPUT",
         "La variable «" + tag + "» es escrita por varias bobinas (rungs " +
         places.map((entry) => entry.rung).join(", ") + "). Revisa sobrescrituras.");
