@@ -1,11 +1,12 @@
 import type { ReactNode } from "react";
 import { getInstructionSelectionFrame, LADDER_SELECTION_BLUE } from "../../plc/ladderSelection";
 
-export type Instruction = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "TON" | "TOF" | "TONOFF" | "CTU" | "CTD";
+export type Instruction = "XIC" | "XIO" | "ONS" | "OTE" | "OTL" | "OTU" | "TON" | "TOF" | "TONOFF" | "CTU" | "CTD";
 
 export const INSTRUCTIONS: { id: Instruction; label: string }[] = [
   { id: "XIC", label: "Examine If Closed" },
   { id: "XIO", label: "Examine If Open" },
+  { id: "ONS", label: "One Shot Rising Storage" },
   { id: "OTE", label: "Output Energize" },
   { id: "OTL", label: "Output Latch" },
   { id: "OTU", label: "Output Unlatch" },
@@ -147,7 +148,7 @@ function SelectedInstructionFrame({ x, y, comment, labelWidth = 96 }: {
 export const SYMBOL_SCALE = 0.5;
 
 export function ToolbarSymbol({ kind }: { kind: Instruction }) {
-  const isContact = kind === "XIC" || kind === "XIO";
+  const isContact = kind === "XIC" || kind === "XIO" || kind === "ONS";
   const isBlock = ["TON", "TOF", "TONOFF", "CTU", "CTD"].includes(kind);
   return (
     <svg width="46" height="28" viewBox="0 0 92 50" aria-hidden="true">
@@ -165,9 +166,9 @@ export function ToolbarSymbol({ kind }: { kind: Instruction }) {
           </>
         )}
       </g>
-      {(kind === "OTL" || kind === "OTU" || isBlock) && (
+      {(kind === "OTL" || kind === "OTU" || kind === "ONS" || isBlock) && (
         <text x="46" y="30" textAnchor="middle" fill="currentColor" fontSize={kind === "TONOFF" ? 8.5 : isBlock ? 12 : 16} fontWeight="600" fontFamily="Arial, sans-serif">
-          {isBlock ? kind : kind === "OTL" ? "L" : "U"}
+          {isBlock ? kind : kind === "ONS" ? "1" : kind === "OTL" ? "L" : "U"}
         </text>
       )}
     </svg>
@@ -191,14 +192,14 @@ export function Wire({
 }
 
 export function Contact({
-  x, y, kind, tag, comment, value, online, powerIn, labelWidth, selected = false,
+  x, y, kind, tag, comment, value, online, powerIn, flowOut, labelWidth, selected = false,
 }: {
-  x: number; y: number; kind: "XIC" | "XIO"; tag: string; comment?: string; labelWidth?: number;
-  value: boolean; online: boolean; powerIn: boolean; selected?: boolean;
+  x: number; y: number; kind: "XIC" | "XIO" | "ONS"; tag: string; comment?: string; labelWidth?: number;
+  value: boolean; online: boolean; powerIn: boolean; flowOut?: boolean; selected?: boolean;
 }) {
   // Logix semantics: XIC = bit TRUE; XIO = bit FALSE.
-  const condition = kind === "XIC" ? value : !value;
-  const flow = powerIn && condition;
+  const condition = kind === "XIC" ? value : kind === "XIO" ? !value : Boolean(flowOut);
+  const flow = kind === "ONS" ? Boolean(flowOut) : powerIn && condition;
   // A TRUE contact without upstream power is not an energized path.
   const activeSymbol = online && flow;
   const halfBarGap = 14 * SYMBOL_SCALE;
@@ -226,7 +227,11 @@ export function Contact({
           " M" + (x + halfBarGap) + " " + (y - halfBarHeight) + "v" + (2 * halfBarHeight)} />
         {kind === "XIO" && <path d={"M" + (x - halfBarGap) + " " + (y + halfBarHeight) +
           "L" + (x + halfBarGap) + " " + (y - halfBarHeight)} />}
+        {kind === "ONS" && <path d={"M" + (x - halfBarGap) + " " + y +
+          "h" + (2 * halfBarGap)} />}
       </g>
+      {kind === "ONS" && <text x={x} y={y + 20} textAnchor="middle"
+        fontSize="10" fontWeight="700" fill={activeSymbol ? HOT : BASE}>ONS</text>}
       <Wire x1={x - terminalX} y1={y} x2={x - halfBarGap} y2={y} live={online && powerIn} />
       <Wire x1={x + halfBarGap} y1={y} x2={x + terminalX} y2={y} live={online && flow} />
     </g>
@@ -234,9 +239,10 @@ export function Contact({
 }
 
 export function Coil({
-  x, y, tag, comment, online, live, labelWidth, selected = false,
+  x, y, tag, comment, online, live, labelWidth, selected = false, kind = "OTE",
 }: {
 x: number; y: number; tag: string; comment?: string; online: boolean; live: boolean; labelWidth?: number; selected?: boolean;
+  kind?: "OTE" | "OTL" | "OTU";
 }) {
   const activeSymbol = online && live;
   const curveEdge = 14 * SYMBOL_SCALE;
@@ -271,6 +277,10 @@ x: number; y: number; tag: string; comment?: string; online: boolean; live: bool
           (x + curveControl) + " " + (y + curveControlY) + " " +
           (x + curveEdge) + " " + (y + halfHeight)} />
       </g>
+      {kind !== "OTE" && <text x={x} y={y + 4} textAnchor="middle"
+        fontSize="12" fontWeight="700" fill={activeSymbol ? HOT : BASE}>
+        {kind === "OTL" ? "L" : "U"}
+      </text>}
       <Wire x1={x - wireEnd} y1={y} x2={x - wireStart} y2={y} live={activeSymbol} />
       <Wire x1={x + wireStart} y1={y} x2={x + wireEnd} y2={y} live={activeSymbol} />
     </g>
