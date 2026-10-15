@@ -4,6 +4,7 @@ import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, FileC
 import { Coil, Contact, TimerBlock, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
+import { TimerPresetEditor } from "./TimerPresetEditor";
 import { resolveLadderDeleteAction } from "../../plc/ladderShortcuts";
 import { getBitMenuTarget, invertInstructionBit } from "../../plc/practiceBitMenu";
 import { getOnlineMonitorReadout, type MonitorSelection } from "../../plc/practiceOnlineMonitor";
@@ -39,6 +40,7 @@ import {
   removeRung,
   isOutputKind,
   isTimerKind,
+  setInstructionTimerPreset,
   type EditableKind,
   type PracticeProject,
 } from "../../plc/practiceDocument";
@@ -79,6 +81,7 @@ export function PracticeEditor({
   const [tagDragSource, setTagDragSource] = useState<string | null>(null);
   const [tagDropTarget, setTagDropTarget] = useState<string | null>(null);
   const [tagSelector, setTagSelector] = useState<TagSelectorState | null>(null);
+  const [editingPresetId, setEditingPresetId] = useState<string | null>(null);
   const [bitMenu, setBitMenu] = useState<{ id: string; x: number; y: number } | null>(null);
   const viewportRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<HTMLElement | null>(null);
@@ -410,6 +413,7 @@ export function PracticeEditor({
   // connected continuation rows, instead of stretching every rung sideways.
   const canvasWidth = Math.max(480, viewportWidth);
   const selectedLocation = selected ? findInstruction(project, selected) : null;
+  const editingPreset = editingPresetId ? findInstruction(project, editingPresetId)?.instruction : undefined;
   const selectedRungForInsert = selectedLocation?.rungId ?? selectedOrBranch?.rungId ?? selectedRungId;
   const monitorSelection: MonitorSelection = selected
     ? { kind: "instruction", instructionId: selected }
@@ -923,6 +927,9 @@ export function PracticeEditor({
                                             x2={coilX - 120} y2={coilRowY} live={rungLive}/>
                                           <TimerBlock x={coilX - 52} y={coilRowY}
                                             kind={output.kind} tag={output.tag || "??"}
+                                            presetLabel={output.preset?.mode === "literal"
+                                              ? String(output.preset.value)
+                                              : output.preset?.mode === "tag" ? output.preset.tag : undefined}
                                             preset={assignedTag?.type === "TIMER" &&
                                               typeof assignedTag.value === "object"
                                                 ? Number(assignedTag.value.PRE) : 0}
@@ -1006,6 +1013,26 @@ export function PracticeEditor({
                       dragButton(output, coilX, outputYs[index]),
                       tagDragButton(output, coilX, outputYs[index]),
                     ])}
+                    {outputs.filter((item) => ["TON", "TOF", "RTO"].includes(item.kind))
+                      .map((item) => {
+                        const index = outputs.findIndex((output) => output.id === item.id);
+                        return (
+                          <button key={"pre-" + item.id} type="button"
+                            aria-label={"Editar PRE de " + item.kind + " " + (item.tag || "sin asignar")}
+                            title="Clic para editar PRE: literal (ms) o variable DINT"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSelected(item.id);
+                              setEditingPresetId(item.id);
+                              setTagSelector(null);
+                            }}
+                            className="absolute z-30 cursor-text rounded border border-transparent bg-transparent hover:border-sky-500 hover:bg-sky-100/25 focus-visible:outline-2 focus-visible:outline-sky-500"
+                            style={{ left: coilX - 110, top: outputYs[index] - 8,
+                              width: 122, height: 19 }}>
+                            <span className="sr-only">Editar PRE</span>
+                          </button>
+                        );
+                      })}
                     {emptyOutputBranches.map((branchId, index) => (
                       <button key={branchId} type="button"
                         aria-label={"Seleccionar rama de salida OR vacía " + (index + 1)}
@@ -1052,6 +1079,19 @@ export function PracticeEditor({
         </div>
       </div>
 
+      {editingPreset && editingPresetId &&
+        ["TON", "TOF", "RTO"].includes(editingPreset.kind) && (
+          <TimerPresetEditor key={editingPresetId}
+            instruction={editingPreset}
+            tags={project.tags}
+            onSave={(preset) => {
+              if (update(() => setInstructionTimerPreset(project, editingPresetId, preset))) {
+                setEditingPresetId(null);
+              }
+            }}
+            onClose={() => setEditingPresetId(null)}
+          />
+        )}
       {bitMenu && currentBitMenuTarget && createPortal(
         <div role="menu" aria-label={"Valor BOOL de " + currentBitMenuTarget.tagName}
           onPointerDown={(event) => event.stopPropagation()}
