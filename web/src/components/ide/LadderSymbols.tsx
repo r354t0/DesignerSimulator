@@ -167,8 +167,8 @@ export function ToolbarSymbol({ kind }: { kind: Instruction }) {
         )}
       </g>
       {(kind === "OTL" || kind === "OTU" || kind === "ONS" || isBlock) && (
-        <text x="46" y="30" textAnchor="middle" fill="currentColor" fontSize={kind === "TONOFF" ? 8.5 : isBlock ? 12 : 16} fontWeight="600" fontFamily="Arial, sans-serif">
-          {isBlock ? kind : kind === "ONS" ? "1" : kind === "OTL" ? "L" : "U"}
+        <text x="46" y="30" textAnchor="middle" fill="currentColor" fontSize={kind === "TONOFF" ? 8.5 : isBlock || kind === "ONS" ? 12 : 16} fontWeight="600" fontFamily="Arial, sans-serif">
+          {isBlock ? kind : kind === "ONS" ? "ONS" : kind === "OTL" ? "L" : "U"}
         </text>
       )}
     </svg>
