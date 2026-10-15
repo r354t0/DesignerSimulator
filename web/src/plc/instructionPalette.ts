@@ -34,8 +34,8 @@ const otu = tool("OTU", "Output Unlatch · desenclavar salida", true);
 const ons = tool("ONS", "One Shot · flanco único (requiere memoria BOOL)", true);
 const osr = tool("OSR", "One Shot Rising · flanco ascendente");
 const osf = tool("OSF", "One Shot Falling · flanco descendente");
-const ton = tool("TON", "Timer On Delay · disponible solo en MainRoutine DEMO", false, true);
-const tof = tool("TOF", "Timer Off Delay · disponible solo en MainRoutine DEMO", false, true);
+const ton = tool("TON", "Timer On Delay · temporizador a conexión", true);
+const tof = tool("TOF", "Timer Off Delay · temporizador a desconexión", true);
 const ctu = tool("CTU", "Count Up · disponible solo en MainRoutine DEMO", false, true);
 const ctd = tool("CTD", "Count Down · disponible solo en MainRoutine DEMO", false, true);
 
@@ -54,7 +54,7 @@ export const PALETTE_CATEGORIES: readonly PaletteCategory[] = [
   ] },
   { id: "timer-counter", label: "Timer/Counter", tools: [
     ton, tof, tool("RTO", "Retentive Timer On", true), ctu, ctd,
-    tool("RES", "Reset timer/counter"),
+    tool("RES", "Reset TIMER acumulado", true),
   ] },
   { id: "input-output", label: "Input/Output", tools: [
     tool("MSG", "Message"), tool("GSV", "Get System Value"),
