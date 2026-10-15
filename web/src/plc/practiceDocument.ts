@@ -2,10 +2,15 @@
  * Immutable PLC practice document. Contact paths can contain XIC/XIO/ONS,
  * output banks can contain OTE/OTL/OTU. Nested OR remains out of scope.
  */
-export type EditableKind = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS";
-export type OutputKind = "OTE" | "OTL" | "OTU";
+export type EditableKind = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" | "TON" | "TOF" | "RTO" | "RES";
+export type TimerKind = "TON" | "TOF" | "RTO" | "RES";
+export const isTimerKind = (kind: EditableKind): kind is TimerKind =>
+  (["TON", "TOF", "RTO", "RES"] as readonly string[]).includes(kind);
+export const isTimerMemberOperand = (tag: string) =>
+  /^[A-Za-z_][A-Za-z0-9_]*\.(EN|TT|DN)$/.test(tag);
+export type OutputKind = "OTE" | "OTL" | "OTU" | TimerKind;
 export type ContactKind = "XIC" | "XIO" | "ONS";
-export const OUTPUT_KINDS: readonly OutputKind[] = ["OTE", "OTL", "OTU"];
+export const OUTPUT_KINDS: readonly OutputKind[] = ["OTE", "OTL", "OTU", "TON", "TOF", "RTO", "RES"];
 export const CONTACT_KINDS: readonly ContactKind[] = ["XIC", "XIO", "ONS"];
 export const isOutputKind = (kind: EditableKind): kind is OutputKind =>
   (OUTPUT_KINDS as readonly string[]).includes(kind);
@@ -55,7 +60,8 @@ function validateTagName(project: PracticeProject, name: string, excludeName?: s
 }
 
 function tagInUse(project: PracticeProject, name: string): boolean {
-  return project.rungs.some((rung) => allInstructions(rung).some((item) => item.tag === name));
+  return project.rungs.some((rung) => allInstructions(rung).some((item) =>
+    item.tag === name || item.tag.startsWith(name + ".")));
 }
 
 /** An empty tag means that the symbol exists but has not been assigned an operand yet. */
@@ -96,18 +102,29 @@ function allInstructions(rung: PracticeRung): PracticeInstruction[] {
   return [...rung.instructions, ...(rung.parallelBranches ?? []).flatMap((branch) => branch.instructions)];
 }
 
-function ensureTag(project: PracticeProject, tag: string): void {
-  const item = project.tags.find((entry) => entry.name === tag);
+function ensureTag(project: PracticeProject, tag: string, kind: EditableKind): void {
+  if (!tag) return;
+  const [root, member, extra] = tag.split(".");
+  if (extra !== undefined) throw new Error("Operando estructurado inválido.");
+  const item = project.tags.find((entry) => entry.name === root);
   if (!item) throw new Error("Selecciona un tag existente.");
-  if (item.type !== "BOOL") throw new Error("Las instrucciones Bit solo admiten tags BOOL.");
+  if (isTimerKind(kind)) {
+    if (member || item.type !== "TIMER") throw new Error(kind + " requiere tag TIMER.");
+  } else if (member) {
+    if (item.type !== "TIMER" || !["EN", "TT", "DN"].includes(member) ||
+        kind === "ONS") throw new Error(kind + " requiere un operando BOOL válido.");
+  } else if (item.type !== "BOOL") {
+    throw new Error(kind + " requiere un tag BOOL.");
+  }
 }
+
 
 function ensureNewInstruction(project: PracticeProject, item: PracticeInstruction): void {
   if (![...CONTACT_KINDS, ...OUTPUT_KINDS].includes(item.kind)) {
     throw new Error("Esta instrucción aún no está habilitada para edición.");
   }
   // A new XIC/XIO/OTE may be inserted before the user assigns a BOOL operand.
-  if (item.tag !== "") ensureTag(project, item.tag);
+  if (item.tag !== "") ensureTag(project, item.tag, item.kind);
   if (project.rungs.some((rung) => allInstructions(rung).some((part) => part.id === item.id))) {
     throw new Error("El identificador de instrucción ya existe.");
   }
@@ -403,7 +420,11 @@ export function changeInstructionTag(
   project: PracticeProject, instructionId: string, tag: string,
 ): PracticeProject {
   // Empty tag is the intentional "sin asignar" state in the editor.
-  if (tag !== "") ensureTag(project, tag);
+  if (tag !== "") {
+    const found = findInstruction(project, instructionId);
+    if (!found) throw new Error("No se encontró la instrucción.");
+    ensureTag(project, tag, found.instruction.kind);
+  }
   return { ...project, rungs: project.rungs.map((rung) => ({
     ...rung,
     instructions: rung.instructions.map((item) => item.id === instructionId ? { ...item, tag } : item),
@@ -663,8 +684,8 @@ export function editTag(
   const nextName = patch.name === undefined ? previousName : validateTagName(project, patch.name, previousName);
   const nextType = patch.type ?? original.type;
   if (!TAG_TYPES.includes(nextType)) throw new Error("Tipo de dato no válido.");
-  if (nextType !== "BOOL" && tagInUse(project, previousName)) {
-    throw new Error("No se puede cambiar el tipo de un tag BOOL utilizado en Ladder.");
+  if (nextType !== original.type && tagInUse(project, previousName)) {
+    throw new Error("No se puede cambiar el tipo de un tag utilizado en Ladder.");
   }
   if (patch.externalAccess && !TAG_EXTERNAL_ACCESS.includes(patch.externalAccess)) {
     throw new Error("Acceso externo no válido.");
@@ -683,10 +704,12 @@ export function editTag(
     rungs: nextName === previousName ? project.rungs : project.rungs.map((rung) => ({
       ...rung,
       instructions: rung.instructions.map((item) =>
-        item.tag === previousName ? { ...item, tag: nextName } : item),
+        item.tag === previousName || item.tag.startsWith(previousName + ".")
+          ? { ...item, tag: nextName + item.tag.slice(previousName.length) } : item),
       parallelBranches: rung.parallelBranches?.map((branch) => ({
         ...branch, instructions: branch.instructions.map((item) =>
-          item.tag === previousName ? { ...item, tag: nextName } : item),
+          item.tag === previousName || item.tag.startsWith(previousName + ".")
+          ? { ...item, tag: nextName + item.tag.slice(previousName.length) } : item),
       })),
     })),
   };
