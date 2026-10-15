@@ -69,14 +69,16 @@ test("moving OR group in one rung preserves all contacts and order", () => {
   assert.deepEqual(p.rungs[0].parallelBranches?.[0].instructions.map((i) => i.id), ["branch2"]);
 });
 
-test("cross-rung moves keep OR groups and reject duplicate OTE atomically", () => {
+test("cross-rung moves keep OR groups and allow parallel OTE outputs", () => {
   let p = createRung(initialPracticeProject(), "rung-2");
   p = insertInstruction(p, "rung-1", 0, xic("a"));
   p = addParallelContact(p, "rung-1", "a", xio("parallel"));
   p = addParallelContact(p, "rung-1", "a", xic("parallel2"));
   p = insertInstruction(p, "rung-1", 1, ote("out-1"));
   p = insertInstruction(p, "rung-2", 0, ote("out-2", "Lamp_Run"));
-  assert.throws(() => moveInstruction(p, "out-1", "rung-2", 0), /ya contiene/);
+  const shared = moveInstruction(p, "out-1", "rung-2", 0);
+  assert.deepEqual(shared.rungs[1].instructions.filter((item) => item.kind === "OTE")
+    .map((item) => item.id), ["out-2", "out-1"]);
   assert.ok(findInstruction(p, "out-1"));
   const moved = moveInstruction(p, "a", "rung-2", 0);
   assert.equal(findInstruction(moved, "a")?.rungId, "rung-2");
