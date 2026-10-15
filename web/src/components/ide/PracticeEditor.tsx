@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, FileCode2, Hammer, Pause, Play, Square, StepForward, XCircle } from "lucide-react";
-import { Coil, Contact, LadderRails, Wire, type Instruction } from "./LadderSymbols";
+import { Coil, Contact, TimerBlock, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
 import { resolveLadderDeleteAction } from "../../plc/ladderShortcuts";
@@ -38,6 +38,7 @@ import {
   removeParallelBranch,
   removeRung,
   isOutputKind,
+  isTimerKind,
   type EditableKind,
   type PracticeProject,
 } from "../../plc/practiceDocument";
@@ -600,6 +601,7 @@ export function PracticeEditor({
           {project.rungs.map((rung, rungIndex) => {
             const contacts = rung.instructions.filter((part) => !isOutputKind(part.kind));
             const outputs = rung.instructions.filter((part) => isOutputKind(part.kind));
+            const hasTimerOutputs = outputs.some((part) => isTimerKind(part.kind));
             const emptyOutputBranches = rung.emptyOutputBranches ?? [];
             const layout = getWrappedRungLayout(
               rung, canvasWidth, Boolean(draggingKind || moving),
@@ -729,7 +731,7 @@ export function PracticeEditor({
                         const lastRow = rowIndex === rows.length - 1;
                         const from = row.groups.at(-1)?.right ?? 64;
                         const to = lastRow && (outputs.length || emptyOutputBranches.length)
-                          ? coilX - 75 : width - 30;
+                          ? coilX - (hasTimerOutputs ? 142 : 75) : width - 30;
                         return (
                           <g key={"wrap-row-" + row.index}>
                             {/* A new continuation line begins at the left rail; the
@@ -880,8 +882,9 @@ export function PracticeEditor({
                                 {/* Both sides of the OTE bank share the same input
                                     power: every output is a PARALLEL end branch. */}
                                 {outputs.length + emptyOutputBranches.length > 1 && (
-                                  <Wire x1={coilX - 75} y1={coilY}
-                                    x2={coilX - 75} y2={emptyOutputYs.at(-1) ?? outputYs.at(-1)!}
+                                  <Wire x1={coilX - (hasTimerOutputs ? 142 : 75)} y1={coilY}
+                                    x2={coilX - (hasTimerOutputs ? 142 : 75)}
+                                    y2={emptyOutputYs.at(-1) ?? outputYs.at(-1)!}
                                     live={rungLive} />
                                 )}
                                 {emptyOutputBranches.map((branchId, index) => {
@@ -894,7 +897,7 @@ export function PracticeEditor({
                                         width="125" height="53" rx="4" fill="#dbeafe" fillOpacity="0.6"
                                         stroke="#0284c7" strokeWidth="1.5" strokeDasharray="4 3"
                                         pointerEvents="none" />}
-                                      <Wire x1={coilX - 75} y1={laneY}
+                                      <Wire x1={coilX - (hasTimerOutputs ? 142 : 75)} y1={laneY}
                                         x2={coilX - 29} y2={laneY} />
                                       <Wire x1={coilX + 29} y1={laneY}
                                         x2={width - 30} y2={laneY} />
@@ -914,15 +917,45 @@ export function PracticeEditor({
                                   const assignedTag = project.tags.find((tag) => tag.name === output.tag);
                                   return (
                                     <g key={output.id}>
-                                      <Wire x1={coilX - 75} y1={coilRowY}
-                                        x2={coilX - 24} y2={coilRowY} live={rungLive} />
-                                      <Coil x={coilX} y={coilRowY} kind={output.kind as "OTE" | "OTL" | "OTU"} tag={output.tag || "??"}
-                                        comment={assignedTag?.description}
-                                        storedValue={assignedTag?.type === "BOOL" && assignedTag.value === true}
-                                        labelWidth={96} selected={selected === output.id}
-                                        online={running} live={rungLive} />
-                                      <Wire x1={coilX + 24} y1={coilRowY}
-                                        x2={width - 30} y2={coilRowY} live={rungLive} />
+                                      {isTimerKind(output.kind) ? (
+                                        <>
+                                          <Wire x1={coilX - 142} y1={coilRowY}
+                                            x2={coilX - 120} y2={coilRowY} live={rungLive}/>
+                                          <TimerBlock x={coilX - 52} y={coilRowY}
+                                            kind={output.kind} tag={output.tag || "??"}
+                                            preset={assignedTag?.type === "TIMER" &&
+                                              typeof assignedTag.value === "object"
+                                                ? Number(assignedTag.value.PRE) : 0}
+                                            accumulated={assignedTag?.type === "TIMER" &&
+                                              typeof assignedTag.value === "object"
+                                                ? Number(assignedTag.value.ACC) : 0}
+                                            en={assignedTag?.type === "TIMER" &&
+                                              typeof assignedTag.value === "object" &&
+                                              assignedTag.value.EN === true}
+                                            tt={assignedTag?.type === "TIMER" &&
+                                              typeof assignedTag.value === "object" &&
+                                              assignedTag.value.TT === true}
+                                            dn={assignedTag?.type === "TIMER" &&
+                                              typeof assignedTag.value === "object" &&
+                                              assignedTag.value.DN === true}
+                                            selected={selected === output.id}
+                                            online={running} live={rungLive}/>
+                                          <Wire x1={coilX + 16} y1={coilRowY}
+                                            x2={width - 30} y2={coilRowY} live={rungLive}/>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Wire x1={coilX - (hasTimerOutputs ? 142 : 75)} y1={coilRowY}
+                                            x2={coilX - 24} y2={coilRowY} live={rungLive} />
+                                          <Coil x={coilX} y={coilRowY} kind={output.kind as "OTE" | "OTL" | "OTU"} tag={output.tag || "??"}
+                                            comment={assignedTag?.description}
+                                            storedValue={assignedTag?.type === "BOOL" && assignedTag.value === true}
+                                            labelWidth={96} selected={selected === output.id}
+                                            online={running} live={rungLive} />
+                                          <Wire x1={coilX + 24} y1={coilRowY}
+                                            x2={width - 30} y2={coilRowY} live={rungLive} />
+                                        </>
+                                      )}
                                     </g>
                                   );
                                 })}
