@@ -15,6 +15,7 @@ interface Props {
   onInsertRung: () => void;
   onInsertParallel: () => void;
   canInsertParallel: boolean;
+  outputSelected?: boolean;
 }
 
 /** First two commands from the Studio 5000 rung instruction strip. */
@@ -55,7 +56,7 @@ function PaletteGlyph({ tool }: { tool: PaletteTool }) {
 
 export function InstructionPalette({
   selectedInstruction, onSelectEditable, onSelectDemo, onDragStart, onDragEnd,
-  onInsertRung, onInsertParallel, canInsertParallel,
+  onInsertRung, onInsertParallel, canInsertParallel, outputSelected = false,
 }: Props) {
   const [categoryId, setCategoryId] = useState<PaletteCategoryId>("favorites");
   const iconsRef = useRef<HTMLDivElement | null>(null);
@@ -97,10 +98,12 @@ export function InstructionPalette({
           </button>
           <button type="button" onClick={onInsertParallel}
             disabled={!canInsertParallel}
-            title={canInsertParallel
-              ? "Crear una rama OR vacía bajo el contacto seleccionado"
-              : "Selecciona un contacto o un rung con un contacto sin rama OR"}
-            aria-label="Crear rama paralela OR"
+            title={outputSelected
+              ? "Añadir una bobina OTE en paralelo a la salida seleccionada"
+              : canInsertParallel
+                ? "Crear una rama OR vacía bajo el contacto seleccionado"
+                : "Selecciona un contacto, una OTE o un rung válido"}
+            aria-label={outputSelected ? "Crear salida OTE paralela" : "Crear rama paralela OR"}
             className="flex h-[42px] min-w-[50px] shrink-0 flex-col items-center justify-center rounded-sm border border-transparent text-[10px] leading-[12px] text-[#37475b] hover:border-[#b0c0d4] hover:bg-[#eef3f9] disabled:cursor-not-allowed disabled:text-[#a0aab8] disabled:hover:border-transparent disabled:hover:bg-transparent"
           >
             <StructuralGlyph parallel />
