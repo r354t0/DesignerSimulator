@@ -53,7 +53,7 @@ export const PALETTE_CATEGORIES: readonly PaletteCategory[] = [
     xic, xio, ote, otl, otu, ons, osr, osf,
   ] },
   { id: "timer-counter", label: "Timer/Counter", tools: [
-    ton, tof, tool("RTO", "Retentive Timer On"), ctu, ctd,
+    ton, tof, tool("RTO", "Retentive Timer On", true), ctu, ctd,
     tool("RES", "Reset timer/counter"),
   ] },
   { id: "input-output", label: "Input/Output", tools: [
@@ -91,6 +91,6 @@ export function getPaletteCategory(id: PaletteCategoryId): PaletteCategory {
 
 export function isImplementedPaletteInstruction(
   id: string,
-): id is "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" {
-  return ["XIC", "XIO", "OTE", "OTL", "OTU", "ONS"].includes(id);
+): id is "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" | "TON" | "TOF" | "RTO" | "RES" {
+  return ["XIC", "XIO", "OTE", "OTL", "OTU", "ONS", "TON", "TOF", "RTO", "RES"].includes(id);
 }
