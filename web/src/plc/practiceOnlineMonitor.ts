@@ -1,4 +1,4 @@
-import type { PracticeProject, PracticeInstruction } from "./practiceDocument.ts";
+import { isOutputKind, type PracticeProject, type PracticeInstruction } from "./practiceDocument.ts";
 import type { SeriesScan } from "./practiceRuntime.ts";
 import type { ScanMode } from "./practiceScanCycle.ts";
 
@@ -48,9 +48,11 @@ function tagValue(project: PracticeProject, name: string): boolean | undefined {
 /** Inputs that have been edited but not read by another scan. OTE outputs are excluded. */
 export function getPendingScanInputs(project: PracticeProject, frame: SeriesScan | null): string[] {
   if (!frame) return [];
-  const outputs = new Set(project.rungs.flatMap((rung) =>
-    rung.instructions.filter((item) => item.kind === "OTE")
-      .map((item) => item.tag)));
+  const outputs = new Set(project.rungs.flatMap((rung) => [
+    ...rung.instructions.filter((item) => isOutputKind(item.kind) || item.kind === "ONS"),
+    ...(rung.parallelBranches ?? []).flatMap((branch) =>
+      branch.instructions.filter((item) => item.kind === "ONS")),
+  ].map((item) => item.tag)));
   return project.tags.filter((tag) =>
     tag.type === "BOOL" && !outputs.has(tag.name) &&
     tagValue(project, tag.name) !== tagValue(frame.project, tag.name))
@@ -90,12 +92,26 @@ function instructionReadout(
   const sampledValue = tagValue(frame!.project, instruction.tag);
   const isPending = pendingInputs.includes(instruction.tag) && sourceValue !== sampledValue;
 
-  if (instruction.kind === "OTE") {
+  if (isOutputKind(instruction.kind)) {
     result.fields = [
       { label: "Entrada de energía", value: POW(flow.powerIn) },
-      { label: "Valor de salida", value: BOOL(flow.value) },
+      { label: instruction.kind === "OTE" ? "Valor de salida" : "Valor retenido",
+        value: BOOL(flow.value) },
     ];
     result.status = mode === "paused" ? "paused" : flow.powerOut ? "energized" : "blocked";
+    return result;
+  }
+  if (instruction.kind === "ONS") {
+    result.fields = [
+      { label: "Memoria antes", value: BOOL(flow.value) },
+      { label: "Energía entrada", value: POW(flow.powerIn) },
+      { label: "Pulso de un scan", value: flow.powerOut ? "ACTIVO" : "INACTIVO" },
+      { label: "Memoria después", value: BOOL(Boolean(tagValue(frame!.project, instruction.tag))) },
+    ];
+    result.status = mode === "paused" ? "paused" : flow.powerOut ? "energized" : "blocked";
+    result.explanation = mode === "paused"
+      ? "ONS congelado en el último scan; RUN o SCAN evalúa el próximo flanco."
+      : "ONS conduce durante un único scan al pasar su entrada de 0 a 1.";
     return result;
   }
   const condition = instruction.kind === "XIC" ? flow.value : !flow.value;
@@ -137,7 +153,7 @@ export function getOnlineMonitorReadout(
       const powered = frame.rungPower[rung.id];
       readout.fields = [
         { label: "Resultado rung", value: POW(powered) },
-        { label: "Bobinas OTE", value: String(rung.instructions.filter((item) => item.kind === "OTE").length) },
+        { label: "Salidas OTE/OTL/OTU", value: String(rung.instructions.filter((item) => isOutputKind(item.kind)).length) },
       ];
       readout.status = mode === "paused" ? "paused" : powered ? "energized" : "blocked";
     }
