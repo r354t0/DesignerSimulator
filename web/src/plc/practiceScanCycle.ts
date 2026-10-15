@@ -6,6 +6,16 @@ import {
 } from "./practiceRuntime.ts";
 
 export type ScanMode = "stopped" | "running" | "paused";
+
+/**
+ * A single RUN control starts a new verified session from STOP, or resumes the
+ * paused session without resetting scan counters or rebuilding unchanged logic.
+ * RUN while already running is a no-op.
+ */
+export function getRunAction(mode: ScanMode): "build-and-start" | "resume" | "none" {
+  return mode === "paused" ? "resume" :
+    mode === "stopped" ? "build-and-start" : "none";
+}
 export const SCAN_PERIODS_MS = [50, 100, 250, 500] as const;
 export type ScanPeriodMs = (typeof SCAN_PERIODS_MS)[number];
 
