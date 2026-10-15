@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   createParallelBranch, addParallelContact, createRung, insertInstruction,
   getOrMainContactIds, initialPracticeProject, setTagValue,
+  removeInstruction, moveToParallel,
 } from "../src/plc/practiceDocument.ts";
 import { getRungGeometry, CONTACT_STEP } from "../src/plc/ladderDragDrop.ts";
 import { getWrappedRungLayout, findWrappedLadderDropTarget } from "../src/plc/ladderWrappedLayout.ts";
@@ -107,4 +108,25 @@ test("OR group remains undivided when layout wraps; branches keep their own coor
   assert.equal(group.branchLanes[0].id, branchId);
   assert.equal(group.branchLanes[0].y, group.mainY + 79);
   assert.ok(layout.rows.length >= 2);
+});
+
+
+test("removing the last upper-path contact moves the OR reunion to the preceding contact", () => {
+  let { project } = upperPath();
+  project = insertInstruction(project, "rung-1", 1, c("second", "Stop_PB"));
+  project = insertInstruction(project, "rung-1", 2, c("third", "Lamp_Run"));
+  assert.equal(project.rungs[0].parallelBranches[0].endId, "third");
+  project = removeInstruction(project, "third");
+  assert.equal(project.rungs[0].parallelBranches[0].endId, "second");
+  assert.equal(buildPracticeProject(project).success, true);
+});
+
+test("moving the upper-path reunion contact into a parallel lane retains valid OR topology", () => {
+  let { project, branchId } = upperPath();
+  project = insertInstruction(project, "rung-1", 1, c("second", "Stop_PB"));
+  project = moveToParallel(project, "second", "rung-1", "start", 1, branchId);
+  assert.equal(project.rungs[0].parallelBranches[0].endId, "start");
+  assert.deepEqual(project.rungs[0].parallelBranches[0].instructions.map((item) => item.id),
+    ["bypass", "second"]);
+  assert.equal(buildPracticeProject(project).success, true);
 });
