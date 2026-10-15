@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { createPortal } from "react-dom";
-import { Check, Search, X } from "lucide-react";
-import { filterPracticeTags } from "../../plc/practiceTagSearch";
-import { isTimerKind, type PracticeTag, type EditableKind } from "../../plc/practiceDocument";
+import { Check, Search, X, ChevronDown, ChevronRight } from "lucide-react";
+import { getTagPickerRows } from "../../plc/practiceTagPicker";
+import { type PracticeTag, type EditableKind } from "../../plc/practiceDocument";
 
 export type TagSelectorMode = "suggestions" | "dialog";
 
@@ -24,28 +24,29 @@ interface Props {
 export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props) {
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
+  const [expandedTimers, setExpandedTimers] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const results = useMemo(() => {
-    const kind = selector.kind as EditableKind;
-    const options = isTimerKind(kind)
-      ? tags.filter((tag) => tag.type === "TIMER")
-      : kind === "ONS" ? tags.filter((tag) => tag.type === "BOOL")
-        : [...tags.filter((tag) => tag.type === "BOOL"),
-            ...tags.filter((tag) => tag.type === "TIMER")
-              .flatMap((tag) => (["EN", "TT", "DN"] as const).map((member) => ({
-                ...tag, name: tag.name + "." + member, type: "BOOL" as const,
-                description: tag.description + " · " + member,
-              })))];
-    return filterPracticeTags(options, query, isTimerKind(kind));
-  }, [tags, query, selector.kind]);
+  const rows = useMemo(() =>
+    getTagPickerRows(tags, selector.kind as EditableKind, query, expandedTimers),
+    [tags, selector.kind, query, expandedTimers]);
   const suggestions = selector.mode === "suggestions";
-  const shown = suggestions ? results.slice(0, 8) : results;
+  const shown = suggestions ? rows.slice(0, 8) : rows;
+  const selectable = shown.filter((row) => row.selectable);
+  const toggleExpanded = (name: string) => {
+    setExpandedTimers((previous) => previous.includes(name)
+      ? previous.filter((item) => item !== name) : [...previous, name]);
+    setActiveIndex(0);
+  };
 
   useEffect(() => {
     inputRef.current?.focus();
     inputRef.current?.select();
-  }, [selector.instructionId, selector.mode]);
+    const currentRoot = selector.currentTag.split(".")[0];
+    if (selector.currentTag.includes(".")) {
+      setExpandedTimers((prev) => prev.includes(currentRoot) ? prev : [...prev, currentRoot]);
+    }
+  }, [selector.instructionId, selector.mode, selector.currentTag]);
 
   // The quick list closes on outside clicks; leave source tag buttons outside
   // this test so a second click can still complete the double-click gesture.
@@ -71,12 +72,12 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
       setActiveIndex((current) =>
-        shown.length === 0 ? 0 :
-        event.key === "ArrowDown" ? (current + 1) % shown.length : (current - 1 + shown.length) % shown.length);
+        selectable.length === 0 ? 0 :
+        event.key === "ArrowDown" ? (current + 1) % selectable.length : (current - 1 + selectable.length) % selectable.length;
     }
-    if (event.key === "Enter" && shown.length) {
+    if (event.key === "Enter" && selectable.length) {
       event.preventDefault();
-      onSelect(shown[Math.min(activeIndex, shown.length - 1)].name);
+      onSelect(selectable[Math.min(activeIndex, selectable.length - 1)].name);
     }
   };
 
@@ -109,32 +110,46 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
             </tr>
           </thead>
           <tbody>
-            {shown.map((tag, index) => (
-              <tr key={tag.name}>
-                <td colSpan={suggestions ? 2 : 3} className="p-0">
-                  <button
-                    type="button"
-                    aria-label={"Asignar tag " + tag.name}
-                    aria-selected={index === activeIndex}
-                    onMouseEnter={() => setActiveIndex(index)}
-                    onClick={() => onSelect(tag.name)}
-                    className={
-                      "grid w-full items-center gap-2 border-t border-slate-100 px-3 py-2 text-left hover:bg-sky-50 " +
-                      (suggestions ? "grid-cols-[minmax(105px,0.8fr)_minmax(100px,1.2fr)]" :
-                        "grid-cols-[minmax(130px,1fr)_62px_minmax(170px,1.5fr)]") +
-                      (index === activeIndex ? " bg-sky-50" : " bg-white")
-                    }
-                  >
-                    <span className="flex min-w-0 items-center gap-1 font-mono font-medium text-slate-900">
-                      <span className="truncate">{tag.name}</span>
-                      {tag.name === selector.currentTag && <Check size={12} className="shrink-0 text-emerald-700" />}
-                    </span>
-                    {!suggestions && <span className="text-slate-500">{tag.type}</span>}
-                    <span className="min-w-0 truncate text-slate-500" title={tag.description}>{tag.description || "—"}</span>
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {shown.map((row) => {
+              const selectableIndex = selectable.findIndex((item) => item.name === row.name);
+              const isActive = selectableIndex === activeIndex && row.selectable;
+              return (
+                <tr key={row.name}>
+                  <td colSpan={suggestions ? 2 : 3} className="p-0">
+                    <button type="button"
+                      aria-label={(row.expandable ? (row.expanded ? "Contraer " : "Expandir ") : "Asignar tag ") + row.name}
+                      aria-selected={isActive}
+                      aria-expanded={row.expandable ? row.expanded : undefined}
+                      disabled={!row.selectable && !row.expandable}
+                      onMouseEnter={() => { if (selectableIndex >= 0) setActiveIndex(selectableIndex); }}
+                      onClick={() => row.expandable ? toggleExpanded(row.name) : row.selectable && onSelect(row.name)}
+                      className={
+                        "grid w-full items-center gap-2 border-t border-slate-100 px-3 py-1.5 text-left " +
+                        (suggestions ? "grid-cols-[minmax(105px,0.8fr)_minmax(100px,1.2fr)]" :
+                          "grid-cols-[minmax(130px,1fr)_62px_minmax(170px,1.5fr)]") +
+                        (isActive ? " bg-sky-50" : row.depth ? " bg-[#f7f9fb]" : " bg-white") +
+                        (row.selectable || row.expandable ? " hover:bg-sky-50" : " cursor-default text-slate-400")
+                      }
+                    >
+                      <span className={"flex min-w-0 items-center gap-1 font-mono " +
+                        (row.selectable ? "font-medium text-slate-900" : "text-slate-600")}
+                        style={{ paddingLeft: row.depth * 15 }}>
+                        {row.expandable ? row.expanded
+                          ? <ChevronDown size={13} className="shrink-0"/>
+                          : <ChevronRight size={13} className="shrink-0"/>
+                          : row.depth ? <span className="w-[13px] shrink-0"/> : null}
+                        <span className="truncate">{row.depth ? row.name.split(".").at(-1) : row.name}</span>
+                        {row.name === selector.currentTag && <Check size={12} className="shrink-0 text-emerald-700" />}
+                      </span>
+                      {!suggestions && <span className="text-slate-500">{row.type}</span>}
+                      <span className="min-w-0 truncate text-slate-500" title={row.description}>
+                        {row.description || "—"}{!row.selectable && !row.expandable ? " · Solo lectura" : ""}
+                      </span>
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       )}
