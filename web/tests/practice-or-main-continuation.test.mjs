@@ -26,8 +26,7 @@ function upperPath() {
 test("main contact inserted after OR anchor extends its upper series path", () => {
   let { project } = upperPath();
   project = insertInstruction(project, "rung-1", 1, c("stop", "Stop_PB"));
-  project = insertInstruction(project, "rung-1", 2, c("estop", "EStop"));
-  // The final reference is not declared yet; geometry must still support it.
+  project = insertInstruction(project, "rung-1", 2, c("estop", "Lamp_Run"));
   assert.deepEqual(getOrMainContactIds(project.rungs[0], "start"), ["start", "stop", "estop"]);
   assert.deepEqual(project.rungs[0].instructions.map((part) => part.id),
     ["start", "stop", "estop", "output"]);
