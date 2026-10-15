@@ -248,7 +248,7 @@ export default function App() {
         <span>VirtualPLC</span>
         <span className="text-slate-600">|</span>
         <span>{online ? "Monitoreo DEMO · Sin controlador físico" : "Sin conexión a controlador"}</span>
-        <span className="ml-auto">Etapa 1 · Editor interactivo (preliminar)</span>
+        <span className="ml-auto">Etapa 2A · Build estático · Motor Ladder pendiente</span>
       </footer>
     </div>
   );
