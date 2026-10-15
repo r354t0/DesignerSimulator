@@ -33,6 +33,7 @@ export function getPracticeBuildSignature(project: PracticeProject): string {
     rungs: project.rungs.map((rung) => ({
       id: rung.id,
       instructions: rung.instructions.map(({ id, kind, tag }) => ({ id, kind, tag })),
+      emptyOutputBranches: rung.emptyOutputBranches ?? [],
       branches: (rung.parallelBranches ?? []).map(({ id, anchorId, endId, instructions }) => ({
         id, anchorId, endId, instructions: instructions.map(({ id: instructionId, kind, tag }) =>
           ({ id: instructionId, kind, tag })),
@@ -162,7 +163,7 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
       } else {
         executableRungs++;
       }
-      if (coils.length > MAX_PARALLEL_OUTPUTS) {
+      if (coils.length + (rung.emptyOutputBranches?.length ?? 0) > MAX_PARALLEL_OUTPUTS) {
         push("error", "OUTPUT_LIMIT",
           at + ": supera el máximo de " + MAX_PARALLEL_OUTPUTS + " OTE en paralelo.",
           rung.id, rungIndex);
@@ -183,6 +184,16 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
 
     for (const instruction of instructions) {
       checkInstruction(instruction, rung, rungIndex, "main");
+    }
+    const emptyOutputs = rung.emptyOutputBranches ?? [];
+    for (const branchId of emptyOutputs) {
+      push("error", "EMPTY_OUTPUT_BRANCH",
+        at + ": rama OR de salida vacía; añade una OTE o elimina la rama.",
+        rung.id, rungIndex, undefined, branchId);
+    }
+    if (new Set(emptyOutputs).size !== emptyOutputs.length) {
+      push("error", "DUPLICATE_OUTPUT_BRANCH",
+        at + ": existen ramas de salida duplicadas.", rung.id, rungIndex);
     }
     const usedBranchIds = new Set<string>();
     const mainContactIds = instructions.filter((item) => item.kind !== "OTE").map((item) => item.id);
