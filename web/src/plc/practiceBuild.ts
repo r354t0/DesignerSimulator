@@ -1,4 +1,4 @@
-import { MAX_PRACTICE_CONTACTS, type EditableKind, type PracticeInstruction,
+import { MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, type EditableKind, type PracticeInstruction,
   type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
 
 export type DiagnosticSeverity = "error" | "warning";
@@ -162,9 +162,9 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
       } else {
         executableRungs++;
       }
-      if (coils.length > 1) {
-        push("error", "MULTIPLE_COILS",
-          at + ": hay varias bobinas OTE. Esta versión admite una por rung.",
+      if (coils.length > MAX_PARALLEL_OUTPUTS) {
+        push("error", "OUTPUT_LIMIT",
+          at + ": supera el máximo de " + MAX_PARALLEL_OUTPUTS + " OTE en paralelo.",
           rung.id, rungIndex);
       }
       if (contacts.length === 0 && coils.length > 0) {
@@ -172,9 +172,11 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
           at + ": OTE sin contactos de condición (salida incondicional).",
           rung.id, rungIndex, coils[0].id);
       }
-      if (coils.length && instructions.at(-1)?.kind !== "OTE") {
+      const firstCoilIndex = instructions.findIndex((item) => item.kind === "OTE");
+      if (firstCoilIndex !== -1 &&
+        instructions.slice(firstCoilIndex).some((item) => item.kind !== "OTE")) {
         push("error", "COIL_NOT_LAST",
-          at + ": la bobina OTE debe situarse al extremo derecho.",
+          at + ": las salidas OTE deben situarse juntas al extremo derecho.",
           rung.id, rungIndex, coils[0].id);
       }
     }
