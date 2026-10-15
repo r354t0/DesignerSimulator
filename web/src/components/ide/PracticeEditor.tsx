@@ -829,7 +829,7 @@ export function PracticeEditor({
                                       <text x={coilX} y={laneY - 17} textAnchor="middle"
                                         fontSize="10" fill="#64748b">Rama OR vacía</text>
                                       <text x={coilX} y={laneY + 4} textAnchor="middle"
-                                        fontSize="11" fill="#64748b">OTE</text>
+                                        fontSize="11" fill="#64748b">Vacía</text>
                                     </g>
                                   );
                                 })}
