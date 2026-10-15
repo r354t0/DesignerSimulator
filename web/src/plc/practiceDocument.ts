@@ -56,6 +56,8 @@ export interface PracticeInstruction { id: string; kind: EditableKind; tag: stri
 export interface ParallelBranch {
   id: string;
   anchorId: string;
+  /** Last main-line contact bypassed by this lane. Absent = anchor only. */
+  endId?: string;
   instructions: PracticeInstruction[];
 }
 export interface PracticeRung {
@@ -196,8 +198,19 @@ export function insertInstruction(
     updated = [...rung.instructions.slice(0, at), item, ...rung.instructions.slice(at)];
   }
 
+  // In Studio 5000, adding a main-line contact immediately after the last
+  // contact enclosed by an OR extends the upper AND path, not the outer rung.
+  // Preserve existing end IDs for insertions already INSIDE an extended group.
+  const nextBranches = item.kind === "OTE" ? rung.parallelBranches :
+    rung.parallelBranches?.map((branch) => {
+      const endId = branch.endId ?? branch.anchorId;
+      const last = rung.instructions.findIndex((part) => part.id === endId);
+      const at = updated.findIndex((part) => part.id === item.id);
+      return at === last + 1 && last >= 0
+        ? { ...branch, endId: item.id } : branch;
+    });
   return { ...project, rungs: project.rungs.map((part) =>
-    part.id === rungId ? { ...part, instructions: updated } : part,
+    part.id === rungId ? { ...part, instructions: updated, parallelBranches: nextBranches } : part,
   ) };
 }
 
@@ -477,6 +490,18 @@ export interface PaletteInsertionTarget {
   position: number;
   anchorId?: string;
   branchId?: string;
+}
+
+/** Main contact IDs covered by a shared OR group (start through reunion). */
+export function getOrMainContactIds(rung: PracticeRung, anchorId: string): string[] {
+  const contacts = rung.instructions.filter((item) => item.kind !== "OTE");
+  const start = contacts.findIndex((item) => item.id === anchorId);
+  if (start < 0) return [];
+  const branch = (rung.parallelBranches ?? []).find((item) => item.anchorId === anchorId);
+  const end = branch?.endId
+    ? contacts.findIndex((item) => item.id === branch.endId) : start;
+  if (end < start) return [];
+  return contacts.slice(start, end + 1).map((item) => item.id);
 }
 
 export function getPaletteInsertionTarget(
