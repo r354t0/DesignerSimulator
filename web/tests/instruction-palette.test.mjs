@@ -35,9 +35,14 @@ test("no unsupported instruction falsely claims editable behavior", () => {
   }
 });
 
-test("timer and counter instructions remain explicitly demo-only", () => {
+test("timers are editable while counters remain demo-only", () => {
   const tools = getPaletteCategory("timer-counter").tools;
-  for (const name of ["TON", "TOF", "CTU", "CTD"]) {
+  for (const name of ["TON", "TOF", "RTO", "RES"]) {
+    const tool = tools.find((item) => item.id === name);
+    assert.ok(tool);
+    assert.equal(tool.editable, true);
+  }
+  for (const name of ["CTU", "CTD"]) {
     const tool = tools.find((item) => item.id === name);
     assert.ok(tool);
     assert.equal(tool.editable, false);
