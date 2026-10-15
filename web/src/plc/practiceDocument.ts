@@ -270,6 +270,28 @@ export function fillEmptyOutputBranch(
   return insertInstruction(released, rungId, rung.instructions.length, item);
 }
 
+/** Move an existing OTE from another rung onto a reserved empty output lane. */
+export function moveInstructionToEmptyOutputBranch(
+  project: PracticeProject, instructionId: string,
+  targetRungId: string, branchId: string,
+): PracticeProject {
+  const source = findInstruction(project, instructionId);
+  if (!source || source.instruction.kind !== "OTE") {
+    throw new Error("Solo se puede colocar una bobina OTE en esta rama.");
+  }
+  const target = getRung(project, targetRungId);
+  if (!(target.emptyOutputBranches ?? []).includes(branchId)) {
+    throw new Error("La rama de salida ya no está vacía.");
+  }
+  if (source.rungId === targetRungId) {
+    throw new Error("La bobina ya pertenece a este rung. Selecciona la rama vacía y añade una OTE.");
+  }
+  // Release the reserved slot before applying the move's output capacity check.
+  const released = removeEmptyOutputBranch(project, targetRungId, branchId);
+  return moveInstruction(released, instructionId, targetRungId,
+    target.instructions.filter((item) => item.kind !== "OTE").length);
+}
+
 /** Create an independent OR lane even when this contact has other OR lanes. */
 export function createParallelBranch(
   project: PracticeProject, rungId: string, anchorId: string,
