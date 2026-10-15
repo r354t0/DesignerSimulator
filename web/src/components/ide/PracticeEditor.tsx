@@ -31,6 +31,7 @@ import {
   findInstruction,
   insertInstruction,
   moveInstruction,
+  moveInstructionToEmptyOutputBranch,
   moveToParallel,
   removeInstruction,
   removeParallelBranch,
@@ -374,7 +375,9 @@ export function PracticeEditor({
       if (isMove && sourceId && findInstruction(project, sourceId)) {
         const done = update(() => target.lane === "parallel" && target.anchorId
           ? moveToParallel(project, sourceId, rungId, target.anchorId, target.position, target.branchId)
-          : moveInstruction(project, sourceId, rungId, target.position));
+          : target.branchId && !target.anchorId
+            ? moveInstructionToEmptyOutputBranch(project, sourceId, rungId, target.branchId)
+            : moveInstruction(project, sourceId, rungId, target.position));
         if (done) {
           setSelected(sourceId);
           setSelectedOrBranch(null);
