@@ -49,9 +49,9 @@ export function setScanPeriod(state: PracticeScanState, period: number): Practic
  * target, not a real-time PLC guarantee. Timing measures JavaScript logic
  * evaluation only, NOT OS scheduling or React paint time.
  */
-function performScan(state: PracticeScanState): PracticeScanState {
+function performScan(state: PracticeScanState, elapsedMs: number): PracticeScanState {
   const begin = performance.now();
-  const frame = evaluateSeriesScan(state.project);
+  const frame = evaluateSeriesScan(state.project, elapsedMs);
   const duration = Math.max(0, performance.now() - begin);
   return {
     ...state,
@@ -73,12 +73,12 @@ export function startPracticeScans(state: PracticeScanState): PracticeScanState 
     lastScanDurationMs: 0,
     maxScanDurationMs: 0,
     frame: null,
-  });
+  }, 0);
 }
 
 /** Called by the periodic scheduler. No work occurs when PAUSED/STOPPED. */
 export function tickPracticeScan(state: PracticeScanState): PracticeScanState {
-  return state.mode === "running" ? performScan(state) : state;
+  return state.mode === "running" ? performScan(state, state.scanPeriodMs) : state;
 }
 
 export function pausePracticeScans(state: PracticeScanState): PracticeScanState {
@@ -92,7 +92,7 @@ export function resumePracticeScans(state: PracticeScanState): PracticeScanState
 
 /** Executes exactly ONE pass and remains PAUSED. */
 export function stepPracticeScan(state: PracticeScanState): PracticeScanState {
-  return state.mode === "paused" ? performScan(state) : state;
+  return state.mode === "paused" ? performScan(state, state.scanPeriodMs) : state;
 }
 
 export function stopPracticeScans(state: PracticeScanState): PracticeScanState {
