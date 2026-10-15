@@ -373,10 +373,18 @@ export function removeInstruction(project: PracticeProject, id: string): Practic
       "Este contacto tiene varias ramas OR. Elimina o reubica las ramas primero.",
     );
     const promoted = paired[0]?.instructions ?? [];
+    const main = rung.instructions.filter((item) => item.kind !== "OTE");
+    const removedAt = main.findIndex((item) => item.id === id);
     return {
       ...rung,
       instructions: rung.instructions.flatMap((item) => item.id === id ? promoted : [item]),
-      parallelBranches: (rung.parallelBranches ?? []).filter((branch) => branch.anchorId !== id),
+      parallelBranches: (rung.parallelBranches ?? [])
+        .filter((branch) => branch.anchorId !== id)
+        .map((branch) => branch.endId === id ? {
+          ...branch,
+          // Removing the former reunion moves it to the previous main contact.
+          endId: removedAt > 0 ? main[removedAt - 1].id : branch.anchorId,
+        } : branch),
     };
   }) };
 }
@@ -397,6 +405,9 @@ export function moveInstruction(
     ? origin.parallelBranches?.filter((branch) => branch.anchorId === instructionId) ?? [] : [];
   const movingCount = 1 + attached.reduce((sum, branch) => sum + branch.instructions.length, 0);
   const sameRung = source.rungId === targetRungId;
+  if (attached.some((branch) => branch.endId && branch.endId !== instructionId)) {
+    throw new Error("Este contacto inicia un OR con varios contactos superiores. Reorganiza el grupo antes de mover su inicio.");
+  }
 
   if (source.instruction.kind === "OTE") {
     if (target.instructions.some((item) => item.kind === "OTE" && item.id !== instructionId)) {
@@ -413,8 +424,16 @@ export function moveInstruction(
       instructions: rung.instructions.filter((item) => item.id !== instructionId),
       parallelBranches: (rung.parallelBranches ?? [])
         .filter((branch) => branch.anchorId !== instructionId)
-        .map((branch) => ({ ...branch,
-          instructions: branch.instructions.filter((item) => item.id !== instructionId) })),
+        .map((branch) => {
+          const priorMain = rung.instructions
+            .filter((item) => item.kind !== "OTE");
+          const removedAt = priorMain.findIndex((item) => item.id === instructionId);
+          const endId = !sameRung && branch.endId === instructionId
+            ? (removedAt > 0 ? priorMain[removedAt - 1].id : branch.anchorId)
+            : branch.endId;
+          return { ...branch, endId,
+            instructions: branch.instructions.filter((item) => item.id !== instructionId) };
+        }),
     }) };
 
   const originalContactCount = target.instructions.filter((item) => item.kind !== "OTE").length;
