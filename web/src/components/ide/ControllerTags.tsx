@@ -11,6 +11,7 @@ import { demoTagMetadata, type DemoInputs, type DemoValues, type InputTag } from
 interface Props {
   project: PracticeProject;
   onChange: (next: PracticeProject) => void;
+  practiceRunning: boolean;
   inputs: DemoInputs;
   values: DemoValues;
   online: boolean;
@@ -89,7 +90,7 @@ const cellWidths = {
 };
 
 export function ControllerTags({
-  project, onChange, inputs, values, online, onTagChange, onResetCounters,
+  project, onChange, practiceRunning, inputs, values, online, onTagChange, onResetCounters,
 }: Props) {
   const [tab, setTab] = useState<Tab>("monitor");
   const [scope, setScope] = useState<Scope>("practice");
@@ -159,6 +160,8 @@ export function ControllerTags({
   const toggleExpand = (name: string) => setExpanded((previous) =>
     previous.includes(name) ? previous.filter((x) => x !== name) : [...previous, name]);
 
+  const writtenOutputs = new Set(project.rungs.flatMap((rung) =>
+    rung.instructions.filter((item) => item.kind === "OTE").map((item) => item.tag)));
   const boolValue = (name: string, value: boolean, disabled: boolean, member?: string) => (
     <button type="button" aria-label={"Cambiar valor de " + name + (member ? "." + member : "")}
       aria-pressed={value} disabled={disabled}
@@ -170,7 +173,8 @@ export function ControllerTags({
 
   const valueCell = (tag: PracticeTag, member?: string) => {
     const sourceValue = member && typeof tag.value === "object" ? tag.value[member] : tag.value;
-    if (typeof sourceValue === "boolean") return boolValue(tag.name, sourceValue, tag.constant, member);
+    if (typeof sourceValue === "boolean") return boolValue(tag.name, sourceValue,
+      tag.constant || (practiceRunning && scope === "practice" && writtenOutputs.has(tag.name)), member);
     if (typeof sourceValue === "number") {
       return <NumberCell key={tag.name + (member ?? "") + tag.type}
         value={sourceValue} label={"Valor de " + tag.name + (member ? "." + member : "")}
@@ -388,7 +392,7 @@ export function ControllerTags({
           </div>
           <span className="truncate text-[10px] text-slate-600">
             {rows.length} de {allRows.length} tags · {scope === "practice"
-              ? "Valores locales de práctica (sin ejecución PLC)"
+              ? practiceRunning ? "RUN · lógica XIC/XIO/OTE en serie (sin scan periódico)" : "Práctica detenida · valores editables"
               : online ? "DEMO · REM RUN" : "DEMO · OFFLINE"}
           </span>
           {scope === "demo" && tab === "monitor" && <button type="button" onClick={onResetCounters}
