@@ -27,7 +27,8 @@ test("contact insertion respects index and OTE stays last", () => {
   p = insertInstruction(p, "rung-1", 1, contact("out", "OTE", "Motor_Run"));
   p = insertInstruction(p, "rung-1", 0, contact("x2", "XIO", "Stop_PB"));
   assert.deepEqual(p.rungs[0].instructions.map((i) => i.id), ["x2", "x1", "out"]);
-  assert.throws(() => insertInstruction(p, "rung-1", 9, contact("out-2", "OTE", "Lamp_Run")), /ya contiene/);
+  p = insertInstruction(p, "rung-1", 9, contact("out-2", "OTE", "Lamp_Run"));
+  assert.deepEqual(p.rungs[0].instructions.map((i) => i.id), ["x2", "x1", "out", "out-2"]);
   assert.throws(() => insertInstruction(p, "rung-99", 0, contact("x3")), /No se encontró/);
 });
 
