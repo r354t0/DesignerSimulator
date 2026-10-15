@@ -84,7 +84,7 @@ test("new rows support drag/drop to the main path", () => {
   for (let i = 0; i < 7; i++) {
     project = insertInstruction(project, "rung-1", i, c("c-" + i));
   }
-  const layout = getWrappedRungLayout(project.rungs[0], 760);
+  const layout = getWrappedRungLayout(project.rungs[0], 760, true);
   assert.ok(layout.rows.length > 1);
   const nextRow = layout.rows[1];
   const drop = findWrappedLadderDropTarget(project, "rung-1", "XIC",
