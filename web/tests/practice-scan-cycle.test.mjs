@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import {
   initialPracticeScanState, startPracticeScans, tickPracticeScan,
   pausePracticeScans, resumePracticeScans, stepPracticeScan, stopPracticeScans,
-  changePracticeScanProject, setScanPeriod,
+  changePracticeScanProject, setScanPeriod, getRunAction,
 } from "../src/plc/practiceScanCycle.ts";
 import {
   initialPracticeProject, insertInstruction, createParallelBranch,
@@ -142,4 +142,28 @@ test("multiple rungs, OR conditions and parallel OTE outputs evaluate each scan"
   assert.equal(get(state, "Motor_Run"), true);
   assert.equal(get(state, "Lamp_Run"), true);
   assert.equal(state.frame?.branchPower[branchId], true);
+});
+
+
+test("single RUN button launches Build only from STOP and RESUMEs the paused session", () => {
+  assert.equal(getRunAction("stopped"), "build-and-start");
+  assert.equal(getRunAction("paused"), "resume");
+  assert.equal(getRunAction("running"), "none");
+
+  let state = startPracticeScans(input(fresh(), true));
+  state = tickPracticeScan(state);
+  state = pausePracticeScans(state);
+  const countBeforeResume = state.scanCount;
+  const scanSnapshot = state.frame;
+  state = input(state, false);
+  // RUN while PAUSED does not rebuild or reset the same session.
+  state = getRunAction(state.mode) === "resume" ? resumePracticeScans(state) : state;
+  assert.equal(state.mode, "running");
+  assert.equal(state.scanCount, countBeforeResume);
+  assert.strictEqual(state.frame, scanSnapshot);
+  assert.equal(get(state, "Motor_Run"), true);
+  state = tickPracticeScan(state);
+  assert.equal(state.scanCount, countBeforeResume + 1);
+  assert.equal(get(state, "Motor_Run"), false);
+  assert.equal(getRunAction(state.mode), "none");
 });
