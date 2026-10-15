@@ -63,7 +63,7 @@ test("refuse incompatible types for Ladder references but support unused types",
   assert.throws(() => editTag(p, "Start_PB", { type: "DINT" }), /utilizado en Ladder/);
   assert.throws(() => deleteTag(p, "Start_PB"), /utilizado en Ladder/);
   p = createTag(p, "Level", "Valor de nivel", "DINT");
-  assert.throws(() => insertInstruction(p, "rung-1", 1, xic("bad", "Level")), /solo admiten tags BOOL/);
+  assert.throws(() => insertInstruction(p, "rung-1", 1, xic("bad", "Level")), /requiere un tag BOOL/);
   p = editTag(p, "Level", { type: "REAL" });
   assert.equal(p.tags.at(-1).type, "REAL");
   p = deleteTag(p, "Level");
