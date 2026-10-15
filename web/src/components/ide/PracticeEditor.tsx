@@ -37,6 +37,7 @@ import {
   removeInstruction,
   removeParallelBranch,
   removeRung,
+  isOutputKind,
   type EditableKind,
   type PracticeProject,
 } from "../../plc/practiceDocument";
@@ -56,9 +57,9 @@ interface Props {
   onStep: () => void;
   onScanPeriodChange: (period: number) => void;
   nextId: (prefix: string) => string;
-  onSelectPaletteTool: (kind: "XIC" | "XIO" | "OTE") => void;
+  onSelectPaletteTool: (kind: EditableKind) => void;
   onSelectDemoTool: (kind: Instruction) => void;
-  onPaletteDragStart: (event: DragEvent<HTMLButtonElement>, kind: "XIC" | "XIO" | "OTE") => void;
+  onPaletteDragStart: (event: DragEvent<HTMLButtonElement>, kind: EditableKind) => void;
   onPaletteDragEnd: () => void;
 }
 interface InternalDrag { id: string; kind: EditableKind }
@@ -240,7 +241,7 @@ export function PracticeEditor({
     const instruction = { id, tag: "", kind };
     const done = update(() => anchorId
       ? addParallelContact(project, rungId, anchorId, instruction, position, branchId)
-      : branchId && kind === "OTE"
+      : branchId && isOutputKind(kind)
         ? fillEmptyOutputBranch(project, rungId, branchId, instruction)
         : insertInstruction(project, rungId, position, instruction));
     if (done) {
@@ -420,7 +421,7 @@ export function PracticeEditor({
     ? project.rungs.find((rung) => rung.id === selectedOrBranch.rungId)
       ?.parallelBranches?.find((branch) => branch.id === selectedOrBranch.branchId)
     : null;
-  const selectedOutputLocation = selectedLocation?.instruction.kind === "OTE" ? selectedLocation : null;
+  const selectedOutputLocation = selectedLocation && isOutputKind(selectedLocation.instruction.kind) ? selectedLocation : null;
   const selectedEmptyOutputBranch = selectedOrBranch &&
     project.rungs.find((rung) => rung.id === selectedOrBranch.rungId)
       ?.emptyOutputBranches?.includes(selectedOrBranch.branchId)
@@ -441,7 +442,7 @@ export function PracticeEditor({
 
   const insertSelectedParallelBranch = () => {
     if (selectedOutputLocation) {
-      // An OR on an OTE creates only an EMPTY parallel output conductor.
+      // OR on an output instruction creates only an EMPTY parallel output conductor.
       const rungId = selectedOutputLocation.rungId;
       const before = project.rungs.find((rung) => rung.id === rungId)?.emptyOutputBranches ?? [];
       if (update(() => createEmptyOutputBranch(project, rungId))) {
@@ -465,14 +466,14 @@ export function PracticeEditor({
       editorRef.current?.focus({ preventScroll: true });
     }
   };
-  const handlePaletteClick = (kind: "XIC" | "XIO" | "OTE") => {
+  const handlePaletteClick = (kind: EditableKind) => {
     onSelectPaletteTool(kind);
-    if (selectedEmptyOutputBranch && kind === "OTE") {
+    if (selectedEmptyOutputBranch && isOutputKind(kind)) {
       insertAt(selectedEmptyOutputBranch.rungId, 0, kind, undefined,
         selectedEmptyOutputBranch.branchId);
       return;
     }
-    if (selectedOrBranch && selectedBranchModel && kind !== "OTE") {
+    if (selectedOrBranch && selectedBranchModel && !isOutputKind(kind)) {
       insertAt(selectedOrBranch.rungId, selectedBranchModel.instructions.length, kind,
         selectedBranchModel.anchorId, selectedBranchModel.id);
       setSelectedRungId(selectedOrBranch.rungId);
@@ -597,12 +598,12 @@ export function PracticeEditor({
             </p>
           )}
           {project.rungs.map((rung, rungIndex) => {
-            const contacts = rung.instructions.filter((part) => part.kind !== "OTE");
-            const outputs = rung.instructions.filter((part) => part.kind === "OTE");
+            const contacts = rung.instructions.filter((part) => !isOutputKind(part.kind));
+            const outputs = rung.instructions.filter((part) => isOutputKind(part.kind));
             const emptyOutputBranches = rung.emptyOutputBranches ?? [];
             const layout = getWrappedRungLayout(
               rung, canvasWidth, Boolean(draggingKind || moving),
-              draggingKind === "OTE" &&
+              draggingKind !== null && isOutputKind(draggingKind) &&
                 outputs.length + emptyOutputBranches.length < MAX_PARALLEL_OUTPUTS,
             );
             const { width, coilX, coilY, outputYs, emptyOutputYs, groups, rows } = layout;
@@ -612,10 +613,11 @@ export function PracticeEditor({
               const flow = runtimeView?.instructionFlow[item.id];
               return (
               <g key={item.id}>
-                <Contact x={x} y={centerY} kind={item.kind as "XIC" | "XIO"}
+                <Contact x={x} y={centerY} kind={item.kind as "XIC" | "XIO" | "ONS"}
                   tag={item.tag || "??"} comment={project.tags.find((tag) => tag.name === item.tag)?.description}
                   labelWidth={96} selected={selected === item.id}
-                  value={flow?.value ?? false} online={running} powerIn={flow?.powerIn ?? false} />
+                  value={flow?.value ?? false} online={running} powerIn={flow?.powerIn ?? false}
+                  flowOut={flow?.powerOut ?? false} />
               </g>
               );
             };
@@ -913,7 +915,7 @@ export function PracticeEditor({
                                     <g key={output.id}>
                                       <Wire x1={coilX - 75} y1={coilRowY}
                                         x2={coilX - 24} y2={coilRowY} live={rungLive} />
-                                      <Coil x={coilX} y={coilRowY} tag={output.tag || "??"}
+                                      <Coil x={coilX} y={coilRowY} kind={output.kind as "OTE" | "OTL" | "OTU"} tag={output.tag || "??"}
                                         comment={project.tags.find((tag) => tag.name === output.tag)?.description}
                                         labelWidth={96} selected={selected === output.id}
                                         online={running} live={rungLive} />
