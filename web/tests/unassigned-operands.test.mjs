@@ -24,7 +24,8 @@ test("new XIC XIO OTE instructions may be inserted with no tag", () => {
     ["XIC", ""], ["XIO", ""], ["OTE", ""],
   ]);
   assert.equal(p.tags.length, 5, "unassigned references must not create tags");
-  assert.throws(() => insertInstruction(p, "rung-1", 2, blank("second", "OTE")), /ya contiene/);
+  p = insertInstruction(p, "rung-1", 2, blank("second", "OTE"));
+  assert.equal(p.rungs[0].instructions.filter((item) => item.kind === "OTE").length, 2);
 });
 
 test("empty contact can anchor an OR branch and blank OR instructions can move between rungs", () => {
