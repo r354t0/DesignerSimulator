@@ -130,7 +130,7 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
     const expectedType = isTimerKind(instruction.kind) ? "TIMER"
       : member ? "TIMER" : "BOOL";
     if (tag.type !== expectedType || (member &&
-      (isTimerKind(instruction.kind) || instruction.kind === "ONS" ||
+      ((instruction.kind !== "XIC" && instruction.kind !== "XIO") ||
         !["EN", "TT", "DN"].includes(member)))) {
       push("error", "INCOMPATIBLE_TAG",
         at + ": " + instruction.kind + " requiere " +
