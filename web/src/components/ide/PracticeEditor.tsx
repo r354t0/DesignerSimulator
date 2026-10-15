@@ -486,6 +486,7 @@ export function PracticeEditor({
         onInsertRung={insertSelectedRungBelow}
         onInsertParallel={insertSelectedParallelBranch}
         canInsertParallel={Boolean(parallelTarget || selectedOutputLocation)}
+        outputSelected={Boolean(selectedOutputLocation)}
       />
 
       <div className="min-h-0 flex-1 overflow-auto bg-white" ref={viewportRef}>
