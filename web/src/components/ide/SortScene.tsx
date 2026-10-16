@@ -81,9 +81,6 @@ export function SortScene({
 
   const plcLabel = mode === "running" ? "PLC · RUN"
     : mode === "paused" ? "PLC · PAUSE" : "PLC · STOP";
-  const processLabel = lotComplete && state.lineClear ? "LOTE TERMINADO"
-    : motor && state.items.length ? "CLASIFICANDO"
-    : motor ? "EN MARCHA" : "DETENIDA";
   const canFeed = canAddSortBox(state);
 
   return (
@@ -113,11 +110,6 @@ export function SortScene({
               <span aria-hidden="true" className={"size-1.5 rounded-full " +
                 (running ? "bg-emerald-400" : mode === "paused" ? "bg-amber-400" : "bg-slate-400")}/>
               {plcLabel}
-            </span>
-            <span className={"rounded border px-2.5 py-1.5 text-[10px] font-semibold tracking-wide " +
-              (motor ? "border-[#356b66] bg-[#173d3b] text-emerald-300" :
-                "border-[#425565] bg-[#202f3e] text-slate-300")}>
-              {processLabel}
             </span>
             <button type="button" aria-haspopup="dialog" aria-expanded={infoOpen}
               onClick={() => setInfoOpen(true)} aria-label="Información del clasificador"

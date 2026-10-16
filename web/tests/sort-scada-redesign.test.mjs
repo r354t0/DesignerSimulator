@@ -13,11 +13,12 @@ const drawing = read("../src/components/ide/SortProcessGraphic.tsx");
 const styles = read("../src/workspace.css");
 const app = read("../src/App.tsx");
 
-test("scene 2 introduces a compact industrial header with truthful PLC and process states", () => {
+test("scene 2 header shows PLC state and info only, without redundant conveyor status", () => {
   assert.match(view, /SCADA · ESTACIÓN CL-02/);
   assert.match(view, /plcLabel = mode === "running" \? "PLC · RUN"/);
   assert.match(view, /mode === "paused" \? "PLC · PAUSE" : "PLC · STOP"/);
-  assert.match(view, /motor && state\.items\.length \? "CLASIFICANDO"/);
+  assert.doesNotMatch(view, /const processLabel|\{processLabel\}|DETENIDA/);
+  assert.match(view, /<Pilot label="MOTOR" active=\{motor\} color="green"\/>/);
   assert.match(view, /Objetivo y mapa E\/S/);
   assert.match(view, /onClick=\{\(\) => setInfoOpen\(true\)\}/);
   assert.match(view, /<SortSceneInfoDialog open=\{infoOpen\}/);
