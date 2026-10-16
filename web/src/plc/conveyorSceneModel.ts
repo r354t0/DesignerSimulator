@@ -1,5 +1,6 @@
 import {
   createRung, createTag, initialPracticeProject, insertInstruction,
+  createIndependentParallelBranch, addParallelContact, insertIntoIndependentOrUpper,
   setTagValue, type PracticeProject, type TagType,
 } from "./practiceDocument.ts";
 
@@ -49,6 +50,13 @@ export const CONVEYOR_TAGS: readonly ConveyorTagDefinition[] = [
     description: "Faja: contador CTU de cajas detectadas por PE-01",
     initialDescription: "Piezas que cruzaron el sensor",
   },
+];
+/** Extra tags installed only when the advanced Ladder solution is loaded. */
+export const CONVEYOR_TEMPLATE_TAGS: readonly ConveyorTagDefinition[] = [
+  { name: "CV_ResetPB", type: "BOOL", direction: "Entrada",
+    description: "Faja: pulsador momentáneo RESET LOTE" },
+  { name: "CV_StopRequest", type: "BOOL", direction: "Interna",
+    description: "Faja: solicitud de parada por STOP o lote completo" },
 ];
 export const CONVEYOR_SENSOR_POSITION = 0.67;
 const BELT_SPEED_UNITS_PER_SECOND = 0.20;
@@ -152,30 +160,69 @@ export function initialConveyorProject(): PracticeProject {
     prepared.tags.find((tag) => tag.name === spec.name)!) };
 }
 
-/** Optional self-contained teaching example, applied only after explicit confirmation. */
+/**
+ * Advanced optional 4-rung Ladder: two real independent OR networks,
+ * seal-in by OTE, automatic batch stop, CTU and manual RES.
+ *
+ * R0: photoeye -> CTU CV_Count (PRE=5)
+ * R1: (Stop_PB OR (CV_Count.DN AND NOT CV_BoxSensor)) -> CV_StopRequest
+ * R2: NOT CV_StopRequest AND (Start_PB OR Motor_Run) -> OTE Motor_Run
+ * R3: NOT CV_BoxSensor AND CV_ResetPB -> RES CV_Count
+ *
+ * The motor stops when the fifth box CLEARS the photoeye (not while
+ * trapped on it), preventing a stale high photoeye on RESET.
+ * Existing five basic tags remain unchanged
+ * until the user explicitly loads the advanced template.
+ */
 export function createConveyorExampleProject(): PracticeProject {
   let project = initialConveyorProject();
+  for (const spec of CONVEYOR_TEMPLATE_TAGS) {
+    project = createTag(project, spec.name, spec.description, spec.type);
+  }
   project = setTagValue(project, CONVEYOR_COUNT_TAG, 5, "PRE");
 
-  // Rung 0: start latch.
+  // Counter evaluates first so DN propagates to the stop request immediately.
   project = insertInstruction(project, "rung-1", 0,
-    { id: "cv-start", kind: "XIC", tag: CONVEYOR_START_TAG });
-  project = insertInstruction(project, "rung-1", 1,
-    { id: "cv-motor-latch", kind: "OTL", tag: CONVEYOR_MOTOR_TAG });
-
-  // Rung 1: stop has priority because it scans AFTER the start rung.
-  project = createRung(project, "cv-rung-stop");
-  project = insertInstruction(project, "cv-rung-stop", 0,
-    { id: "cv-stop", kind: "XIC", tag: CONVEYOR_STOP_TAG });
-  project = insertInstruction(project, "cv-rung-stop", 1,
-    { id: "cv-motor-unlatch", kind: "OTU", tag: CONVEYOR_MOTOR_TAG });
-
-  // Rung 2: the sensor advances the retentive counter once per rising edge.
-  project = createRung(project, "cv-rung-count");
-  project = insertInstruction(project, "cv-rung-count", 0,
     { id: "cv-sensor", kind: "XIC", tag: CONVEYOR_SENSOR_TAG });
-  project = insertInstruction(project, "cv-rung-count", 1,
+  project = insertInstruction(project, "rung-1", 1,
     { id: "cv-counter", kind: "CTU", tag: CONVEYOR_COUNT_TAG });
+
+  // First OR: automatic batch completion OR physical STOP.
+  project = createRung(project, "cv-rung-stop-request");
+  project = insertInstruction(project, "cv-rung-stop-request", 0,
+    { id: "cv-stop-request-coil", kind: "OTE", tag: "CV_StopRequest" });
+  project = createIndependentParallelBranch(project, "cv-rung-stop-request");
+  const stopOr = project.rungs.find(r => r.id === "cv-rung-stop-request")!
+    .instructions.find(item => item.kind === "OR_JUNCTION")!.id;
+  project = insertIntoIndependentOrUpper(project, "cv-rung-stop-request", stopOr,
+    { id: "cv-stop", kind: "XIC", tag: CONVEYOR_STOP_TAG });
+  project = addParallelContact(project, "cv-rung-stop-request", stopOr,
+    { id: "cv-full", kind: "XIC", tag: "CV_Count.DN" });
+  project = addParallelContact(project, "cv-rung-stop-request", stopOr,
+    { id: "cv-no-box", kind: "XIO", tag: CONVEYOR_SENSOR_TAG });
+
+  // Second OR: an actual seal-in circuit, de-energized by the stop interlock.
+  project = createRung(project, "cv-rung-motor");
+  project = insertInstruction(project, "cv-rung-motor", 0,
+    { id: "cv-not-stop", kind: "XIO", tag: "CV_StopRequest" });
+  project = insertInstruction(project, "cv-rung-motor", 1,
+    { id: "cv-motor", kind: "OTE", tag: CONVEYOR_MOTOR_TAG });
+  project = createIndependentParallelBranch(project, "cv-rung-motor", "cv-not-stop");
+  const motorOr = project.rungs.find(r => r.id === "cv-rung-motor")!
+    .instructions.find(item => item.kind === "OR_JUNCTION")!.id;
+  project = insertIntoIndependentOrUpper(project, "cv-rung-motor", motorOr,
+    { id: "cv-start", kind: "XIC", tag: CONVEYOR_START_TAG });
+  project = addParallelContact(project, "cv-rung-motor", motorOr,
+    { id: "cv-seal-in", kind: "XIC", tag: CONVEYOR_MOTOR_TAG });
+
+  // Reset is explicit: pressing STOP must not silently erase the counter.
+  project = createRung(project, "cv-rung-reset");
+  project = insertInstruction(project, "cv-rung-reset", 0,
+    { id: "cv-reset-when-clear", kind: "XIO", tag: CONVEYOR_SENSOR_TAG });
+  project = insertInstruction(project, "cv-rung-reset", 1,
+    { id: "cv-reset", kind: "XIC", tag: "CV_ResetPB" });
+  project = insertInstruction(project, "cv-rung-reset", 2,
+    { id: "cv-reset-counter", kind: "RES", tag: CONVEYOR_COUNT_TAG });
   return project;
 }
 

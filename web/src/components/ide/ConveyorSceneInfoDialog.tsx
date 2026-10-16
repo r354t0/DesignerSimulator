@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { BookOpen, Info, X } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import {
-  CONVEYOR_TAGS, readConveyorBool, readConveyorCount,
+  CONVEYOR_TAGS, CONVEYOR_TEMPLATE_TAGS, readConveyorBool, readConveyorCount,
 } from "../../plc/conveyorSceneModel";
 
 interface Props {
@@ -94,7 +94,8 @@ export function ConveyorSceneInfoDialog({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/70">
-                {CONVEYOR_TAGS.map((spec) => {
+                {[...CONVEYOR_TAGS, ...CONVEYOR_TEMPLATE_TAGS.filter(spec =>
+                  project.tags.some(tag => tag.name === spec.name))].map((spec) => {
                   const linked = project.tags.find((tag) => tag.name === spec.name);
                   const valid = linked?.type === spec.type;
                   const value = valid
@@ -133,9 +134,15 @@ export function ConveyorSceneInfoDialog({
               Ver orientación para desarrollar el Ladder (opcional)
             </summary>
             <div className="mt-2 space-y-1 font-mono text-[11px] text-slate-300">
-              <p>Rung 0: Start_PB → OTL Motor_Run</p>
-              <p>Rung 1: Stop_PB → OTU Motor_Run</p>
-              <p>Rung 2: CV_BoxSensor → CTU CV_Count (PRE=5)</p>
+              <p>Rung 0: CV_BoxSensor → CTU CV_Count (PRE=5)</p>
+              <p>Rung 1: OR (Stop_PB | CV_Count.DN + XIO CV_BoxSensor) → OTE CV_StopRequest</p>
+              <p>Rung 2: XIO CV_StopRequest + OR (Start_PB | Motor_Run) → OTE Motor_Run</p>
+              <p>Rung 3: XIO CV_BoxSensor + CV_ResetPB → RES CV_Count</p>
+              <p className="pt-2 font-sans text-slate-400">
+                Al completar cinco detecciones y liberarse PE-01, la faja se detiene.
+                RESET LOTE solo opera con el sensor libre; después pulsa START
+                para comenzar otro lote. STOP detiene sin perder el conteo.
+              </p>
             </div>
           </details>
           <button type="button" onClick={() => { onClose(); onLoadExample(); }}
@@ -143,7 +150,8 @@ export function ConveyorSceneInfoDialog({
             Cargar plantilla Ladder (reemplaza MainRoutine)
           </button>
           <p className="mt-2 text-[11px] text-slate-400">
-            La plantilla requiere confirmación. Registrar tags no agrega rungs ni activa salidas.
+            La plantilla avanzada requiere confirmación y añade CV_ResetPB y
+            CV_StopRequest. Registrar los cinco tags básicos no agrega rungs ni activa salidas.
           </p>
         </section>
       </div>

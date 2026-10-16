@@ -117,7 +117,7 @@ test("scene is registered on activation; map E/S and objective live in an access
   assert.match(info, /onClose=\{onClose\}/);
   assert.match(info, /Objetivo del ejercicio/);
   assert.match(info, /arranque|arranque y detenga|arranque y parada|arranque y detenga|arranque y detener|arranque/i);
-  assert.match(info, /CONVEYOR_TAGS\.map\(/);
+  assert.match(info, /\.\.\.CONVEYOR_TAGS, \.\.\.CONVEYOR_TEMPLATE_TAGS\.filter/);
   assert.match(info, /Mapa E\/S · Tags vinculados a la simulación/);
   assert.match(info, /Abrir Controller Tags/);
 });

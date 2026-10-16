@@ -15,7 +15,7 @@ interface Props {
   project: PracticeProject;
   mode: ScanMode;
   scene: ConveyorState;
-  onInputChange: (name: "Start_PB" | "Stop_PB", value: boolean) => void;
+  onInputChange: (name: "Start_PB" | "Stop_PB" | "CV_ResetPB", value: boolean) => void;
   onAddItem: () => void;
   onResetScene: () => void;
   onPrepareTags: () => void;
@@ -52,6 +52,12 @@ export function ConveyorScene({
   const motorOn = running && readConveyorBool(project, "Motor_Run");
   const start = readConveyorBool(project, "Start_PB");
   const stop = readConveyorBool(project, "Stop_PB");
+  const resetAvailable = project.tags.some(tag =>
+    tag.name === "CV_ResetPB" && tag.type === "BOOL");
+  const reset = resetAvailable && readConveyorBool(project, "CV_ResetPB");
+  const batchDone = project.tags.some(tag => tag.name === "CV_StopRequest") &&
+    project.tags.some(tag => tag.name === "CV_Count" && tag.type === "COUNTER" &&
+      typeof tag.value === "object" && tag.value.DN === true);
   const sensor = readConveyorBool(project, CONVEYOR_SENSOR_TAG);
   const count = readConveyorCount(project);
   const wired = hasConveyorTags(project);
@@ -213,6 +219,11 @@ export function ConveyorScene({
               <MomentaryPushButton name="STOP" tone="stop" pressed={stop}
                 onChange={(pressed) => onInputChange("Stop_PB", pressed)}
                 icon={<Pause size={18} aria-hidden="true"/>}>STOP</MomentaryPushButton>
+              {resetAvailable && (
+                <MomentaryPushButton name="RESET LOTE" tone="drain" pressed={reset}
+                  onChange={(pressed) => onInputChange("CV_ResetPB", pressed)}
+                  icon={<RotateCcw size={18} aria-hidden="true"/>}>RESET</MomentaryPushButton>
+              )}
             </div>
           </div>
           <div className="rounded-lg border border-slate-700 bg-[#172634] p-3">
@@ -221,6 +232,9 @@ export function ConveyorScene({
               <PilotLed label="EN MARCHA" lit={motorOn} tone="green"/>
               <PilotLed label="DETENIDA" lit={!motorOn} tone="red"/>
               <PilotLed label="PE-01 · CAJA" lit={sensor} tone="amber"/>
+              {resetAvailable && (
+                <PilotLed label="LOTE COMPLETO" lit={batchDone} tone="amber"/>
+              )}
             </div>
             <div className="mt-3 flex items-center justify-between border-t border-slate-700 pt-2 text-[11px]">
               <span className="text-slate-400">Cajas detectadas</span>

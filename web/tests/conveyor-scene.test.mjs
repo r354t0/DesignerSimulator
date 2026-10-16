@@ -29,11 +29,12 @@ test("prepare tags preserves the full current Ladder and does not duplicate tags
   assert.equal(prepareConveyorTags(next), next);
 });
 
-test("Ladder example builds and exposes three stable control rungs", () => {
+test("Advanced Ladder builds two OR networks and four control rungs", () => {
   const project = createConveyorExampleProject();
   assert.equal(buildPracticeProject(project).success, true);
   assert.deepEqual(project.rungs.map(r => r.instructions.map(i => i.kind)), [
-    ["XIC", "OTL"], ["XIC", "OTU"], ["XIC", "CTU"],
+    ["XIC", "CTU"], ["OR_JUNCTION", "XIC", "OTE"],
+    ["XIO", "OR_JUNCTION", "XIC", "OTE"], ["XIO", "XIC", "RES"],
   ]);
   assert.equal(project.tags.find(t => t.name === "CV_Count").value.PRE, 5);
   assert.equal(hasConveyorTags(project), true);
@@ -47,10 +48,10 @@ test("start/stop inputs actuate conveyor through actual PracticeRoutine scans", 
   assert.equal(readConveyorBool(state.project, "Motor_Run"), true);
   state = changePracticeScanProject(state, setTagValue(state.project, "Start_PB", false));
   state = tickPracticeScan(state);
-  assert.equal(readConveyorBool(state.project, "Motor_Run"), true, "OTL retains motor");
+  assert.equal(readConveyorBool(state.project, "Motor_Run"), true, "OR seal-in retains motor");
   state = changePracticeScanProject(state, setTagValue(state.project, "Stop_PB", true));
   state = tickPracticeScan(state);
-  assert.equal(readConveyorBool(state.project, "Motor_Run"), false, "OTU wins");
+  assert.equal(readConveyorBool(state.project, "Motor_Run"), false, "STOP interlock has priority");
   state = stopPracticeScans(state);
   assert.equal(state.mode, "stopped");
 });

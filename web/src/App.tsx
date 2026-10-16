@@ -370,10 +370,13 @@ export default function App() {
     }
   }, [changeScan]);
 
-  const setConveyorInput = useCallback((tag: "Start_PB" | "Stop_PB", value: boolean) => {
-    // A quick momentary press must reach the PLC even between timer ticks.
-    // Only the rising press samples a zero-elapsed scan in RUN mode.
-    changeScan((state) => applyMomentaryBoolInput(state, tag, value));
+  const setConveyorInput = useCallback((tag: "Start_PB" | "Stop_PB" | "CV_ResetPB", value: boolean) => {
+    // The advanced template enables an optional reset input. De-energize it
+    // at the moment of release; START/STOP retain rising-only PLC sampling.
+    if (activeControllerScene.current !== "conveyor") return;
+    changeScan((state) => applyMomentaryBoolInput(
+      state, tag, value, tag === "CV_ResetPB",
+    ));
   }, [changeScan]);
   const resetConveyor = useCallback(() => {
     changeConveyor(() => initialConveyorState());

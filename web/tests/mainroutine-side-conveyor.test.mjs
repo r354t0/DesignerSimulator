@@ -5,7 +5,7 @@ import { buildPracticeProject } from "../src/plc/practiceBuild.ts";
 import { evaluateSeriesScan } from "../src/plc/practiceRuntime.ts";
 import { setTagValue } from "../src/plc/practiceDocument.ts";
 import {
-  initialConveyorProject, prepareConveyorTags, CONVEYOR_TAGS,
+  initialConveyorProject, prepareConveyorTags, CONVEYOR_TAGS, CONVEYOR_TEMPLATE_TAGS,
   createConveyorExampleProject, initialConveyorState, addConveyorItem,
   stepConveyor,
 } from "../src/plc/conveyorSceneModel.ts";
@@ -87,11 +87,14 @@ test("scene motor power is still calculated from Ladder, not animation timers",(
  assert.equal(p.tags.find(t=>t.name==="Motor_Run").value,false);
 });
 
-test("conveyor example populates only linked tags; no legacy demo variables",()=>{
+test("conveyor template adds only its two advanced tags; no legacy demo variables",()=>{
  const p=createConveyorExampleProject();
- assert.deepEqual(p.tags.map(t=>t.name),CONVEYOR_TAGS.map(t=>t.name));
+ assert.deepEqual(p.tags.map(t=>t.name),[
+  ...CONVEYOR_TAGS.map(t=>t.name), ...CONVEYOR_TEMPLATE_TAGS.map(t=>t.name),
+ ]);
  assert.deepEqual(p.rungs.map(r=>r.instructions.map(i=>i.kind)),[
-  ["XIC","OTL"],["XIC","OTU"],["XIC","CTU"]
+  ["XIC","CTU"],["OR_JUNCTION","XIC","OTE"],
+  ["XIO","OR_JUNCTION","XIC","OTE"],["XIO","XIC","RES"]
  ]);
  assert.equal(p.tags.find(t=>t.name==="CV_Count").value.PRE,5);
 });
