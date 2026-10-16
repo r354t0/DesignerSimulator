@@ -88,13 +88,18 @@ test("editor draws each parallel output separately with stable shared x and enou
   assert.equal(layout.outputYs[0], layout.coilY);
   assert.ok(layout.height - layout.outputYs[1] >= 16, "no clipped coil at bottom");
   assert.equal(layout.coilX, getRungGeometry(p.rungs[0], 760).coilX);
-  const preview = getWrappedRungLayout(p.rungs[0], 760, true, true);
-  assert.ok(preview.height > layout.height, "room for third coil preview");
+  // Dragging a third output must NOT grow the current rung (or move its siblings).
+  // Targeting stays in the existing output lane; the new branch is created only
+  // when the user actually drops the instruction.
   const drop = findWrappedLadderDropTarget(
-    p, "rung-1", "OTE", layout.coilX, preview.outputYs.at(-1) + OUTPUT_BRANCH_STEP, 760,
+    p, "rung-1", "OTE", layout.coilX, layout.outputYs.at(-1), 760,
   );
   assert.equal(drop?.lane, "main");
   assert.equal(drop?.kind, "OTE");
+  assert.equal(getWrappedRungLayout(p.rungs[0], 760).height, layout.height);
+  assert.equal(findWrappedLadderDropTarget(
+    p, "rung-1", "OTE", layout.coilX, layout.height + 40, 760,
+  ), null, "dragging must not reveal a provisional third output lane");
   assert.ok(findLadderDropTarget(p, "rung-1", "OTE", layout.coilX, 760));
 });
 
