@@ -60,7 +60,7 @@ export function ConveyorSceneInfoDialog({
             <BookOpen size={15} aria-hidden="true"/> Objetivo del ejercicio
           </h3>
           <p className="text-xs leading-relaxed text-slate-200">
-            Programa en MainRoutine un enclavamiento de marcha con ramas OR
+            Programa en MainRoutine el arranque y enclavamiento de marcha con ramas OR
             (START o Motor_Run), protegido por una solicitud de parada.
             Cuenta las cajas mediante CTU al cruzar PE-01, situado en la
             descarga. Al completar un lote de cinco cajas, detén la faja
