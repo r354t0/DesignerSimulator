@@ -20,6 +20,13 @@ import { SimulationScene } from "./components/ide/SimulationScene";
 import { ConveyorScene } from "./components/ide/ConveyorScene";
 import { SortScene } from "./components/ide/SortScene";
 import { TankScene } from "./components/ide/TankScene";
+import { TrafficScene } from "./components/ide/TrafficScene";
+import {
+  addTrafficVehicle, createTrafficExampleProject,
+  initialTrafficProject, initialTrafficState,
+  prepareTrafficTags, readTrafficBool, stepTrafficState, trafficWaiting,
+  type TrafficDirection, type TrafficState,
+} from "./plc/trafficSceneModel";
 import {
   createTankExampleProject, initialTankProject, initialTankState,
   prepareTankTags, readTankBool, stepTankState, tankSensorInputs,
@@ -72,8 +79,8 @@ const layoutConfig: IJsonModel = {
   },
 };
 
-type SimulationTab = "conveyor" | "sorting" | "tank" | "motor";
-type ProgrammingScene = "conveyor" | "sorting" | "tank";
+type SimulationTab = "conveyor" | "sorting" | "tank" | "traffic" | "motor";
+type ProgrammingScene = "conveyor" | "sorting" | "tank" | "traffic";
 
 interface DemoMachineState {
   inputs: DemoInputs;
@@ -104,6 +111,7 @@ export default function App() {
   const sceneSessions = useRef<Record<ProgrammingScene, PracticeScanState>>({
     conveyor: scanState, sorting: initialPracticeScanState(initialSortProject()),
     tank: initialPracticeScanState(initialTankProject()),
+    traffic: initialPracticeScanState(initialTrafficProject()),
   });
   const activeControllerScene = useRef<ProgrammingScene>("conveyor");
   const practice = scanState.project;
@@ -151,6 +159,17 @@ export default function App() {
     if (next !== sortRef.current) {
       sortRef.current = next;
       setSortState(next);
+    }
+  }, []);
+
+  const [trafficSetupError, setTrafficSetupError] = useState<string | null>(null);
+  const [trafficState, setTrafficState] = useState<TrafficState>(initialTrafficState);
+  const trafficRef = useRef(trafficState);
+  const changeTraffic = useCallback((operation: (state: TrafficState) => TrafficState) => {
+    const next = operation(trafficRef.current);
+    if (next !== trafficRef.current) {
+      trafficRef.current = next;
+      setTrafficState(next);
     }
   }, []);
 
@@ -233,6 +252,49 @@ export default function App() {
     return () => window.clearInterval(id);
   }, [practiceMode, simulationTab, changeSort, changeScan]);
 
+  // Scene 04 physical movement only reads PLC lamp outputs, never chooses
+  // a traffic-light phase. Detection edges trigger zero-time scan events
+  // without accelerating TON timers (identical principle to scenes 1–3).
+  useEffect(() => {
+    if (practiceMode !== "running" || activeControllerScene.current !== "traffic") return;
+    const id = window.setInterval(() => {
+      const current = scanRef.current;
+      if (current.mode !== "running" || activeControllerScene.current !== "traffic") return;
+      const next = stepTrafficState(trafficRef.current,
+        readTrafficBool(current.project, "Tr_NS_Green"),
+        readTrafficBool(current.project, "Tr_EW_Green"),
+        readTrafficBool(current.project, "Tr_Walk"), 50);
+      if (next !== trafficRef.current) changeTraffic(() => next);
+      // Sensor pulses are generated on a *new* vehicle exit. They always
+      // fall before the next event, preserving CTU rising-edge semantics.
+      changeScan(state => {
+        let updated=state;
+        for (const [tag,prev,now] of [
+          ["Tr_NSExit", trafficRef.current.exitedNS, next.exitedNS],
+          ["Tr_EWExit", trafficRef.current.exitedEW, next.exitedEW],
+        ] as const) {
+          const input=updated.project.tags.find(t=>t.name===tag);
+          if (input?.type==="BOOL" && now>prev) {
+            for(let pulse=prev;pulse<now;pulse++) {
+              updated=applySceneSensorBoolInput(updated,tag,true);
+              updated=applySceneSensorBoolInput(updated,tag,false);
+            }
+          }
+        }
+        for(const [tag,wants] of [
+          ["Tr_NSWaiting",trafficWaiting(next,"NS")],
+          ["Tr_EWWaiting",trafficWaiting(next,"EW")],
+        ] as const) {
+          const input=updated.project.tags.find(t=>t.name===tag);
+          if(input?.type==="BOOL" && input.value!==wants)
+            updated=applySceneSensorBoolInput(updated,tag,wants);
+        }
+        return updated;
+      });
+    },50);
+    return () => window.clearInterval(id);
+  }, [practiceMode,simulationTab,changeTraffic,changeScan]);
+
   // Tank process physics follows the real PLC output values and is never
   // active while this scene is stopped, paused, or not the selected controller.
   useEffect(() => {
@@ -301,6 +363,40 @@ export default function App() {
   }, []);
   const handlePracticeChange = useCallback((next: PracticeProject) =>
     changeScan((state) => changePracticeScanProject(state, next)), [changeScan]);
+
+  const setTrafficInput = useCallback((tag:
+    "Tr_StartPB" | "Tr_StopPB" | "Tr_ResetPB" | "Tr_PedPB", pressed:boolean) => {
+    if (activeControllerScene.current !== "traffic") return;
+    changeScan(state => applyMomentaryBoolInput(state,tag,pressed,
+      tag==="Tr_PedPB" || tag==="Tr_ResetPB"));
+  }, [changeScan]);
+  const resetTraffic = useCallback(() => {
+    if(scanRef.current.mode==="running")return;
+    changeTraffic(() => initialTrafficState());
+    changeScan(state=>{
+      let updated=state;
+      for(const tag of ["Tr_NSWaiting","Tr_EWWaiting","Tr_NSExit","Tr_EWExit"]) {
+        const input=updated.project.tags.find(t=>t.name===tag);
+        if(input?.type==="BOOL" && input.value)
+          updated=changePracticeScanProject(updated,
+            setTagValue(updated.project,tag,false));
+      }
+      return updated;
+    });
+  },[changeTraffic,changeScan]);
+  const prepareTraffic = useCallback(() => {
+    try {
+      changeScan(state => {
+        const prepared=prepareTrafficTags(state.project);
+        return prepared===state.project ? state :
+          changePracticeScanProject(state,prepared);
+      });
+      setTrafficSetupError(null);
+    }catch(error){
+      setTrafficSetupError(error instanceof Error ?
+        error.message : "No se pudieron registrar los tags.");
+    }
+  },[changeScan]);
 
   const setTankInput = useCallback((
     tag: "Tank_StartPB" | "Tank_StopPB" | "Tank_DrainPB" | "Tank_ResetPB", pressed: boolean,
@@ -415,7 +511,8 @@ export default function App() {
     if (simulationTab === "conveyor") prepareConveyor();
     else if (simulationTab === "sorting") prepareSort();
     else if (simulationTab === "tank") prepareTank();
-  }, [simulationTab, prepareConveyor, prepareSort, prepareTank]);
+    else if (simulationTab === "traffic") prepareTraffic();
+  }, [simulationTab, prepareConveyor, prepareSort, prepareTank, prepareTraffic]);
 
   const startPractice = useCallback(() =>
     changeScan(startPracticeScans), [changeScan]);
@@ -451,6 +548,18 @@ export default function App() {
     }
     setEditorView(view);
   }, [model]);
+
+  const loadTrafficExample = useCallback(() => {
+    if (!window.confirm(
+      "Se reemplazarán MainRoutine y Controller Tags de la escena SEMÁFOROS. ¿Continuar?",
+    )) return;
+    changeScan(state=>({
+      ...initialPracticeScanState(createTrafficExampleProject()),
+      scanPeriodMs:state.scanPeriodMs,
+    }));
+    changeTraffic(()=>initialTrafficState());
+    openEditorView("practice");
+  },[changeScan,changeTraffic,openEditorView]);
 
   const loadTankExample = useCallback(() => {
     if (!window.confirm(
@@ -546,6 +655,7 @@ export default function App() {
                   <option value="conveyor">Faja transportadora</option>
                   <option value="sorting">Clasificación de cajas</option>
                   <option value="tank">Sistema de llenado de tanques</option>
+                  <option value="traffic">Intersección semaforizada</option>
                   <option value="motor">Motor · DEMO</option>
                 </select>
               </div>
@@ -576,6 +686,16 @@ export default function App() {
                           setupError={tankSetupError}
                           onOpenTags={() => openEditorView("tags")}
                           onLoadExample={loadTankExample}/>
+                    : simulationTab === "traffic"
+                      ? <TrafficScene project={practice} mode={practiceMode} state={trafficState}
+                          onInputChange={setTrafficInput}
+                          onAddVehicle={(direction: TrafficDirection) =>
+                            changeTraffic(state=>addTrafficVehicle(state,direction))}
+                          onReset={resetTraffic}
+                          onPrepareTags={prepareTraffic}
+                          setupError={trafficSetupError}
+                          onOpenTags={() => openEditorView("tags")}
+                          onLoadExample={loadTrafficExample}/>
                       : <SimulationScene online={online} inputs={inputs} values={values}
                         onTagChange={handleTagChange}/>}
               </div>
@@ -593,7 +713,9 @@ export default function App() {
       conveyorTagSetupError, loadConveyorExample, sortState, setSortInput,
       changeSort, resetSort, prepareSort, sortSetupError, loadSortExample,
       chooseSimulationTab, tankState, changeTank, setTankInput, resetTank,
-      prepareTank, tankSetupError, loadTankExample],
+      prepareTank, tankSetupError, loadTankExample, trafficState, changeTraffic,
+      setTrafficInput, resetTraffic, prepareTraffic, trafficSetupError,
+      loadTrafficExample],
   );
 
   const syncTabSelection = useCallback((updatedModel: Model) => {
