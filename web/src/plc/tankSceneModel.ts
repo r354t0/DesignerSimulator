@@ -23,6 +23,9 @@ export const TANK_TAGS: readonly {
   { name: "Tank_FillStage", type: "BOOL", direction: "Interna", description: "Etapa llenado" },
   { name: "Tank_MixStage", type: "BOOL", direction: "Interna", description: "Etapa mezclado" },
   { name: "Tank_DrainStage", type: "BOOL", direction: "Interna", description: "Etapa vaciado" },
+  { name: "Tank_ToMix", type: "BOOL", direction: "Interna", description: "Paso a mezclado" },
+  { name: "Tank_ToDrain", type: "BOOL", direction: "Interna", description: "Paso a vaciado" },
+  { name: "Tank_ToFill", type: "BOOL", direction: "Interna", description: "Paso a llenado" },
   { name: "Tank_Alarm", type: "BOOL", direction: "Interna", description: "Fallo de proceso" },
   { name: "Tank_TStart", type: "TIMER", direction: "Interna", description: "Retardo bomba" },
   { name: "Tank_TMix", type: "TIMER", direction: "Interna", description: "Tiempo mezclado" },
@@ -112,8 +115,10 @@ export function initialTankProject(): PracticeProject {
 /**
  * Optional reference program. ALL physical actuators come from Ladder OTEs;
  * no hidden stage transitions execute in the browser process model.
- * Three actual independent OR junctions: cycle seal-in, watchdog alarm,
- * and automatic/manual draining (plus stage termination ORs).
+ * Independent OR junctions handle seal-in, watchdogs, manual/automatic
+ * draining and stage cancellation. The transition conditions are captured
+ * by OTE bits BEFORE any OTU; each OTU precedes the next stage's OTL.
+ * This keeps stage changes deterministic in a top-to-bottom PLC scan.
  */
 export function createTankExampleProject(): PracticeProject {
   let p = initialTankProject();
@@ -188,30 +193,42 @@ export function createTankExampleProject(): PracticeProject {
   make("tank-pump", [x("Tank_FillStage"), x("Tank_RunCmd"),
     x("Tank_TStart.DN"), nx("Tank_HighLS"), nx("Tank_Alarm"),
     nx("Tank_DrainStage"), output("OTE", "Tank_Pump")]);
-  // High level completes fill; enter mix phase.
-  make("tank-mix-begin", [x("Tank_FillStage"), x("Tank_HighLS"),
-    x("Tank_RunCmd"), nx("Tank_Alarm"), output("OTL", "Tank_MixStage")]);
-  or("tank-fill-end", [x("Tank_HighLS")], [nx("Tank_RunCmd")],
+  // Capture the transition BEFORE clearing the source stage (same scan).
+  // Fill → Mix: transition condition → OTU Fill → OTL Mix.
+  make("tank-to-mix", [x("Tank_FillStage"), x("Tank_HighLS"),
+    x("Tank_RunCmd"), nx("Tank_Alarm"), output("OTE", "Tank_ToMix")]);
+  or("tank-fill-end", [x("Tank_ToMix")], [nx("Tank_RunCmd")],
     [], output("OTU", "Tank_FillStage"));
+  make("tank-mix-begin", [x("Tank_ToMix"),
+    output("OTL", "Tank_MixStage")]);
   make("tank-mix-timer", [x("Tank_MixStage"), x("Tank_RunCmd"),
     output("TON", "Tank_TMix")]);
   make("tank-mixer", [x("Tank_MixStage"), x("Tank_RunCmd"),
     nx("Tank_TMix.DN"), nx("Tank_Alarm"), output("OTE", "Tank_Mixer")]);
-  make("tank-drain-begin", [x("Tank_MixStage"), x("Tank_TMix.DN"),
-    x("Tank_RunCmd"), nx("Tank_Alarm"),
-    output("OTL", "Tank_DrainStage")]);
-  or("tank-mix-end", [x("Tank_TMix.DN")], [nx("Tank_RunCmd")],
+  // Mix → Drain: transition condition → OTU Mix → OTL Drain.
+  make("tank-to-drain", [x("Tank_MixStage"), x("Tank_TMix.DN"),
+    x("Tank_RunCmd"), nx("Tank_Alarm"), output("OTE", "Tank_ToDrain")]);
+  or("tank-mix-end", [x("Tank_ToDrain")], [nx("Tank_RunCmd")],
     [], output("OTU", "Tank_MixStage"));
+  make("tank-drain-begin", [x("Tank_ToDrain"),
+    output("OTL", "Tank_DrainStage")]);
   // Manual drain is only possible with automation off; no simultaneous filling.
   or("tank-drain-valve", [x("Tank_DrainStage"), x("Tank_RunCmd")],
     [x("Tank_DrainPB"), nx("Tank_RunCmd")],
     [nx("Tank_LowLS"), nx("Tank_Alarm"), nx("Tank_Pump"),
       nx("Tank_InletValve")], output("OTE", "Tank_DrainValve"));
-  // Counter increments just once on the low-level edge, before stage unlatch.
+  // Count the just-completed lot BEFORE deciding whether another is needed.
   make("tank-batch-counter", [x("Tank_DrainStage"), x("Tank_LowLS"),
     x("Tank_RunCmd"), output("CTU", "Tank_Batches")]);
+  // Drain → Fill: only for lots 1 and 2. At lot 3, Batches.DN inhibits
+  // the transition, and the first rung removes RunCmd at the next scan.
+  make("tank-to-fill", [x("Tank_DrainStage"), x("Tank_LowLS"),
+    x("Tank_RunCmd"), nx("Tank_Batches.DN"), nx("Tank_Alarm"),
+    output("OTE", "Tank_ToFill")]);
   or("tank-drain-end", [x("Tank_LowLS")], [nx("Tank_RunCmd")],
     [], output("OTU", "Tank_DrainStage"));
+  make("tank-fill-next", [x("Tank_ToFill"),
+    output("OTL", "Tank_FillStage")]);
   return p;
 }
 
