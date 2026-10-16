@@ -133,7 +133,7 @@ test("advanced SCADA controls, map E/S and help match optional template logic",(
   const info=readFileSync(new URL("../src/components/ide/ConveyorSceneInfoDialog.tsx",import.meta.url),"utf8");
   const app=readFileSync(new URL("../src/App.tsx",import.meta.url),"utf8");
   assert.match(scene,/resetAvailable && \(/);
-  assert.match(scene,/MomentaryPushButton name="RESET LOTE"/);
+  assert.match(scene,/MomentaryPushButton compact name="RESET LOTE"/);
   assert.match(scene,/onInputChange\("CV_ResetPB", pressed\)/);
   assert.match(scene,/PilotLed label="LOTE COMPLETO"/);
   assert.match(info,/CONVEYOR_TEMPLATE_TAGS\.filter/);
