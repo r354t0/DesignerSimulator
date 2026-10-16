@@ -23,9 +23,11 @@ test("SCADA view has no extra documentation or PLC developer-status header", () 
   assert.doesNotMatch(conveyor, /Pulsadores tipo interruptor/);
   assert.doesNotMatch(conveyor, /<header className=/);
   assert.match(conveyor, /Línea de transporte/);
-  assert.match(conveyor, /Motor_Run = \{Number\(motorOn\)\}/);
+  assert.doesNotMatch(conveyor, /Motor_Run = \{Number\(motorOn\)\}/);
+  assert.match(conveyor, /Objetivo y mapa E\/S/);
   assert.match(conveyor, /Tablero de mando/);
-  assert.match(conveyor, /Señales de la escena/);
+  assert.match(conveyor, /Pilotos LED/);
+  assert.doesNotMatch(conveyor, /Señales de la escena/);
 });
 
 test("the information dialog remains accessible from a compact icon in the process card", () => {
@@ -38,11 +40,11 @@ test("the information dialog remains accessible from a compact icon in the proce
 });
 
 test("SCADA operator controls still update the PLC tags and physical scene", () => {
-  assert.match(conveyor, /onClick=\{\(\) => onInputChange\("Start_PB", !start\)\}/);
-  assert.match(conveyor, /onClick=\{\(\) => onInputChange\("Stop_PB", !stop\)\}/);
+  assert.match(conveyor, /onChange=\{\(pressed\) => onInputChange\("Start_PB", pressed\)\}/);
+  assert.match(conveyor, /onChange=\{\(pressed\) => onInputChange\("Stop_PB", pressed\)\}/);
   assert.match(conveyor, /onClick=\{onAddItem\}/);
   assert.match(conveyor, /onClick=\{onResetScene\}/);
   assert.match(conveyor, /CONVEYOR_SENSOR_TAG/);
-  assert.match(conveyor, /CONVEYOR_COUNT_TAG/);
+  assert.match(conveyor, /readConveyorCount\(project\)/);
   assert.match(conveyor, /!wired &&/);
 });
