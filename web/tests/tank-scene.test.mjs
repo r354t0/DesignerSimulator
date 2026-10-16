@@ -53,7 +53,20 @@ test("tank tag registration rejects wrong type without partial mutation",()=>{
 test("tank reference Ladder builds with actual independent OR, TON and CTU",()=>{
   const project=createTankExampleProject(),result=buildPracticeProject(project);
   assert.equal(result.success,true,JSON.stringify(result.diagnostics));
-  assert.equal(project.rungs.length,23);
+  assert.equal(project.rungs.length,22);
+  assert.equal(project.rungs.some(r=>r.id==="tank-fill-next"),false,
+    "the former rung 22 must be removed");
+  const begin=project.rungs.find(r=>r.id==="tank-begin");
+  assert.deepEqual(begin.instructions.map(i=>i.kind),
+    ["OR_JUNCTION","XIC","XIO","XIO","XIO","OTL"]);
+  assert.deepEqual(begin.instructions.slice(1,5).map(i=>i.tag),
+    ["Tank_RunCmd","Tank_FillStage","Tank_MixStage","Tank_DrainStage"]);
+  assert.equal(begin.instructions.at(-1).tag,"Tank_FillStage");
+  assert.equal(begin.parallelBranches.length,1);
+  assert.deepEqual(begin.parallelBranches[0].instructions.map(i=>i.tag),
+    ["Tank_ToFill"],"ToFill must bypass the entire upper contact chain");
+  assert.equal(begin.parallelBranches[0].endId,begin.instructions[4].id,
+    "ToFill branch must rejoin after Tank_DrainStage");
   const joins=project.rungs.filter(r=>r.instructions.some(i=>i.kind==="OR_JUNCTION"));
   assert.ok(joins.length>=5,"the training template must use several real OR junctions");
   assert.ok(joins.every(r=>r.parallelBranches?.some(b=>b.instructions.length>0)));
@@ -63,12 +76,11 @@ test("tank reference Ladder builds with actual independent OR, TON and CTU",()=>
     assert.equal(project.tags.find(t=>t.name===name).value.PRE,pre);
   }
   assert.equal(project.tags.find(t=>t.name==="Tank_Batches").value.PRE,TANK_BATCH_TARGET);
-  // Every transfer is captured before deactivating the old stage, and
-  // the new stage is latched only AFTER the OTU rung.
+  // Mix and drain activate in the same scan AFTER their source stage's OTU.
+  // Drain-to-fill loops back to R1, therefore its OTL runs NEXT scan.
   for (const [transition, ending, start, oldStage, newStage] of [
     ["tank-to-mix","tank-fill-end","tank-mix-begin","Tank_FillStage","Tank_MixStage"],
     ["tank-to-drain","tank-mix-end","tank-drain-begin","Tank_MixStage","Tank_DrainStage"],
-    ["tank-to-fill","tank-drain-end","tank-fill-next","Tank_DrainStage","Tank_FillStage"],
   ]) {
     const index = (id) => project.rungs.findIndex(r=>r.id===id);
     assert.ok(index(transition)<index(ending) && index(ending)<index(start),
@@ -83,6 +95,12 @@ test("tank reference Ladder builds with actual independent OR, TON and CTU",()=>
     assert.equal(lookup(ending,"OTU",oldStage),true);
     assert.equal(lookup(start,"OTL",newStage),true);
   }
+  assert.ok(project.rungs.findIndex(r=>r.id==="tank-to-fill") <
+    project.rungs.findIndex(r=>r.id==="tank-drain-end"),
+    "DrainStage must be unlatched only after ToFill is captured");
+  assert.ok(project.rungs.findIndex(r=>r.id==="tank-begin") <
+    project.rungs.findIndex(r=>r.id==="tank-drain-end"),
+    "re-entry to FillStage via R1 is evaluated on the following scan");
   assert.ok(project.rungs.findIndex(r=>r.id==="tank-batch-counter") <
     project.rungs.findIndex(r=>r.id==="tank-to-fill"),
     "batch CTU must be evaluated before deciding on another batch");
@@ -143,11 +161,14 @@ test("transition flags preserve OTU→OTL semantics in one scan",()=>{
   assertExclusiveStages(plc,"drain to next fill");
   assert.equal(readTankBool(plc.project,"Tank_ToFill"),true);
   assert.equal(readTankBool(plc.project,"Tank_DrainStage"),false);
-  assert.equal(readTankBool(plc.project,"Tank_FillStage"),true);
+  assert.equal(readTankBool(plc.project,"Tank_FillStage"),false,
+    "R1 is above the transition rung and must not latch FillStage in this scan");
   assert.equal(plc.project.tags.find(t=>t.name==="Tank_Batches").value.ACC,1);
-  // First subsequent scan clears transition bits (non-retentive OTE).
+  // The following scan loops back through R1, latches FillStage, then ToFill
+  // resets as a non-retentive OTE without creating a separate rung 22.
   plc=tickPracticeScan(plc);
-  assertExclusiveStages(plc,"transition flags reset");
+  assertExclusiveStages(plc,"return to fill through OR in rung 1");
+  assert.equal(readTankBool(plc.project,"Tank_FillStage"),true);
   assert.equal(readTankBool(plc.project,"Tank_ToMix"),false);
   assert.equal(readTankBool(plc.project,"Tank_ToDrain"),false);
   assert.equal(readTankBool(plc.project,"Tank_ToFill"),false);
