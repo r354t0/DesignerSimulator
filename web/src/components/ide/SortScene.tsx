@@ -162,36 +162,27 @@ export function SortScene({
           </div>
         </section>
 
-        <div className="grid gap-3" style={{
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 290px), 1fr))",
-        }}>
-          <section className="sort-panel rounded-lg border border-[#344c5e] p-3"
+        <div className="scada-dashboard-grid grid gap-3">
+          <section className="sort-panel rounded-lg border border-[#344c5e] p-2.5"
             aria-labelledby="sort-control-title">
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <h3 id="sort-control-title" className="text-xs font-semibold">Tablero de mando</h3>
-              <span className="text-[10px] text-slate-400">Pulsadores momentáneos</span>
-            </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <MomentaryPushButton name="START" tone="start" pressed={start}
+            <h3 id="sort-control-title" className="mb-2 text-[11px] font-semibold">
+              Tablero de mando
+            </h3>
+            <div className="scada-command-buttons grid max-w-[210px] grid-cols-2 gap-2">
+              <MomentaryPushButton compact name="START" tone="start" pressed={start}
                 onChange={(v) => onInputChange("Sort_StartPB", v)}
-                icon={<Play size={18} aria-hidden="true"/>}>START</MomentaryPushButton>
-              <MomentaryPushButton name="STOP" tone="stop" pressed={stop}
+                icon={<Play size={15} aria-hidden="true"/>}>START</MomentaryPushButton>
+              <MomentaryPushButton compact name="STOP" tone="stop" pressed={stop}
                 onChange={(v) => onInputChange("Sort_StopPB", v)}
-                icon={<Pause size={18} aria-hidden="true"/>}>STOP</MomentaryPushButton>
+                icon={<Pause size={15} aria-hidden="true"/>}>STOP</MomentaryPushButton>
               {resetAvailable && (
-                <MomentaryPushButton name="RESET LOTE" tone="drain" pressed={reset}
+                <MomentaryPushButton compact name="RESET LOTE" tone="drain" pressed={reset}
                   onChange={(v) => onInputChange("Sort_ResetPB", v)}
-                  icon={<RotateCcw size={18} aria-hidden="true"/>}>RESET</MomentaryPushButton>
+                  icon={<RotateCcw size={15} aria-hidden="true"/>}>RESET</MomentaryPushButton>
               )}
             </div>
-            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#334a5e] pt-2.5 text-[10px]">
-              <span className="text-slate-400">ESTADO DEL ACCIONAMIENTO</span>
-              <span className={motor ? "font-bold text-emerald-300" : "font-bold text-slate-300"}>
-                M-01 {motor ? "MARCHA" : "PARADO"}
-              </span>
-            </div>
           </section>
-          <section className="sort-panel rounded-lg border border-[#344c5e] p-3"
+          <section className="sort-panel min-w-0 rounded-lg border border-[#344c5e] p-3"
             aria-labelledby="sort-signals-title">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 id="sort-signals-title" className="text-xs font-semibold">
@@ -199,7 +190,7 @@ export function SortScene({
               </h3>
               <span className="font-mono text-[10px] text-slate-400">ESTADOS EN VIVO</span>
             </div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="scada-pilot-grid grid grid-cols-2 gap-2">
               <Pilot label="MOTOR" active={motor} color="green"/>
               <Pilot label="DESVIADOR B" active={divert} color="amber"/>
               <Pilot label="TIPO B" active={detection} color="blue"/>
