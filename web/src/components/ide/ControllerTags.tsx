@@ -9,6 +9,7 @@ import {
 import { demoTagMetadata, type DemoInputs, type DemoValues, type InputTag } from "../../plc/demoModel";
 
 interface Props {
+  activeScene: "conveyor" | "motor";
   project: PracticeProject;
   onChange: (next: PracticeProject) => void;
   practiceRunning: boolean;
@@ -92,10 +93,12 @@ const cellWidths = {
 };
 
 export function ControllerTags({
-  project, onChange, practiceRunning, practicePaused, inputs, values, online, onTagChange, onResetCounters,
+  activeScene, project, onChange, practiceRunning, practicePaused, inputs, values, online, onTagChange, onResetCounters,
 }: Props) {
   const [tab, setTab] = useState<Tab>("monitor");
-  const [scope, setScope] = useState<Scope>("practice");
+  // Only tags wired to the active process are shown: MainRoutine for the
+  // conveyor and the independent read-only tag bank for Motor · DEMO.
+  const scope: Scope = activeScene === "conveyor" ? "practice" : "demo";
   const [show, setShow] = useState("all");
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<string[]>([]);
@@ -354,15 +357,9 @@ export function ControllerTags({
     <section className="flex h-full min-h-0 flex-col overflow-hidden bg-white text-slate-900">
       <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-300 bg-[#f0f2f5] px-3 py-2 text-xs">
         <strong className="text-[12px]">Controller Tags</strong>
-        <label className="flex items-center gap-1">
-          Scope:
-          <select aria-label="Scope tags" value={scope} onChange={(event) => {
-            setScope(event.target.value as Scope); setError(""); setNotice(""); setShow("all");
-          }} className="rounded border border-slate-300 bg-white px-2 py-1">
-            <option value="practice">PracticeRoutine (controller)</option>
-            <option value="demo">MainRoutine (demo)</option>
-          </select>
-        </label>
+        <span className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px]">
+          {scope === "practice" ? "MainRoutine · Faja transportadora" : "Motor · DEMO"}
+        </span>
         <label className="flex items-center gap-1">
           Show:
           <select aria-label="Filtrar tipos de tags" value={show} onChange={(event) => setShow(event.target.value)}
@@ -412,7 +409,7 @@ export function ControllerTags({
           </div>
           <span className="truncate text-[10px] text-slate-600">
             {rows.length} de {allRows.length} tags · {scope === "practice"
-              ? practicePaused ? "PAUSE · salidas y flujo congelados" : practiceRunning ? "RUN · Scan Cycle periódico activo" : "Práctica detenida · valores editables"
+              ? practicePaused ? "PAUSE · salidas y flujo congelados" : practiceRunning ? "RUN · Scan Cycle periódico activo" : "MainRoutine detenido · valores editables"
               : online ? "DEMO · REM RUN" : "DEMO · OFFLINE"}
           </span>
           {scope === "demo" && tab === "monitor" && <button type="button" onClick={onResetCounters}
@@ -421,7 +418,7 @@ export function ControllerTags({
           </button>}
         </div>
         {scope === "demo" && tab === "edit" && <p className="shrink-0 border-t border-slate-200 bg-amber-50 px-3 py-1.5 text-[10px] text-amber-800">
-          Los tags fijos del programa DEMO no se pueden modificar desde esta vista; cambia Scope a PracticeRoutine para crear o editar tags.
+          Los tags fijos del programa DEMO no se pueden modificar desde esta vista; selecciona la escena de la faja para trabajar con MainRoutine.
         </p>}
       </div>
     </section>

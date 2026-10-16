@@ -2,10 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent } fro
 import { Actions, DockLocation, Layout, Model, type IJsonModel, type TabNode, type TabSetNode } from "flexlayout-react";
 import { Cpu, Menu, PanelLeftClose, PanelLeftOpen, CircleHelp, BookOpen } from "lucide-react";
 import { ControllerOrganizer, type EditorView } from "./components/ide/ControllerOrganizer";
-import { LadderEditor } from "./components/ide/LadderEditor";
 import { ControllerTags } from "./components/ide/ControllerTags";
 import { PracticeEditor } from "./components/ide/PracticeEditor";
-import { initialPracticeProject, setTagValue, type EditableKind, type PracticeProject } from "./plc/practiceDocument";
+import { setTagValue, type EditableKind, type PracticeProject } from "./plc/practiceDocument";
 import {
   initialPracticeScanState, changePracticeScanProject,
   startPracticeScans, stopPracticeScans, pausePracticeScans,
@@ -20,7 +19,7 @@ import { SimulationScene } from "./components/ide/SimulationScene";
 import { ConveyorScene } from "./components/ide/ConveyorScene";
 import {
   CONVEYOR_SENSOR_TAG, addConveyorItem, createConveyorExampleProject,
-  initialConveyorState, prepareConveyorTags, readConveyorBool, stepConveyor,
+  initialConveyorProject, initialConveyorState, prepareConveyorTags, readConveyorBool, stepConveyor,
   type ConveyorState,
 } from "./plc/conveyorSceneModel";
 import "flexlayout-react/style/dark.css";
@@ -44,8 +43,7 @@ const layoutConfig: IJsonModel = {
         weight: 55,
         selected: 0,
         children: [
-          { type: "tab", id: "editor-mainroutine", name: "MainRoutine.LAD", component: "ladder" },
-          { type: "tab", id: "editor-practice", name: "PracticeRoutine.LAD", component: "practice" },
+          { type: "tab", id: "editor-mainroutine", name: "MainRoutine.LAD", component: "practice" },
           { type: "tab", id: "editor-tags", name: "Controller Tags", component: "tags" },
         ],
       },
@@ -79,11 +77,11 @@ function scanDemo(previous: DemoMachineState, elapsedMs: number): DemoMachineSta
 export default function App() {
   const [model] = useState(() => Model.fromJson(layoutConfig));
   const [organizerOpen, setOrganizerOpen] = useState(true);
-  const [editorView, setEditorView] = useState<EditorView>("ladder");
+  const [editorView, setEditorView] = useState<EditorView>("practice");
   const [instruction, setInstruction] = useState<Instruction>("XIC");
   const [draggingKind, setDraggingKind] = useState<EditableKind | null>(null);
   const [scanState, setScanState] = useState<PracticeScanState>(() =>
-    initialPracticeScanState(initialPracticeProject()));
+    initialPracticeScanState(initialConveyorProject()));
   const scanRef = useRef(scanState);
   const practice = scanState.project;
   const practiceMode = scanState.mode;
@@ -123,7 +121,7 @@ export default function App() {
     }
   }, []);
 
-  // Each physics tick samples the REAL PracticeRoutine output and stages
+  // Each physics tick samples the REAL MainRoutine output and stages
   // the photoelectric sensor before the next (serialized) Ladder scan.
   useEffect(() => {
     if (practiceMode !== "running") return;
@@ -225,11 +223,9 @@ export default function App() {
     changeScan((state) => setScanPeriod(state, period)), [changeScan]);
 
   const openEditorView = useCallback((view: EditorView) => {
-    const tab = view === "ladder"
-      ? { id: "editor-mainroutine", name: "MainRoutine.LAD", component: "ladder" }
-      : view === "practice"
-        ? { id: "editor-practice", name: "PracticeRoutine.LAD", component: "practice" }
-        : { id: "editor-tags", name: "Controller Tags", component: "tags" };
+    const tab = view === "practice"
+      ? { id: "editor-mainroutine", name: "MainRoutine.LAD", component: "practice" }
+      : { id: "editor-tags", name: "Controller Tags", component: "tags" };
 
     // Select an existing document, instead of replacing the content of another tab.
     if (model.getNodeById(tab.id)) {
@@ -249,7 +245,7 @@ export default function App() {
   }, [model]);
 
   const loadConveyorExample = useCallback(() => {
-    if (!window.confirm("Se reemplazará PracticeRoutine y sus Controller Tags por el ejemplo de faja. ¿Continuar?")) {
+    if (!window.confirm("Se reemplazará MainRoutine y sus Controller Tags por el ejemplo de faja. ¿Continuar?")) {
       return;
     }
     changeScan((state) => ({
@@ -269,7 +265,7 @@ export default function App() {
     event.dataTransfer.setData(LADDER_DRAG_MIME, kind);
     setInstruction(kind);
     setDraggingKind(kind);
-    // Palette now lives inside PracticeRoutine; keep the same tab and drag surface mounted.
+    // Palette lives inside MainRoutine; keep the same tab and drag surface mounted.
   }, []);
 
   const factory = useCallback(
@@ -295,16 +291,15 @@ export default function App() {
               onSelectPaletteTool={setInstruction}
               onSelectDemoTool={(kind) => {
                 setInstruction(kind);
-                openEditorView("ladder");
+                openEditorView("practice");
               }}
               onPaletteDragStart={onToolbarDragStart}
               onPaletteDragEnd={() => setDraggingKind(null)}
             />
           );
-        case "ladder":
-          return <LadderEditor online={online} inputs={inputs} values={values} blocks={blocks} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
+
         case "tags":
-          return <ControllerTags project={practice} onChange={handlePracticeChange} practiceRunning={practiceMode !== "stopped"} practicePaused={practiceMode === "paused"} online={online} inputs={inputs} values={values} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
+          return <ControllerTags activeScene={simulationTab} project={practice} onChange={handlePracticeChange} practiceRunning={practiceMode !== "stopped"} practicePaused={practiceMode === "paused"} online={online} inputs={inputs} values={values} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
         case "simulation":
           return (
             <div className="flex h-full min-h-0 flex-col bg-[#111c27]">
@@ -351,8 +346,7 @@ export default function App() {
     const activeTabset = updatedModel.getNodeById("workspace-editor");
     if (!activeTabset || activeTabset.getType() !== "tabset") return;
     const selectedId = (activeTabset as TabSetNode).getSelectedNode()?.getId();
-    if (selectedId === "editor-mainroutine") setEditorView("ladder");
-    if (selectedId === "editor-practice") setEditorView("practice");
+    if (selectedId === "editor-mainroutine") setEditorView("practice");
     if (selectedId === "editor-tags") setEditorView("tags");
   }, []);
 
@@ -412,7 +406,7 @@ export default function App() {
         <span>VirtualPLC</span>
         <span className="text-slate-600">|</span>
         <span>{online ? "Monitoreo DEMO · Sin controlador físico" : "Sin conexión a controlador"}</span>
-        <span className="ml-auto">Fase 5 · Escena 01 · Faja transportadora (PracticeRoutine)</span>
+        <span className="ml-auto">Fase 5 · Escena 01 · Faja transportadora (MainRoutine)</span>
       </footer>
     </div>
   );

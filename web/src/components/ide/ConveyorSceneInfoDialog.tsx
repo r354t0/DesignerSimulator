@@ -60,7 +60,7 @@ export function ConveyorSceneInfoDialog({
             <BookOpen size={15} aria-hidden="true"/> Objetivo del ejercicio
           </h3>
           <p className="text-xs leading-relaxed text-slate-200">
-            Desarrolla un programa Ladder en PracticeRoutine que arranque y detenga la
+            Desarrolla un programa Ladder en MainRoutine que arranque y detenga la
             faja con START y STOP, mantenga el motor en marcha hasta recibir la orden
             de parada y contabilice una sola vez cada caja detectada por el sensor PE-01.
             Comprueba su funcionamiento con Build y RUN.
@@ -140,7 +140,7 @@ export function ConveyorSceneInfoDialog({
           </details>
           <button type="button" onClick={() => { onClose(); onLoadExample(); }}
             className="mt-3 rounded border border-sky-600 px-3 py-1.5 text-[11px] font-semibold text-sky-300 hover:bg-sky-950">
-            Cargar plantilla Ladder (reemplaza PracticeRoutine)
+            Cargar plantilla Ladder (reemplaza MainRoutine)
           </button>
           <p className="mt-2 text-[11px] text-slate-400">
             La plantilla requiere confirmación. Registrar tags no agrega rungs ni activa salidas.

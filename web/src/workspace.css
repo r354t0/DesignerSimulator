@@ -44,3 +44,27 @@ button.ide-tree-row:hover {
   background: #1d4e70;
   color: #eff6ff;
 }
+
+
+/* MainRoutine-driven 2D conveyor animation. Freeze during PLC PAUSE/STOP;
+   CSS draws motion only; scene physics owns the box positions and sensor. */
+@keyframes conveyor-drive-rotation {
+  to { transform: rotate(360deg); }
+}
+@keyframes conveyor-belt-travel {
+  to { stroke-dashoffset: -36; }
+}
+.conveyor-motor-spin {
+  animation: conveyor-drive-rotation 1.15s linear infinite;
+  animation-play-state: paused;
+}
+.conveyor-belt-motion {
+  animation: conveyor-belt-travel 0.9s linear infinite;
+  animation-play-state: paused;
+}
+@media (prefers-reduced-motion: reduce) {
+  .conveyor-motor-spin,
+  .conveyor-belt-motion {
+    animation-duration: 6s;
+  }
+}

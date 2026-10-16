@@ -125,9 +125,22 @@ export function prepareConveyorTags(project: PracticeProject): PracticeProject {
   return result;
 }
 
+/**
+ * Scene-based startup: MainRoutine starts with only the five wired conveyor
+ * declarations. Generic legacy demo tags remain available exclusively from
+ * the separate Motor · DEMO scene.
+ */
+export function initialConveyorProject(): PracticeProject {
+  const base = initialPracticeProject();
+  const allowed = new Set(CONVEYOR_TAGS.map((tag) => tag.name));
+  return prepareConveyorTags({
+    ...base, tags: base.tags.filter((tag) => allowed.has(tag.name)),
+  });
+}
+
 /** Optional self-contained teaching example, applied only after explicit confirmation. */
 export function createConveyorExampleProject(): PracticeProject {
-  let project = prepareConveyorTags(initialPracticeProject());
+  let project = initialConveyorProject();
   project = setTagValue(project, CONVEYOR_COUNT_TAG, 5, "PRE");
 
   // Rung 0: start latch.

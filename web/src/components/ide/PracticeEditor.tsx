@@ -221,7 +221,7 @@ export function PracticeEditor({
    * RUN always invokes a fresh Build, even after a failed or stale check.
    * A successful Build starts a periodic browser-based scan session.
    */
-  const verifyPracticeRoutine = (requestedBy: "build" | "run") => {
+  const verifyMainRoutine = (requestedBy: "build" | "run") => {
     const result = buildPracticeProject(project);
     // RUN always performs a fresh Build, including for OR branch networks.
     if (requestedBy === "run") {
@@ -615,8 +615,8 @@ export function PracticeEditor({
     >
       <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-slate-200 bg-[#e9eef4] px-3 py-1.5 text-xs">
         <div className="flex shrink-0 items-center gap-2">
-          <button type="button" onClick={() => verifyPracticeRoutine("build")}
-            title="Verificar PracticeRoutine sin iniciar el scan"
+          <button type="button" onClick={() => verifyMainRoutine("build")}
+            title="Verificar MainRoutine sin iniciar el scan"
             className="flex items-center gap-1.5 rounded border border-slate-300 bg-white px-2.5 py-1.5 font-semibold text-slate-700 hover:bg-slate-100">
             <Hammer size={14} /> Build
           </button>
@@ -625,7 +625,7 @@ export function PracticeEditor({
             onClick={() => {
               const action = getRunAction(scanMode);
               if (action === "resume") onResume();
-              else if (action === "build-and-start") verifyPracticeRoutine("run");
+              else if (action === "build-and-start") verifyMainRoutine("run");
             }}
             title={scanMode === "paused"
               ? "Reanudar la simulación pausada, conservando el contador de scans"
@@ -1548,7 +1548,7 @@ export function PracticeEditor({
           <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-200 px-3 py-1.5 text-xs">
             <Hammer size={14} />
             <strong>Build Output</strong>
-            <span className="font-mono text-[11px] text-slate-500">PracticeRoutine.LAD</span>
+            <span className="font-mono text-[11px] text-slate-500">MainRoutine.LAD</span>
             <span className="ml-auto flex items-center gap-1 text-red-700">
               <XCircle size={13} /> {currentBuild?.errors ?? 0} errores
             </span>

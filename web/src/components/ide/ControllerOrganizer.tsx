@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Cpu, Folder, FileCode2, Tags, Settings2, PanelLeftClose } from "lucide-react";
 
-export type EditorView = "ladder" | "practice" | "tags";
+export type EditorView = "practice" | "tags";
 
 interface Props {
   view: EditorView;
@@ -50,17 +50,10 @@ export function ControllerOrganizer({ view, onSelectView, onHide }: Props) {
                 <div className="ide-tree-row"><Folder size={14} className="text-amber-300" /> MainProgram</div>
                 <button
                   type="button"
-                  onClick={() => onSelectView("ladder")}
-                  className={`ide-tree-row ml-2 w-[calc(100%-0.5rem)] ${view === "ladder" ? "ide-tree-selected" : ""}`}
-                >
-                  <FileCode2 size={14} /> MainRoutine.LAD
-                </button>
-                <button
-                  type="button"
                   onClick={() => onSelectView("practice")}
                   className={`ide-tree-row ml-2 w-[calc(100%-0.5rem)] ${view === "practice" ? "ide-tree-selected" : ""}`}
                 >
-                  <FileCode2 size={14} /> PracticeRoutine.LAD
+                  <FileCode2 size={14} /> MainRoutine.LAD
                 </button>
                 <button
                   type="button"
@@ -75,7 +68,7 @@ export function ControllerOrganizer({ view, onSelectView, onHide }: Props) {
         )}
       </nav>
       <div className="border-t border-slate-700/70 p-3 text-[11px] text-slate-400">
-        Proyecto de práctica · V1
+        Simulador de procesos · V1
       </div>
     </div>
   );
