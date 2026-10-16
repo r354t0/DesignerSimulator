@@ -27,14 +27,11 @@ import {
   addParallelContact,
   changeInstructionTag,
   copyInstructionTag,
-  createParallelBranch,
   createIndependentParallelBranch,
   insertIntoIndependentOrUpper,
-  createEmptyOutputBranch,
   removeEmptyOutputBranch,
   fillEmptyOutputBranch,
 
-  getParallelBranchTarget,
   getPaletteInsertionTarget,
   insertRungBelow,
   findInstruction,
@@ -532,11 +529,14 @@ export function PracticeEditor({
     const after = location?.lane === "main" && !isOutputKind(location.instruction.kind)
       ? location.instruction.id
       : selectedBranchModel?.endId ?? selectedBranchModel?.anchorId;
-    const created = createIndependentParallelBranch(project, rungId, after);
-    if (update(() => created)) {
+    let created: PracticeProject | null = null;
+    if (update(() => {
+      created = createIndependentParallelBranch(project, rungId, after);
+      return created;
+    }) && created) {
       const previous = new Set(project.rungs.find((r) => r.id === rungId)
         ?.parallelBranches?.map((branch) => branch.id) ?? []);
-      const newBranch = created.rungs.find((r) => r.id === rungId)
+      const newBranch = (created as PracticeProject).rungs.find((r) => r.id === rungId)
         ?.parallelBranches?.find((branch) => !previous.has(branch.id));
       setSelected(null);
       setSelectedRungId(null);
@@ -687,8 +687,8 @@ export function PracticeEditor({
         onDragEnd={onPaletteDragEnd}
         onInsertRung={insertSelectedRungBelow}
         onInsertParallel={insertSelectedParallelBranch}
-        canInsertParallel={Boolean(parallelTarget || selectedOutputLocation)}
-        outputSelected={Boolean(selectedOutputLocation)}
+        canInsertParallel={Boolean(selected || selectedOrBranch || selectedRungId)}
+        outputSelected={false}
       />
 
       <div className="min-h-0 flex-1 overflow-auto bg-white" ref={viewportRef}>

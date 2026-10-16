@@ -57,7 +57,7 @@ function PaletteGlyph({ tool }: { tool: PaletteTool }) {
 
 export function InstructionPalette({
   selectedInstruction, onSelectEditable, onSelectDemo, onDragStart, onDragEnd,
-  onInsertRung, onInsertParallel, canInsertParallel, outputSelected = false,
+  onInsertRung, onInsertParallel, canInsertParallel,
 }: Props) {
   const [categoryId, setCategoryId] = useState<PaletteCategoryId>("favorites");
   const iconsRef = useRef<HTMLDivElement | null>(null);
@@ -99,12 +99,10 @@ export function InstructionPalette({
           </button>
           <button type="button" onClick={onInsertParallel}
             disabled={!canInsertParallel}
-            title={outputSelected
-              ? "Crear una rama de salida paralela VACÍA para OTE, OTL u OTU"
-              : canInsertParallel
-                ? "Crear una rama OR vacía bajo el contacto seleccionado"
-                : "Selecciona un contacto, una OTE o un rung válido"}
-            aria-label={outputSelected ? "Crear rama paralela de salida vacía" : "Crear rama paralela OR"}
+            title={canInsertParallel
+              ? "Crear un bloque OR independiente después de la instrucción o a la derecha del rung seleccionado"
+              : "Selecciona una instrucción o un rung para crear un OR independiente"}
+            aria-label="Crear bloque OR independiente"
             className="flex h-[42px] min-w-[50px] shrink-0 flex-col items-center justify-center rounded-sm border border-transparent text-[10px] leading-[12px] text-[#37475b] hover:border-[#b0c0d4] hover:bg-[#eef3f9] disabled:cursor-not-allowed disabled:text-[#a0aab8] disabled:hover:border-transparent disabled:hover:bg-transparent"
           >
             <StructuralGlyph parallel />
