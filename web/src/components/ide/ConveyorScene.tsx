@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Boxes, CircleAlert, Gauge, Info, Pause, Play, RotateCcw } from "lucide-react";
+import { MomentaryPushButton } from "./MomentaryPushButton";
 import { ConveyorSceneInfoDialog } from "./ConveyorSceneInfoDialog";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
@@ -22,7 +23,26 @@ interface Props {
   onLoadExample: () => void;
 }
 
-/** Inputs come from user controls; only PracticeRoutine evaluates motor/CTU outputs. */
+function PilotLed({ label, lit, tone }: {
+  label: string;
+  lit: boolean;
+  tone: "green" | "red" | "amber";
+}) {
+  const colors = {
+    green: lit ? "border-emerald-200 bg-emerald-400 shadow-[0_0_12px_3px_#34d3997a]" : "border-emerald-950 bg-emerald-950/40",
+    red: lit ? "border-red-200 bg-red-500 shadow-[0_0_12px_3px_#ef44447a]" : "border-red-950 bg-red-950/40",
+    amber: lit ? "border-amber-200 bg-amber-400 shadow-[0_0_12px_3px_#fbbf247a]" : "border-amber-950 bg-amber-950/40",
+  };
+  return (
+    <div role="status" aria-label={label + ": " + (lit ? "encendido" : "apagado")}
+      className="flex min-w-0 items-center gap-2 rounded border border-slate-700 bg-[#0e1b27] px-2.5 py-2">
+      <span aria-hidden="true" className={"size-4 shrink-0 rounded-full border-2 " + colors[tone]}/>
+      <span className="text-[11px] font-medium text-slate-200">{label}</span>
+    </div>
+  );
+}
+
+/** Inputs come from operator controls; MainRoutine alone evaluates outputs. */
 export function ConveyorScene({
   project, mode, scene, onInputChange, onAddItem, onResetScene,
   onPrepareTags, onOpenTags, setupError, onLoadExample,
@@ -48,15 +68,13 @@ export function ConveyorScene({
               <Boxes size={16} className="text-sky-400"/> Línea de transporte
             </span>
             <div className="ml-auto flex items-center gap-3">
-              <span className={motorOn ? "font-medium text-emerald-400" : "text-slate-400"}>
-                Motor_Run = {Number(motorOn)} · {motorOn ? "EN MARCHA" : "DETENIDA"}
-              </span>
               <button type="button" aria-haspopup="dialog" aria-expanded={infoOpen}
                 aria-label="Información de la escena"
-                title="Objetivo del ejercicio y mapa E/S"
+                title="Consultar objetivo del ejercicio y mapa E/S"
                 onClick={() => setInfoOpen(true)}
-                className="inline-flex size-7 items-center justify-center rounded border border-slate-600 text-slate-300 hover:border-sky-600 hover:bg-slate-700 hover:text-sky-200 focus-visible:outline-2 focus-visible:outline-sky-500">
+                className="inline-flex items-center gap-1.5 rounded border border-slate-600 px-2.5 py-1.5 text-[11px] font-medium text-sky-200 hover:border-sky-600 hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-sky-500">
                 <Info size={15} aria-hidden="true"/>
+                Objetivo y mapa E/S
               </button>
             </div>
           </div>
@@ -74,8 +92,10 @@ export function ConveyorScene({
                   <stop offset="100%" stopColor="#293d50"/>
                 </linearGradient>
               </defs>
+              {/* Move the conveyor to the right to make room for the drive motor on the left. */}
+              <g transform="translate(100 0)">
               {/* Mechanical support structure, entirely fixed to the ground. */}
-              <path d="M72 237 H712" stroke="#405367" strokeWidth="5" strokeLinecap="round"/>
+              <path d="M-70 237 H625" stroke="#405367" strokeWidth="5" strokeLinecap="round"/>
               <g fill="#45596a" stroke="#8293a3" strokeWidth="2">
                 <path d="M136 153 L121 235 H137 L160 153 Z"/>
                 <path d="M514 153 L533 235 H549 L539 153 Z"/>
@@ -132,33 +152,34 @@ export function ConveyorScene({
                   opacity={sensor ? "0.95" : "0.55"}/>
                 <text x="13" y="54" fontSize="11" fill="#a8cbe3">PE-01</text>
               </g>
-              {/* Gearmotor / drive pulley: rotational motion is tied to Motor_Run. */}
-              <path d="M562 143 L624 196 M576 143 L638 196"
+              </g>
+              {/* Left-side gearmotor, output pulley and coupler. */}
+              <path d="M129 187 L191 145 M141 200 L206 155"
                 stroke="#9aabb9" strokeWidth="3" fill="none"/>
-              <circle cx="569" cy="137" r="20" fill="#334858"
+              <circle cx="209" cy="134" r="20" fill="#334858"
                 stroke="#8da3b5" strokeWidth="3"/>
               <g className="conveyor-motor-spin"
-                style={{ transformOrigin: "569px 137px",
+                style={{ transformOrigin: "209px 134px",
                   animationPlayState: motorOn ? "running" : "paused" }}>
-                <path d="M554 137 H584 M569 122 V152 M558 126 L580 148 M580 126 L558 148"
+                <path d="M194 134 H224 M209 119 V149 M198 123 L220 145 M220 123 L198 145"
                   stroke="#b4c2cc" strokeWidth="3"/>
               </g>
-              <circle cx="569" cy="137" r="5" fill="#d0dce6"/>
-              <rect x="625" y="176" width="78" height="61" rx="11"
+              <circle cx="209" cy="134" r="5" fill="#d0dce6"/>
+              <rect x="47" y="175" width="83" height="62" rx="11"
                 fill={motorOn ? "#27554d" : "#405568"}
                 stroke={motorOn ? "#34d399" : "#96a7b5"} strokeWidth="2.5"/>
-              <rect x="612" y="194" width="16" height="24" rx="4"
+              <rect x="128" y="193" width="15" height="25" rx="4"
                 fill="#33495a" stroke="#99aebb" strokeWidth="2"/>
               <g className="conveyor-motor-spin"
-                style={{ transformOrigin: "664px 206px",
+                style={{ transformOrigin: "89px 206px",
                   animationPlayState: motorOn ? "running" : "paused" }}>
-                <circle cx="664" cy="206" r="19" fill="#1b303b"
+                <circle cx="89" cy="206" r="19" fill="#1b303b"
                   stroke={motorOn ? "#34d399" : "#97a9b7"} strokeWidth="2"/>
-                <path d="M647 206 H681 M664 189 V223 M652 194 L676 218 M676 194 L652 218"
+                <path d="M72 206 H106 M89 189 V223 M77 194 L101 218 M101 194 L77 218"
                   stroke="#a6bac8" strokeWidth="3"/>
               </g>
-              <circle cx="664" cy="206" r="4" fill="#d5e4ed"/>
-              <text x="663" y="250" fontSize="10" textAnchor="middle"
+              <circle cx="89" cy="206" r="4" fill="#d5e4ed"/>
+              <text x="89" y="250" fontSize="10" textAnchor="middle"
                 fill={motorOn ? "#6ee7b7" : "#94a3b8"}>
                 MOTOR {motorOn ? "RUN" : "OFF"}
               </text>
@@ -184,39 +205,27 @@ export function ConveyorScene({
               <Gauge size={15}/> Tablero de mando
             </div>
             <div className="flex flex-wrap items-center gap-3">
-              <button type="button" aria-pressed={start}
-                onClick={() => onInputChange("Start_PB", !start)}
-                className={"flex h-16 w-20 flex-col items-center justify-center gap-0.5 rounded-md border-2 text-xs font-bold " +
-                  (start ? "border-emerald-300 bg-emerald-600 text-white" : "border-emerald-700 bg-emerald-950 text-emerald-300")}>
-                <Play size={18}/> START {start ? "1" : "0"}
-              </button>
-              <button type="button" aria-pressed={stop}
-                onClick={() => onInputChange("Stop_PB", !stop)}
-                className={"flex h-16 w-20 flex-col items-center justify-center gap-0.5 rounded-md border-2 text-xs font-bold " +
-                  (stop ? "border-red-300 bg-red-600 text-white" : "border-red-700 bg-red-950 text-red-300")}>
-                <Pause size={18}/> STOP {stop ? "1" : "0"}
-              </button>
+              <MomentaryPushButton name="START" tone="start" pressed={start}
+                onChange={(pressed) => onInputChange("Start_PB", pressed)}
+                icon={<Play size={18} aria-hidden="true"/>}>START</MomentaryPushButton>
+              <MomentaryPushButton name="STOP" tone="stop" pressed={stop}
+                onChange={(pressed) => onInputChange("Stop_PB", pressed)}
+                icon={<Pause size={18} aria-hidden="true"/>}>STOP</MomentaryPushButton>
             </div>
           </div>
           <div className="rounded-lg border border-slate-700 bg-[#172634] p-3">
-            <div className="mb-3 text-xs font-semibold">Señales de la escena</div>
-            <div className="space-y-2 text-xs">
-              <div className="flex justify-between gap-2">
-                <span className="font-mono text-slate-400">Motor_Run</span>
-                <span className={motorOn ? "text-emerald-400" : "text-slate-400"}>
-                  {Number(motorOn)} · {motorOn ? "RUN" : "OFF"}
-                </span>
-              </div>
-              <div className="flex justify-between gap-2">
-                <span className="font-mono text-slate-400">{CONVEYOR_SENSOR_TAG}</span>
-                <span className={sensor ? "text-amber-300" : "text-slate-400"}>
-                  {wired ? Number(sensor) : "Sin tag"}
-                </span>
-              </div>
-              <div className="flex justify-between gap-2">
-                <span className="font-mono text-slate-400">{CONVEYOR_COUNT_TAG}.ACC</span>
-                <span className="font-mono text-sky-300">{count ?? "Sin tag"}</span>
-              </div>
+            <div className="mb-3 text-xs font-semibold text-slate-200">Pilotos LED</div>
+            <div className="grid grid-cols-1 gap-2 xl:grid-cols-3">
+              <PilotLed label="EN MARCHA" lit={motorOn} tone="green"/>
+              <PilotLed label="DETENIDA" lit={!motorOn} tone="red"/>
+              <PilotLed label="PE-01 · CAJA" lit={sensor} tone="amber"/>
+            </div>
+            <div className="mt-3 flex items-center justify-between border-t border-slate-700 pt-2 text-[11px]">
+              <span className="text-slate-400">Cajas detectadas</span>
+              <output aria-label="Conteo de cajas CV_Count.ACC"
+                className="font-mono text-sm font-bold tabular-nums text-sky-200">
+                {count ?? "—"}
+              </output>
             </div>
           </div>
         </div>
