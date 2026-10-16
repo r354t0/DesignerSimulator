@@ -242,7 +242,7 @@ export function TankScene({
           </div>
         </div>
 
-        {!hasTankTags(project) && (
+        {!wired && (
           <div className="rounded border border-amber-600 bg-amber-950/30 p-3 text-xs">
             <p className="font-semibold text-amber-300">Faltan tags de la escena</p>
             <p className="mt-1 text-slate-300">
