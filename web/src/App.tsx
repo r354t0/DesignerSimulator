@@ -783,7 +783,13 @@ export default function App() {
         <span>VirtualPLC</span>
         <span className="text-slate-600">|</span>
         <span>{online ? "Monitoreo DEMO · Sin controlador físico" : "Sin conexión a controlador"}</span>
-        <span className="ml-auto">Fase 5 · Escena 01 · Faja transportadora (MainRoutine)</span>
+        <span className="ml-auto">
+          {simulationTab === "traffic" ? "Escena 04 · Intersección semaforizada"
+            : simulationTab === "tank" ? "Escena 03 · Tanque por lotes"
+            : simulationTab === "sorting" ? "Escena 02 · Clasificación de cajas"
+            : simulationTab === "conveyor" ? "Escena 01 · Faja transportadora"
+            : "Motor · DEMO"}
+        </span>
       </footer>
     </div>
   );
