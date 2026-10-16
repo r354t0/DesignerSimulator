@@ -10,7 +10,9 @@ export type CompareKind = "EQU" | "NEQ" | "LES" | "LEQ" | "GRT" | "GEQ";
 export const COMPARE_KINDS: readonly CompareKind[] = ["EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ"];
 export const isCompareKind = (kind: string): kind is CompareKind =>
   (COMPARE_KINDS as readonly string[]).includes(kind);
-export type EditableKind = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" | "TON" | "TOF" | "RTO" | "CTU" | "CTD" | "RES" | CompareKind | MathKind;
+/** Structural OR junction; neither an operand nor an actuator. */
+export const OR_JUNCTION_KIND = "OR_JUNCTION" as const;
+export type EditableKind = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" | "TON" | "TOF" | "RTO" | "CTU" | "CTD" | "RES" | CompareKind | MathKind | typeof OR_JUNCTION_KIND;
 export type TimerKind = "TON" | "TOF" | "RTO" | "RES";
 export const isTimerKind = (kind: EditableKind): kind is TimerKind =>
   (["TON", "TOF", "RTO", "RES"] as readonly string[]).includes(kind);
@@ -20,9 +22,9 @@ export const isCounterKind = (kind: EditableKind): kind is CounterKind =>
 export const isTimerMemberOperand = (tag: string) =>
   /^[A-Za-z_][A-Za-z0-9_]*\.(EN|TT|DN)$/.test(tag);
 export type OutputKind = "OTE" | "OTL" | "OTU" | TimerKind | CounterKind | MathKind;
-export type ContactKind = "XIC" | "XIO" | "ONS" | CompareKind;
+export type ContactKind = "XIC" | "XIO" | "ONS" | CompareKind | typeof OR_JUNCTION_KIND;
 export const OUTPUT_KINDS: readonly OutputKind[] = ["OTE", "OTL", "OTU", "TON", "TOF", "RTO", "CTU", "CTD", "RES", ...MATH_KINDS];
-export const CONTACT_KINDS: readonly ContactKind[] = ["XIC", "XIO", "ONS", ...COMPARE_KINDS];
+export const CONTACT_KINDS: readonly ContactKind[] = ["XIC", "XIO", "ONS", ...COMPARE_KINDS, OR_JUNCTION_KIND];
 export const isOutputKind = (kind: EditableKind): kind is OutputKind =>
   (OUTPUT_KINDS as readonly string[]).includes(kind);
 export const isContactKind = (kind: EditableKind): kind is ContactKind =>
@@ -177,6 +179,10 @@ function allInstructions(rung: PracticeRung): PracticeInstruction[] {
 }
 
 function ensureTag(project: PracticeProject, tag: string, kind: EditableKind): void {
+  if (kind === OR_JUNCTION_KIND) {
+    if (tag) throw new Error("La unión OR no admite tags.");
+    return;
+  }
   if (isCompareKind(kind)) {
     if (tag) throw new Error("Las comparaciones utilizan operandos Source A y Source B.");
     return;
@@ -214,7 +220,10 @@ function ensureNewInstruction(project: PracticeProject, item: PracticeInstructio
   if (![...CONTACT_KINDS, ...OUTPUT_KINDS].includes(item.kind)) {
     throw new Error("Esta instrucción aún no está habilitada para edición.");
   }
-  // A new XIC/XIO/OTE may be inserted before the user assigns a BOOL operand.
+  // Structural junctions may only be added through createIndependentParallelBranch.
+  if (item.kind === OR_JUNCTION_KIND && !item.id.startsWith("or-node-")) {
+    throw new Error("Utiliza el comando OR para añadir una unión independiente.");
+  }
   if (item.tag !== "") ensureTag(project, item.tag, item.kind);
   if (project.rungs.some((rung) => allInstructions(rung).some((part) => part.id === item.id))) {
     throw new Error("El identificador de instrucción ya existe.");
@@ -357,7 +366,9 @@ export function insertInstruction(
       const endId = branch.endId ?? branch.anchorId;
       const last = rung.instructions.findIndex((part) => part.id === endId);
       const at = updated.findIndex((part) => part.id === item.id);
-      return at === last + 1 && last >= 0
+      return at === last + 1 && last >= 0 && item.kind !== OR_JUNCTION_KIND &&
+        branch.anchorId !== undefined &&
+        rung.instructions.find((part) => part.id === branch.anchorId)?.kind !== OR_JUNCTION_KIND
         ? { ...branch, endId: item.id } : branch;
     });
   return { ...project, rungs: project.rungs.map((part) =>
@@ -437,6 +448,67 @@ export function moveInstructionToEmptyOutputBranch(
     target.instructions.filter((item) => !isOutputKind(item.kind)).length);
 }
 
+/**
+ * Create an OR component at a MAIN-line insertion slot. It owns a structural
+ * junction, not the neighboring XIC/XIO/compare instruction. Its visual
+ * position survives deletion of that instruction.
+ */
+export function createIndependentParallelBranch(
+  project: PracticeProject, rungId: string, afterId?: string,
+): PracticeProject {
+  const rung = getRung(project, rungId);
+  const contacts = rung.instructions.filter((item) => !isOutputKind(item.kind));
+  let position = contacts.length;
+  if (afterId) {
+    const index = contacts.findIndex((item) => item.id === afterId);
+    if (index < 0) throw new Error("Selecciona una instrucción principal válida del rung.");
+    // If selecting a member of a multi-contact OR, place a new component
+    // after its reunion rather than nesting it in the existing OR.
+    const group = (rung.parallelBranches ?? []).find((branch) =>
+      branch.anchorId === afterId || branch.endId === afterId);
+    const end = group?.endId ? contacts.findIndex((item) => item.id === group.endId) : index;
+    position = Math.max(index, end) + 1;
+  }
+  let serial = 1;
+  const allIds = new Set(project.rungs.flatMap((r) => [
+    ...r.instructions.map((item) => item.id),
+    ...(r.parallelBranches ?? []).flatMap((branch) =>
+      [branch.id, ...branch.instructions.map((item) => item.id)]),
+  ]));
+  while (allIds.has("or-node-" + serial)) serial++;
+  const junctionId = "or-node-" + serial;
+  const withNode = insertInstruction(project, rungId, position, {
+    id: junctionId, kind: OR_JUNCTION_KIND, tag: "",
+  });
+  return createParallelBranch(withNode, rungId, junctionId);
+}
+
+/**
+ * Insert in the upper OR path (between the junction and reunion). A separate
+ * function keeps normal insertion AFTER the OR from extending its upper path.
+ */
+export function insertIntoIndependentOrUpper(
+  project: PracticeProject, rungId: string, anchorId: string,
+  instruction: PracticeInstruction,
+): PracticeProject {
+  const rung = getRung(project, rungId);
+  const anchor = rung.instructions.find((item) => item.id === anchorId);
+  if (anchor?.kind !== OR_JUNCTION_KIND) throw new Error("Selecciona una unión OR independiente.");
+  if (isOutputKind(instruction.kind) || instruction.kind === OR_JUNCTION_KIND) {
+    throw new Error("La trayectoria superior OR requiere un contacto o comparación.");
+  }
+  const contacts = rung.instructions.filter((item) => !isOutputKind(item.kind));
+  const branch = rung.parallelBranches?.find((item) => item.anchorId === anchorId);
+  if (!branch) throw new Error("La unión OR no tiene rama.");
+  const endIndex = contacts.findIndex((item) => item.id === (branch.endId ?? anchorId));
+  const withContact = insertInstruction(project, rungId, endIndex + 1, instruction);
+  return { ...withContact, rungs: withContact.rungs.map((item) =>
+    item.id !== rungId ? item : { ...item,
+      parallelBranches: item.parallelBranches?.map((lane) =>
+        lane.anchorId === anchorId ? { ...lane, endId: instruction.id } : lane),
+    }) };
+}
+
 /** Create an independent OR lane even when this contact has other OR lanes. */
 export function createParallelBranch(
   project: PracticeProject, rungId: string, anchorId: string,
@@ -461,11 +533,18 @@ export function removeParallelBranch(
   project: PracticeProject, rungId: string, anchorId: string, branchId?: string,
 ): PracticeProject {
   getRung(project, rungId);
-  return { ...project, rungs: project.rungs.map((part) => part.id === rungId ? {
-    ...part,
-    parallelBranches: (part.parallelBranches ?? []).filter((branch) =>
-      branchId ? branch.id !== branchId : branch.anchorId !== anchorId),
-  } : part) };
+  return { ...project, rungs: project.rungs.map((part) => {
+    if (part.id !== rungId) return part;
+    const remaining = (part.parallelBranches ?? []).filter((branch) =>
+      branchId ? branch.id !== branchId : branch.anchorId !== anchorId);
+    const ownsJunction = part.instructions.some((item) =>
+      item.id === anchorId && item.kind === OR_JUNCTION_KIND);
+    return {
+      ...part, parallelBranches: remaining,
+      instructions: ownsJunction && !remaining.some((branch) => branch.anchorId === anchorId)
+        ? part.instructions.filter((item) => item.id !== anchorId) : part.instructions,
+    };
+  }) };
 }
 
 /** Insert into a specific OR lane. Without branchId, use/create the first lane. */
@@ -594,6 +673,9 @@ export function removeInstruction(project: PracticeProject, id: string): Practic
       })),
     };
     const paired = (rung.parallelBranches ?? []).filter((branch) => branch.anchorId === id);
+    if (source.instruction.kind === OR_JUNCTION_KIND && paired.length) {
+      throw new Error("Selecciona la rama OR y elimínala con Supr; la unión es independiente.");
+    }
     // Preserving all lanes when deleting an anchor would require regrouping
     // their topology. Refuse such a deletion rather than lose instructions.
     if (paired.length > 1) throw new Error(
@@ -626,6 +708,9 @@ export function moveInstruction(
 ): PracticeProject {
   const source = findInstruction(project, instructionId);
   if (!source) throw new Error("No se encontró la instrucción.");
+  if (source.instruction.kind === OR_JUNCTION_KIND) {
+    throw new Error("El bloque OR se mueve como estructura; no arrastres su unión como contacto.");
+  }
   const target = getRung(project, targetRungId);
   const origin = getRung(project, source.rungId);
   const attached = source.lane === "main"

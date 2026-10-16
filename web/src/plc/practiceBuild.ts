@@ -1,6 +1,6 @@
 import { validateComparisonOperand, validateComparisonPair } from "./practiceCompare.ts";
 import { validateMathSource, validateMathDestination } from "./practiceMath.ts";
-import { isMathKind, isCompareKind, MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, isOutputKind, isTimerKind, isCounterKind, isValidTimerPreset, isValidCounterPreset, type EditableKind, type PracticeInstruction,
+import { OR_JUNCTION_KIND, isMathKind, isCompareKind, MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, isOutputKind, isTimerKind, isCounterKind, isValidTimerPreset, isValidCounterPreset, type EditableKind, type PracticeInstruction,
   type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
 
 export type DiagnosticSeverity = "error" | "warning";
@@ -110,7 +110,7 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
     }
     seenInstructions.add(id);
 
-    if (!["XIC", "XIO", "OTE", "OTL", "OTU", "ONS", "TON", "TOF", "RTO", "CTU", "CTD", "RES", "EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ", "MOV", "ADD", "SUB", "MUL", "DIV"].includes(instruction.kind as EditableKind)) {
+    if (!["XIC", "XIO", "OTE", "OTL", "OTU", "ONS", "TON", "TOF", "RTO", "CTU", "CTD", "RES", "EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ", "MOV", "ADD", "SUB", "MUL", "DIV", OR_JUNCTION_KIND].includes(instruction.kind as EditableKind)) {
       push("error", "UNSUPPORTED_INSTRUCTION",
         at + ": instrucción " + instruction.kind + " no admitida por el motor actual.",
         rung.id, rungIndex, id, branchId);
@@ -118,6 +118,15 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
     if (lane === "parallel" && isOutputKind(instruction.kind)) {
       push("error", "COIL_IN_BRANCH",
         at + ": una rama OR de contactos no admite OTE, OTL ni OTU.", rung.id, rungIndex, id, branchId);
+    }
+    if (instruction.kind === OR_JUNCTION_KIND) {
+      if (lane !== "main" || instruction.tag ||
+          !rung.parallelBranches?.some((branch) => branch.anchorId === id)) {
+        push("error", "INVALID_OR_JUNCTION",
+          at + ": la unión OR debe ser independiente y tener al menos una rama.",
+          rung.id, rungIndex, id, branchId);
+      }
+      return;
     }
     if (isCompareKind(instruction.kind)) {
       if (instruction.tag || instruction.preset) {

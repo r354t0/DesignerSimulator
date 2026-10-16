@@ -1,4 +1,4 @@
-import { isMathKind, isCompareKind, isCounterKind, isOutputKind, isTimerKind, isValidTimerPreset, type PracticeProject, type PracticeTag, type PracticeInstruction } from "./practiceDocument.ts";
+import { OR_JUNCTION_KIND, isMathKind, isCompareKind, isCounterKind, isOutputKind, isTimerKind, isValidTimerPreset, type PracticeProject, type PracticeTag, type PracticeInstruction } from "./practiceDocument.ts";
 import { compareValues, readComparisonOperand } from "./practiceCompare.ts";
 import { convertMathResult, evaluateMath, readMathSource } from "./practiceMath.ts";
 
@@ -205,6 +205,13 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
     counterUpdates.has(tag.name) ? { ...tag, value: { ...counterUpdates.get(tag.name)! } } : tag);
 
   const evalContact = (instruction: PracticeInstruction, powerIn: boolean): boolean => {
+    if (instruction.kind === OR_JUNCTION_KIND) {
+      // Pure structural node: no BOOL operand and no dependence on adjacent tags.
+      instructionFlow[instruction.id] = {
+        powerIn, condition: true, powerOut: powerIn, value: true,
+      };
+      return powerIn;
+    }
     if (isCompareKind(instruction.kind)) {
       // Compare against the current scan's numeric states (including updated
       // timer and counter values from earlier rungs).
@@ -280,6 +287,15 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
           throw new Error("No se admiten grupos OR superpuestos en esta versión.");
         }
         mainPower = evalContact(main[index], mainPower);
+      }
+      // An independent OR with no upper contacts does not short-circuit its
+      // lower branch via a permanent TRUE wire. Until the upper path receives
+      // an instruction, only the lower path may energize the continuation.
+      if (anchor.kind === OR_JUNCTION_KIND && end === mainIndex && branches.length) {
+        mainPower = false;
+        instructionFlow[anchor.id] = {
+          powerIn: input, condition: false, powerOut: false, value: false,
+        };
       }
       let mergedPower: boolean = mainPower;
       for (const branch of branches) {

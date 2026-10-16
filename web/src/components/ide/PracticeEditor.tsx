@@ -28,6 +28,8 @@ import {
   changeInstructionTag,
   copyInstructionTag,
   createParallelBranch,
+  createIndependentParallelBranch,
+  insertIntoIndependentOrUpper,
   createEmptyOutputBranch,
   removeEmptyOutputBranch,
   fillEmptyOutputBranch,
@@ -49,6 +51,7 @@ import {
   isCounterKind,
   isCompareKind,
   isMathKind,
+  OR_JUNCTION_KIND,
   setInstructionPreset,
   type EditableKind,
   type PracticeProject,
@@ -502,14 +505,10 @@ export function PracticeEditor({
     ? project.rungs.find((rung) => rung.id === selectedOrBranch.rungId)
       ?.parallelBranches?.find((branch) => branch.id === selectedOrBranch.branchId)
     : null;
-  const selectedOutputLocation = selectedLocation && isOutputKind(selectedLocation.instruction.kind) ? selectedLocation : null;
   const selectedEmptyOutputBranch = selectedOrBranch &&
     project.rungs.find((rung) => rung.id === selectedOrBranch.rungId)
       ?.emptyOutputBranches?.includes(selectedOrBranch.branchId)
     ? selectedOrBranch : null;
-  const parallelTarget = selectedOrBranch && selectedBranchModel
-    ? { rungId: selectedOrBranch.rungId, anchorId: selectedBranchModel.anchorId }
-    : getParallelBranchTarget(project, selected, selectedRungId);
 
   const insertSelectedRungBelow = () => {
     const id = nextId("rung");
@@ -522,28 +521,26 @@ export function PracticeEditor({
   };
 
   const insertSelectedParallelBranch = () => {
-    if (selectedOutputLocation) {
-      // OR on an output instruction creates only an EMPTY parallel output conductor.
-      const rungId = selectedOutputLocation.rungId;
-      const before = project.rungs.find((rung) => rung.id === rungId)?.emptyOutputBranches ?? [];
-      if (update(() => createEmptyOutputBranch(project, rungId))) {
-        const after = [...(before ?? [])];
-        let serial = 1;
-        while (after.includes("output-or-" + serial)) serial++;
-        setSelected(null);
-        setSelectedRungId(null);
-        setSelectedOrBranch({ rungId, branchId: "output-or-" + serial });
-        editorRef.current?.focus({ preventScroll: true });
-      }
+    const location = selected ? findInstruction(project, selected) : null;
+    const rungId = location?.rungId ?? selectedOrBranch?.rungId ?? selectedRungId;
+    if (!rungId) {
+      setError("Selecciona una instrucción o el número del rung para insertar un OR independiente.");
       return;
     }
-    if (!parallelTarget) {
-      setError("Selecciona un contacto principal o un rung con un contacto disponible para crear una rama OR.");
-      return;
-    }
-    if (update(() => createParallelBranch(project, parallelTarget.rungId, parallelTarget.anchorId))) {
-      setSelectedRungId(parallelTarget.rungId);
-      setSelectedOrBranch(null);
+    // A selected main contact identifies the slot AFTER it; selecting a rung
+    // places the independent OR at the last main slot, before output coils.
+    const after = location?.lane === "main" && !isOutputKind(location.instruction.kind)
+      ? location.instruction.id
+      : selectedBranchModel?.endId ?? selectedBranchModel?.anchorId;
+    const created = createIndependentParallelBranch(project, rungId, after);
+    if (update(() => created)) {
+      const previous = new Set(project.rungs.find((r) => r.id === rungId)
+        ?.parallelBranches?.map((branch) => branch.id) ?? []);
+      const newBranch = created.rungs.find((r) => r.id === rungId)
+        ?.parallelBranches?.find((branch) => !previous.has(branch.id));
+      setSelected(null);
+      setSelectedRungId(null);
+      setSelectedOrBranch(newBranch ? { rungId, branchId: newBranch.id } : null);
       editorRef.current?.focus({ preventScroll: true });
     }
   };
@@ -554,10 +551,33 @@ export function PracticeEditor({
         selectedEmptyOutputBranch.branchId);
       return;
     }
+    if (selected && findInstruction(project, selected)?.instruction.kind === OR_JUNCTION_KIND &&
+        !isOutputKind(kind)) {
+      const location = findInstruction(project, selected)!;
+      if (update(() => insertIntoIndependentOrUpper(project, location.rungId, selected, {
+        id: nextId("practice"), kind, tag: "",
+      }))) {
+        setSelectedRungId(location.rungId);
+        setSelected(null);
+      }
+      return;
+    }
     if (selectedOrBranch && selectedBranchModel && !isOutputKind(kind)) {
-      insertAt(selectedOrBranch.rungId, selectedBranchModel.instructions.length, kind,
-        selectedBranchModel.anchorId, selectedBranchModel.id);
+      if (selectedBranchModel.instructions.length === 0) {
+        // First instruction is placed in the empty lower lane.
+        insertAt(selectedOrBranch.rungId, 0, kind,
+          selectedBranchModel.anchorId, selectedBranchModel.id);
+      } else {
+        // Once the lower OR has content, clicking the OR conductor then a
+        // palette instruction continues the main path AFTER the reunion.
+        const rung = project.rungs.find((item) => item.id === selectedOrBranch.rungId)!;
+        const endId = selectedBranchModel.endId ?? selectedBranchModel.anchorId;
+        const position = rung.instructions.filter((item) => !isOutputKind(item.kind))
+          .findIndex((item) => item.id === endId) + 1;
+        insertAt(rung.id, position, kind);
+      }
       setSelectedRungId(selectedOrBranch.rungId);
+      setSelectedOrBranch(null);
       return;
     }
     const target = getPaletteInsertionTarget(project, selected, selectedOrBranch?.rungId ?? selectedRungId, kind);
@@ -692,6 +712,17 @@ export function PracticeEditor({
             const rungLive = running && Boolean(runtimeView?.rungPower[rung.id]);
             const drawContact = (item: typeof contacts[number], x: number, centerY: number) => {
               const flow = runtimeView?.instructionFlow[item.id];
+              if (item.kind === OR_JUNCTION_KIND) return (
+                <g key={item.id}>
+                  <rect x={x - 18} y={centerY - 17} width={36} height={34}
+                    rx={5} fill={selected === item.id ? "#dbeafe" : "#f1f5f9"}
+                    stroke={selected === item.id ? "#0284c7" : "#64748b"}
+                    strokeWidth={selected === item.id ? 2 : 1.5}/>
+                  <text x={x} y={centerY + 4} fontSize="11"
+                    fontWeight="700" textAnchor="middle" fill="#1e40af">OR</text>
+                  <title>Unión OR independiente · clic y paleta para ampliar camino superior</title>
+                </g>
+              );
               if (isCompareKind(item.kind)) return (
                 <ComparisonBlock key={item.id} x={x} y={centerY} kind={item.kind}
                   sourceA={numericOperandLabel(item.compareA)}
@@ -1208,10 +1239,24 @@ export function PracticeEditor({
                         .filter((branch) => branch.anchorId === group.anchorId);
                       return [
                         ...mainItems.flatMap((contact, index) => [
-                          dragButton(contact, group.mainCenters[index], group.mainY),
-                          ...(isCompareKind(contact.kind)
-                            ? compareHotspots(contact, group.mainCenters[index], group.mainY)
-                            : [tagDragButton(contact, group.mainCenters[index], group.mainY)]),
+                          ...(contact.kind === OR_JUNCTION_KIND ? [] :
+                            [dragButton(contact, group.mainCenters[index], group.mainY)]),
+                          ...(contact.kind === OR_JUNCTION_KIND
+                            ? [<button key={"or-node-" + contact.id} type="button"
+                                aria-label="Seleccionar unión OR e insertar en la trayectoria superior"
+                                title="Clic + instrucción: insertar en trayectoria superior del OR"
+                                className="absolute z-30 cursor-pointer rounded border border-transparent hover:border-sky-500 focus-visible:outline-2 focus-visible:outline-sky-500"
+                                style={{ left: group.mainCenters[index] - 20,
+                                  top: group.mainY - 20, width: 40, height: 40 }}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setSelected(contact.id);
+                                  setSelectedOrBranch(null);
+                                  setSelectedRungId(null);
+                                }}/>]
+                            : isCompareKind(contact.kind)
+                              ? compareHotspots(contact, group.mainCenters[index], group.mainY)
+                              : [tagDragButton(contact, group.mainCenters[index], group.mainY)]),
                         ]),
                         ...branches.flatMap((branch, laneIndex) => {
                           const lane = group.branchLanes[laneIndex];
