@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Boxes, CircleAlert, CircleHelp, Gauge, Pause, Play, RotateCcw } from "lucide-react";
+import { Boxes, CircleAlert, CircleHelp, Gauge, Pause, Play, RotateCcw, ScanLine } from "lucide-react";
 import { MomentaryPushButton } from "./MomentaryPushButton";
 import { ConveyorSceneInfoDialog } from "./ConveyorSceneInfoDialog";
 import type { PracticeProject } from "../../plc/practiceDocument";
@@ -102,7 +102,14 @@ export function ConveyorScene({
           </div>
         </header>
 
-        <div className="rounded-lg border border-slate-700 bg-[#172634] px-3 py-4">
+        <section className="sort-panel rounded-lg border border-[#344c5e] p-3"
+          aria-labelledby="conveyor-process-title">
+          <div className="mb-3 flex items-center gap-2">
+            <ScanLine size={16} className="text-sky-300" aria-hidden="true"/>
+            <h3 id="conveyor-process-title" className="text-xs font-semibold text-slate-100">
+              Vista de proceso
+            </h3>
+          </div>
           <div className="overflow-x-auto rounded-md border border-slate-600 bg-[#0f1b26]"
             role="img" aria-label={"Vista lateral de faja transportadora con " +
               scene.items.length + " cajas, motor " +
@@ -222,7 +229,7 @@ export function ConveyorScene({
             </button>
             <span className="ml-auto text-xs text-slate-400">Cajas despachadas: {scene.passed}</span>
           </div>
-        </div>
+        </section>
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-lg border border-slate-700 bg-[#172634] p-3">
