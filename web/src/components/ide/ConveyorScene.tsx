@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Activity, Boxes, CircleAlert, Gauge, Info, Pause, Play, RotateCcw } from "lucide-react";
+import { Boxes, CircleAlert, Gauge, Info, Pause, Play, RotateCcw } from "lucide-react";
 import { ConveyorSceneInfoDialog } from "./ConveyorSceneInfoDialog";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
@@ -39,42 +39,26 @@ export function ConveyorScene({
   return (
     <section className="flex h-full min-h-0 flex-col overflow-y-auto bg-[#111c27] text-slate-100"
       aria-label="Escena de faja transportadora conectada a PracticeRoutine">
-      <header className="shrink-0 border-b border-slate-700/70 bg-[#1a2632] px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-sm font-semibold">Escena 01 · Faja transportadora</h2>
-            <p className="mt-0.5 text-[11px] text-slate-400">
-              Entradas físicas simuladas → Controller Tags → PracticeRoutine → Motor_Run
-            </p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" aria-haspopup="dialog" aria-expanded={infoOpen}
-              onClick={() => setInfoOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded border border-sky-700 px-2.5 py-1.5 text-[11px] font-semibold text-sky-300 hover:bg-sky-950 focus-visible:outline-2 focus-visible:outline-sky-500">
-              <Info size={15} aria-hidden="true"/> Información de la escena
-            </button>
-            <span className={"inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] " +
-              (mode === "running"
-                ? "border-emerald-700 bg-emerald-950 text-emerald-300"
-                : mode === "paused"
-                  ? "border-amber-700 bg-amber-950 text-amber-300"
-                  : "border-slate-600 bg-slate-800 text-slate-300")}>
-              <Activity size={12}/> {mode === "running" ? "PracticeRoutine RUN" :
-                mode === "paused" ? "PracticeRoutine PAUSE" : "PracticeRoutine STOP"}
-            </span>
-          </div>
-        </div>
-      </header>
+
 
       <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
         <div className="rounded-lg border border-slate-700 bg-[#172634] px-3 py-4">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-xs">
             <span className="flex items-center gap-2 font-semibold text-slate-200">
               <Boxes size={16} className="text-sky-400"/> Línea de transporte
             </span>
-            <span className={motorOn ? "text-emerald-400" : "text-slate-400"}>
-              Motor_Run = {Number(motorOn)} · {motorOn ? "EN MARCHA" : "DETENIDA"}
-            </span>
+            <div className="ml-auto flex items-center gap-3">
+              <span className={motorOn ? "font-medium text-emerald-400" : "text-slate-400"}>
+                Motor_Run = {Number(motorOn)} · {motorOn ? "EN MARCHA" : "DETENIDA"}
+              </span>
+              <button type="button" aria-haspopup="dialog" aria-expanded={infoOpen}
+                aria-label="Información de la escena"
+                title="Objetivo del ejercicio y mapa E/S"
+                onClick={() => setInfoOpen(true)}
+                className="inline-flex size-7 items-center justify-center rounded border border-slate-600 text-slate-300 hover:border-sky-600 hover:bg-slate-700 hover:text-sky-200 focus-visible:outline-2 focus-visible:outline-sky-500">
+                <Info size={15} aria-hidden="true"/>
+              </button>
+            </div>
           </div>
 
           <div className="relative h-36 overflow-hidden rounded-md border border-slate-600 bg-[#0f1b26]"
@@ -140,10 +124,6 @@ export function ConveyorScene({
                 <Pause size={18}/> STOP {stop ? "1" : "0"}
               </button>
             </div>
-            <p className="mt-2 text-[11px] text-slate-400">
-              Pulsadores tipo interruptor para que ningún pulso se pierda entre scans.
-              Haz clic nuevamente para volver a 0.
-            </p>
           </div>
           <div className="rounded-lg border border-slate-700 bg-[#172634] p-3">
             <div className="mb-3 text-xs font-semibold">Señales de la escena</div>
@@ -182,10 +162,6 @@ export function ConveyorScene({
             </button>
           </div>
         )}
-        <p className="text-[11px] text-slate-400">
-          Build y RUN se inician desde PracticeRoutine. La faja solo avanza con el
-          motor habilitado; vaciar la faja no reinicia el contador PLC.
-        </p>
       </div>
       <ConveyorSceneInfoDialog open={infoOpen} project={project}
         onClose={() => setInfoOpen(false)}

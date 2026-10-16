@@ -308,19 +308,17 @@ export default function App() {
         case "simulation":
           return (
             <div className="flex h-full min-h-0 flex-col bg-[#111c27]">
-              <div className="flex shrink-0 gap-2 border-b border-slate-700 bg-[#1b2835] px-3 py-2">
-                <button type="button" onClick={() => setSimulationTab("conveyor")}
-                  aria-pressed={simulationTab === "conveyor"}
-                  className={"rounded px-3 py-1.5 text-xs font-semibold " +
-                    (simulationTab === "conveyor" ? "bg-sky-700 text-white" : "text-slate-300 hover:bg-slate-700")}>
-                  Faja transportadora
-                </button>
-                <button type="button" onClick={() => setSimulationTab("motor")}
-                  aria-pressed={simulationTab === "motor"}
-                  className={"rounded px-3 py-1.5 text-xs font-semibold " +
-                    (simulationTab === "motor" ? "bg-sky-700 text-white" : "text-slate-300 hover:bg-slate-700")}>
-                  Motor · DEMO
-                </button>
+              {/* Scene navigation is a compact selector, not a second page header. */}
+              <div className="flex h-9 shrink-0 items-center border-b border-slate-700/70 bg-[#172432] px-3">
+                <label htmlFor="simulation-scene-selector" className="sr-only">
+                  Seleccionar escena de simulación
+                </label>
+                <select id="simulation-scene-selector" value={simulationTab}
+                  onChange={(event) => setSimulationTab(event.target.value as "conveyor" | "motor")}
+                  className="max-w-full cursor-pointer rounded border border-slate-600 bg-[#1c2e3e] px-2 py-1 text-[11px] font-medium text-slate-200 outline-none hover:border-slate-400 focus-visible:border-sky-500">
+                  <option value="conveyor">Faja transportadora</option>
+                  <option value="motor">Motor · DEMO</option>
+                </select>
               </div>
               <div className="min-h-0 flex-1">
                 {simulationTab === "conveyor"
