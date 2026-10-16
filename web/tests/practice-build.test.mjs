@@ -78,22 +78,67 @@ test("multiple OR lanes with serial contacts pass Build", () => {
   assert.equal(buildPracticeProject(project).success, true);
 });
 
-test("empty rungs and missing OTE give warnings; no executable rung is a blocking error", () => {
+test("only empty rungs remain invalid; executable logic does not need an output", () => {
   let project = initialPracticeProject();
   let report = buildPracticeProject(project);
   assert.ok(codes(report).includes("EMPTY_RUNG"));
   assert.ok(codes(report).includes("NO_EXECUTABLE_RUNG"));
   assert.equal(report.success, false);
+
   project = insertInstruction(project, "rung-1", 0, xic("only"));
   report = buildPracticeProject(project);
-  assert.ok(codes(report).includes("NO_OUTPUT"));
-  assert.ok(codes(report).includes("NO_EXECUTABLE_RUNG"));
+  assert.equal(report.success, true, "A contact-only rung is valid");
+  assert.deepEqual(codes(report), []);
+
   project = insertInstruction(project, "rung-1", 1, ote("out"));
   project = createRung(project, "rung-2");
   report = buildPracticeProject(project);
-  assert.equal(report.success, true, "Warnings must not block valid ladder");
+  assert.equal(report.success, true, "An unrelated empty rung should only warn");
   assert.equal(report.warnings, 1);
+  assert.deepEqual(codes(report), ["EMPTY_RUNG"]);
   assert.equal(report.diagnostics[0].rungIndex, 1);
+});
+
+test("comparison-only and OR rungs build without requiring an actuator", () => {
+  let project = initialPracticeProject();
+  project = insertInstruction(project, "rung-1", 0, {
+    id: "comparison", kind: "EQU", tag: "",
+    compareA: { mode: "literal", value: 10 },
+    compareB: { mode: "literal", value: 10 },
+  });
+  let report = buildPracticeProject(project);
+  assert.equal(report.success, true);
+  assert.equal(report.errors, 0);
+  assert.equal(report.warnings, 0);
+
+  project = createParallelBranch(project, "rung-1", "comparison");
+  project = addParallelContact(project, "rung-1", "comparison", xio("or"), 0);
+  report = buildPracticeProject(project);
+  assert.equal(report.success, true);
+  assert.deepEqual(codes(report), []);
+});
+
+test("unconditional math output is valid without warnings or a physical actuator", () => {
+  let project = initialPracticeProject();
+  project = createTag(project, "OutputReal", "Numeric destination", "REAL");
+  project = insertInstruction(project, "rung-1", 0, {
+    id: "math", kind: "MOV", tag: "OutputReal",
+    compareA: { mode: "literal", value: 12.5 },
+  });
+  const report = buildPracticeProject(project);
+  assert.equal(report.success, true);
+  assert.deepEqual(codes(report), []);
+});
+
+test("invalid operands still block Build in a rung without an output", () => {
+  let project = initialPracticeProject();
+  project = insertInstruction(project, "rung-1", 0, {
+    id: "bad-compare", kind: "EQU", tag: "",
+  });
+  const result = buildPracticeProject(project);
+  assert.equal(result.success, false);
+  assert.ok(codes(result).includes("INVALID_COMPARE_OPERAND"));
+  assert.ok(!codes(result).includes("NO_OUTPUT"));
 });
 
 test("an OTE without contacts is valid with an explicit warning", () => {
