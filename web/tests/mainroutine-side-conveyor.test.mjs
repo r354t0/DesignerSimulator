@@ -84,6 +84,7 @@ test("scene motor power is still calculated from Ladder, not animation timers",(
  assert.equal(stepConveyor(moving,false,50),moving);
  p=setTagValue(p,"Stop_PB",true);
  p=evaluateSeriesScan(p).project;
+ p=evaluateSeriesScan(p).project; // R0 observes R1's stop request on next scan.
  assert.equal(p.tags.find(t=>t.name==="Motor_Run").value,false);
 });
 
@@ -93,8 +94,8 @@ test("conveyor template adds only its two advanced tags; no legacy demo variable
   ...CONVEYOR_TAGS.map(t=>t.name), ...CONVEYOR_TEMPLATE_TAGS.map(t=>t.name),
  ]);
  assert.deepEqual(p.rungs.map(r=>r.instructions.map(i=>i.kind)),[
-  ["XIC","CTU"],["OR_JUNCTION","XIC","OTE"],
-  ["XIO","OR_JUNCTION","XIC","OTE"],["XIO","XIC","RES"]
+  ["OR_JUNCTION","XIC","XIO","OTE"],["OR_JUNCTION","XIC","OTE"],
+  ["XIC","CTU"],["XIO","XIC","RES"]
  ]);
  assert.equal(p.tags.find(t=>t.name==="CV_Count").value.PRE,5);
 });

@@ -31,6 +31,7 @@ import {
 } from "./plc/sortSceneModel";
 import {
   CONVEYOR_SENSOR_TAG, addConveyorItem, createConveyorExampleProject,
+  applyConveyorMomentaryInput, applyConveyorPhotoeyeInput,
   initialConveyorProject, initialConveyorState, prepareConveyorTags, readConveyorBool, stepConveyor,
   type ConveyorState,
 } from "./plc/conveyorSceneModel";
@@ -198,7 +199,7 @@ export default function App() {
       const sensorTag = plc.project.tags.find((tag) => tag.name === CONVEYOR_SENSOR_TAG);
       if (sensorTag?.type === "BOOL" && sensorTag.value !== next.sensorActive) {
         changeScan((current) =>
-          applySceneSensorBoolInput(current, CONVEYOR_SENSOR_TAG, next.sensorActive));
+          applyConveyorPhotoeyeInput(current, next.sensorActive));
       }
     }, 50);
     return () => window.clearInterval(id);
@@ -371,12 +372,8 @@ export default function App() {
   }, [changeScan]);
 
   const setConveyorInput = useCallback((tag: "Start_PB" | "Stop_PB" | "CV_ResetPB", value: boolean) => {
-    // The advanced template enables an optional reset input. De-energize it
-    // at the moment of release; START/STOP retain rising-only PLC sampling.
     if (activeControllerScene.current !== "conveyor") return;
-    changeScan((state) => applyMomentaryBoolInput(
-      state, tag, value, tag === "CV_ResetPB",
-    ));
+    changeScan(state => applyConveyorMomentaryInput(state, tag, value));
   }, [changeScan]);
   const resetConveyor = useCallback(() => {
     changeConveyor(() => initialConveyorState());

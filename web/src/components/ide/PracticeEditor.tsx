@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, GripVertical, Hammer, Pause, Play, Square, StepForward, XCircle } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, Hammer, Pause, Play, Square, StepForward, XCircle } from "lucide-react";
 import { Coil, ResetCoil, Contact, TimerBlock, CounterBlock, ComparisonBlock, MathOutputBlock, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { CompareOperandEditor, type CompareOperandAnchor } from "./CompareOperandEditor";
 import { numericOperandLabel, setComparisonOperand } from "../../plc/practiceCompare";
@@ -907,13 +907,12 @@ export function PracticeEditor({
                     editorRef.current?.focus({ preventScroll: true });
                   }}
                   className={
-                    "absolute inset-y-0 left-0 z-20 flex w-[49px] cursor-grab select-none items-center justify-center gap-0.5 border-r border-slate-200 font-mono text-xs active:cursor-grabbing " +
+                    "absolute inset-y-0 left-0 z-20 flex w-[49px] cursor-grab select-none items-center justify-center border-r border-slate-200 font-mono text-xs active:cursor-grabbing " +
                     (selectedRungId === rung.id
                       ? "bg-[#087bd1] text-white"
                       : "bg-[#f4f7fa] text-slate-500 hover:bg-sky-100")
                   }
                 >
-                  <GripVertical size={12} aria-hidden="true" className="shrink-0 opacity-55" />
                   {rungIndex}
                 </button>
                 <div>

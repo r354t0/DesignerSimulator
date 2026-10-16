@@ -82,6 +82,16 @@ export function tickPracticeScan(state: PracticeScanState): PracticeScanState {
 }
 
 /**
+ * Reevaluate Ladder once without advancing virtual elapsed time. Used only
+ * by scene-specific control-edge adapters when reference rung order means
+ * an internal stop request must propagate into an earlier motor rung.
+ * STOP and PAUSE remain inert, and TON/TOF/RTO accumulate no extra time.
+ */
+export function rescanPracticeWithoutTime(state: PracticeScanState): PracticeScanState {
+  return state.mode === "running" ? performScan(state, 0) : state;
+}
+
+/**
  * UI momentary pushbuttons can be pressed and released in less than one
  * configurable scan interval (50–500 ms). A scheduled scan could miss such
  * a real user action entirely. Sample ONLY a new rising button input

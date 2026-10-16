@@ -3,6 +3,10 @@ import {
   createIndependentParallelBranch, addParallelContact, insertIntoIndependentOrUpper,
   setTagValue, type PracticeProject, type TagType,
 } from "./practiceDocument.ts";
+import {
+  applyMomentaryBoolInput, applySceneSensorBoolInput, rescanPracticeWithoutTime,
+  type PracticeScanState,
+} from "./practiceScanCycle.ts";
 
 /** Phase 5 / Scene 01 — a simulated conveyor, never a physical controller. */
 export const CONVEYOR_SENSOR_TAG = "CV_BoxSensor";
@@ -25,40 +29,51 @@ export interface ConveyorTagDefinition {
 export const CONVEYOR_TAGS: readonly ConveyorTagDefinition[] = [
   {
     name: CONVEYOR_START_TAG, type: "BOOL", direction: "Entrada",
-    description: "Faja: pulsador START de marcha",
+    description: "Pulsador START",
     initialDescription: "Pulsador de arranque",
-    legacyDescriptions: ["Faja: pulsador START de marcha (entrada digital simulada)"],
+    legacyDescriptions: [
+      "Faja: pulsador START de marcha", "Faja: pulsador START de marcha (entrada digital simulada)",
+    ],
   },
   {
     name: CONVEYOR_STOP_TAG, type: "BOOL", direction: "Entrada",
-    description: "Faja: pulsador STOP de parada",
+    description: "Pulsador STOP",
     initialDescription: "Pulsador de parada",
-    legacyDescriptions: ["Faja: pulsador STOP de parada (entrada digital simulada)"],
+    legacyDescriptions: [
+      "Faja: pulsador STOP de parada", "Faja: pulsador STOP de parada (entrada digital simulada)",
+    ],
   },
   {
     name: CONVEYOR_SENSOR_TAG, type: "BOOL", direction: "Entrada",
-    description: "Faja: sensor fotoeléctrico de presencia de caja (PE-01)",
+    description: "Sensor PE-01",
+    legacyDescriptions: ["Faja: sensor fotoeléctrico de presencia de caja (PE-01)"],
   },
   {
     name: CONVEYOR_MOTOR_TAG, type: "BOOL", direction: "Salida",
-    description: "Faja: orden de marcha del motor transportador",
+    description: "Motor de faja",
     initialDescription: "Motor habilitado",
-    legacyDescriptions: ["Faja: orden de marcha del motor transportador (salida digital)"],
+    legacyDescriptions: [
+      "Faja: orden de marcha del motor transportador",
+      "Faja: orden de marcha del motor transportador (salida digital)",
+    ],
   },
   {
     name: CONVEYOR_COUNT_TAG, type: "COUNTER", direction: "Interna",
-    description: "Faja: contador CTU de cajas detectadas por PE-01",
+    description: "Conteo de cajas",
+    legacyDescriptions: ["Faja: contador CTU de cajas detectadas por PE-01"],
     initialDescription: "Piezas que cruzaron el sensor",
   },
 ];
 /** Extra tags installed only when the advanced Ladder solution is loaded. */
 export const CONVEYOR_TEMPLATE_TAGS: readonly ConveyorTagDefinition[] = [
   { name: "CV_ResetPB", type: "BOOL", direction: "Entrada",
-    description: "Faja: pulsador momentáneo RESET LOTE" },
+    description: "RESET lote",
+    legacyDescriptions: ["Faja: pulsador momentáneo RESET LOTE"] },
   { name: "CV_StopRequest", type: "BOOL", direction: "Interna",
-    description: "Faja: solicitud de parada por STOP o lote completo" },
+    description: "Parada STOP/lote",
+    legacyDescriptions: ["Faja: solicitud de parada por STOP o lote completo"] },
 ];
-export const CONVEYOR_SENSOR_POSITION = 0.67;
+export const CONVEYOR_SENSOR_POSITION = 0.90;
 const BELT_SPEED_UNITS_PER_SECOND = 0.20;
 /** Same box size and belt span used by the lateral SVG (44px over 505px). */
 export const CONVEYOR_BOX_WIDTH_PX = 44;
@@ -112,7 +127,12 @@ export function hasConveyorTags(project: PracticeProject): boolean {
  * overwritten. Validate the full catalog before creating any declaration.
  */
 export function prepareConveyorTags(project: PracticeProject): PracticeProject {
-  for (const spec of CONVEYOR_TAGS) {
+  const sceneSpecs = [
+    ...CONVEYOR_TAGS,
+    ...CONVEYOR_TEMPLATE_TAGS.filter(spec =>
+      project.tags.some(tag => tag.name.toLowerCase() === spec.name.toLowerCase())),
+  ];
+  for (const spec of sceneSpecs) {
     const existing = project.tags.find((tag) =>
       tag.name.toLowerCase() === spec.name.toLowerCase());
     if (existing && existing.name !== spec.name) {
@@ -127,7 +147,7 @@ export function prepareConveyorTags(project: PracticeProject): PracticeProject {
   }
 
   let result = project;
-  for (const spec of CONVEYOR_TAGS) {
+  for (const spec of sceneSpecs) {
     const existing = result.tags.find((tag) => tag.name === spec.name);
     if (!existing) {
       result = createTag(result, spec.name, spec.description, spec.type);
@@ -161,18 +181,17 @@ export function initialConveyorProject(): PracticeProject {
 }
 
 /**
- * Advanced optional 4-rung Ladder: two real independent OR networks,
- * seal-in by OTE, automatic batch stop, CTU and manual RES.
+ * Optional advanced solution — exactly the rung order and OR topology shown
+ * in the Studio 5000 reference image:
  *
- * R0: photoeye -> CTU CV_Count (PRE=5)
- * R1: (Stop_PB OR (CV_Count.DN AND NOT CV_BoxSensor)) -> CV_StopRequest
- * R2: NOT CV_StopRequest AND (Start_PB OR Motor_Run) -> OTE Motor_Run
- * R3: NOT CV_BoxSensor AND CV_ResetPB -> RES CV_Count
+ * R0: (Start_PB OR Motor_Run) AND NOT CV_StopRequest -> OTE Motor_Run.
+ * R1: Stop_PB OR (CV_Count.DN AND NOT CV_BoxSensor) -> OTE CV_StopRequest.
+ * R2: CV_BoxSensor -> CTU CV_Count (PRE=5).
+ * R3: NOT CV_BoxSensor AND CV_ResetPB -> RES CV_Count.
  *
- * The motor stops when the fifth box CLEARS the photoeye (not while
- * trapped on it), preventing a stale high photoeye on RESET.
- * Existing five basic tags remain unchanged
- * until the user explicitly loads the advanced template.
+ * R0 precedes R1 in the source reference. Operator/sensor edge handlers
+ * perform a second zero-time scan for STOP and completed batches so the
+ * command takes effect immediately despite that cyclic evaluation order.
  */
 export function createConveyorExampleProject(): PracticeProject {
   let project = initialConveyorProject();
@@ -181,13 +200,20 @@ export function createConveyorExampleProject(): PracticeProject {
   }
   project = setTagValue(project, CONVEYOR_COUNT_TAG, 5, "PRE");
 
-  // Counter evaluates first so DN propagates to the stop request immediately.
+  // R0. The OR joins BEFORE the normally-closed stop permissive.
   project = insertInstruction(project, "rung-1", 0,
-    { id: "cv-sensor", kind: "XIC", tag: CONVEYOR_SENSOR_TAG });
-  project = insertInstruction(project, "rung-1", 1,
-    { id: "cv-counter", kind: "CTU", tag: CONVEYOR_COUNT_TAG });
+    { id: "cv-motor", kind: "OTE", tag: CONVEYOR_MOTOR_TAG });
+  project = createIndependentParallelBranch(project, "rung-1");
+  const motorOr = project.rungs[0].instructions.find(
+    item => item.kind === "OR_JUNCTION")!.id;
+  project = insertIntoIndependentOrUpper(project, "rung-1", motorOr,
+    { id: "cv-start", kind: "XIC", tag: CONVEYOR_START_TAG });
+  project = addParallelContact(project, "rung-1", motorOr,
+    { id: "cv-seal-in", kind: "XIC", tag: CONVEYOR_MOTOR_TAG });
+  project = insertInstruction(project, "rung-1", 2,
+    { id: "cv-not-stop", kind: "XIO", tag: "CV_StopRequest" });
 
-  // First OR: automatic batch completion OR physical STOP.
+  // R1. Either STOP or a finished batch with a clear PE-01 requests stop.
   project = createRung(project, "cv-rung-stop-request");
   project = insertInstruction(project, "cv-rung-stop-request", 0,
     { id: "cv-stop-request-coil", kind: "OTE", tag: "CV_StopRequest" });
@@ -201,21 +227,14 @@ export function createConveyorExampleProject(): PracticeProject {
   project = addParallelContact(project, "cv-rung-stop-request", stopOr,
     { id: "cv-no-box", kind: "XIO", tag: CONVEYOR_SENSOR_TAG });
 
-  // Second OR: an actual seal-in circuit, de-energized by the stop interlock.
-  project = createRung(project, "cv-rung-motor");
-  project = insertInstruction(project, "cv-rung-motor", 0,
-    { id: "cv-not-stop", kind: "XIO", tag: "CV_StopRequest" });
-  project = insertInstruction(project, "cv-rung-motor", 1,
-    { id: "cv-motor", kind: "OTE", tag: CONVEYOR_MOTOR_TAG });
-  project = createIndependentParallelBranch(project, "cv-rung-motor", "cv-not-stop");
-  const motorOr = project.rungs.find(r => r.id === "cv-rung-motor")!
-    .instructions.find(item => item.kind === "OR_JUNCTION")!.id;
-  project = insertIntoIndependentOrUpper(project, "cv-rung-motor", motorOr,
-    { id: "cv-start", kind: "XIC", tag: CONVEYOR_START_TAG });
-  project = addParallelContact(project, "cv-rung-motor", motorOr,
-    { id: "cv-seal-in", kind: "XIC", tag: CONVEYOR_MOTOR_TAG });
+  // R2. The counter is driven only by the photoeye rising edge.
+  project = createRung(project, "cv-rung-count");
+  project = insertInstruction(project, "cv-rung-count", 0,
+    { id: "cv-sensor", kind: "XIC", tag: CONVEYOR_SENSOR_TAG });
+  project = insertInstruction(project, "cv-rung-count", 1,
+    { id: "cv-counter", kind: "CTU", tag: CONVEYOR_COUNT_TAG });
 
-  // Reset is explicit: pressing STOP must not silently erase the counter.
+  // R3. RESET is blocked while a box still covers the photoeye.
   project = createRung(project, "cv-rung-reset");
   project = insertInstruction(project, "cv-rung-reset", 0,
     { id: "cv-reset-when-clear", kind: "XIO", tag: CONVEYOR_SENSOR_TAG });
@@ -224,6 +243,38 @@ export function createConveyorExampleProject(): PracticeProject {
   project = insertInstruction(project, "cv-rung-reset", 2,
     { id: "cv-reset-counter", kind: "RES", tag: CONVEYOR_COUNT_TAG });
   return project;
+}
+
+/** Apply momentary conveyor commands without losing short STOP pulses.
+ * R0 reads the prior R1 result, so a second zero-ms evaluation is needed
+ * for STOP assertion and RESET of a completed batch. */
+export function applyConveyorMomentaryInput(
+  state: PracticeScanState, tag: "Start_PB" | "Stop_PB" | "CV_ResetPB",
+  pressed: boolean,
+): PracticeScanState {
+  let next = applyMomentaryBoolInput(
+    state, tag, pressed, tag === "Stop_PB" || tag === "CV_ResetPB",
+  );
+  if (pressed && (tag === "Stop_PB" || tag === "CV_ResetPB")) {
+    next = rescanPracticeWithoutTime(next);
+  }
+  return next;
+}
+
+/** Optical edge input with immediate stop propagation across the two
+ * consecutive Ladder rungs, only once a completed batch clears PE-01. */
+export function applyConveyorPhotoeyeInput(
+  state: PracticeScanState, detected: boolean,
+): PracticeScanState {
+  const previous = state.project.tags.find(tag => tag.name === CONVEYOR_SENSOR_TAG);
+  if (previous?.type === "BOOL" && previous.value === detected) return state;
+  let next = applySceneSensorBoolInput(state, CONVEYOR_SENSOR_TAG, detected);
+  if (!detected && next.mode === "running" &&
+    readConveyorBool(next.project, "CV_StopRequest") &&
+    readConveyorBool(next.project, CONVEYOR_MOTOR_TAG)) {
+    next = rescanPracticeWithoutTime(next);
+  }
+  return next;
 }
 
 /** Same rule for the SCADA button disabled state and conveyor physics. */

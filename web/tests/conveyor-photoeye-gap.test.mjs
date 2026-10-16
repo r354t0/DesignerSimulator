@@ -167,7 +167,7 @@ test("duplicate photoeye observations produce no extra scans", () => {
 test("photoeye input wiring uses edge-driven scans and same physical SVG width", () => {
   const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
   const svg = readFileSync(new URL("../src/components/ide/ConveyorScene.tsx", import.meta.url), "utf8");
-  assert.match(app,/applySceneSensorBoolInput\(current, CONVEYOR_SENSOR_TAG, next\.sensorActive\)/);
+  assert.match(app,/applyConveyorPhotoeyeInput\(current, next\.sensorActive\)/);
   assert.match(svg,/width=\{CONVEYOR_BOX_WIDTH_PX\}/);
   assert.match(svg,/item\.position \* CONVEYOR_BELT_LENGTH_PX/);
   assert.match(svg,/CONVEYOR_SENSOR_POSITION \* CONVEYOR_BELT_LENGTH_PX/);

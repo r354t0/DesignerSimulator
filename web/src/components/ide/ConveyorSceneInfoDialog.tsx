@@ -134,12 +134,13 @@ export function ConveyorSceneInfoDialog({
               Ver orientación para desarrollar el Ladder (opcional)
             </summary>
             <div className="mt-2 space-y-1 font-mono text-[11px] text-slate-300">
-              <p>Rung 0: CV_BoxSensor → CTU CV_Count (PRE=5)</p>
+              <p>Rung 0: OR (Start_PB | Motor_Run) + XIO CV_StopRequest → OTE Motor_Run</p>
               <p>Rung 1: OR (Stop_PB | CV_Count.DN + XIO CV_BoxSensor) → OTE CV_StopRequest</p>
-              <p>Rung 2: XIO CV_StopRequest + OR (Start_PB | Motor_Run) → OTE Motor_Run</p>
+              <p>Rung 2: CV_BoxSensor → CTU CV_Count (PRE=5)</p>
               <p>Rung 3: XIO CV_BoxSensor + CV_ResetPB → RES CV_Count</p>
               <p className="pt-2 font-sans text-slate-400">
-                Al completar cinco detecciones y liberarse PE-01, la faja se detiene.
+                PE-01 se ubica cerca de la salida. Tras cinco detecciones y
+                con el sensor libre, la faja se detiene.
                 RESET LOTE solo opera con el sensor libre; después pulsa START
                 para comenzar otro lote. STOP detiene sin perder el conteo.
               </p>

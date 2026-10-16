@@ -22,7 +22,7 @@ test("scene defines a complete and self-documenting E/S contract", () => {
     ["CV_Count", "COUNTER", "Interna"],
   ]);
   for (const definition of CONVEYOR_TAGS) {
-    assert.ok(definition.description.startsWith("Faja: "), definition.name);
+    assert.ok(definition.description.length <= 19, definition.name);
   }
 });
 

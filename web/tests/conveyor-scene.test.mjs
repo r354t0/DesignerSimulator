@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  addConveyorItem, createConveyorExampleProject, hasConveyorTags,
+  addConveyorItem, applyConveyorMomentaryInput,
+  createConveyorExampleProject, hasConveyorTags,
   initialConveyorState, prepareConveyorTags, readConveyorBool,
   readConveyorCount, stepConveyor, CONVEYOR_SENSOR_TAG,
 } from "../src/plc/conveyorSceneModel.ts";
@@ -33,8 +34,8 @@ test("Advanced Ladder builds two OR networks and four control rungs", () => {
   const project = createConveyorExampleProject();
   assert.equal(buildPracticeProject(project).success, true);
   assert.deepEqual(project.rungs.map(r => r.instructions.map(i => i.kind)), [
-    ["XIC", "CTU"], ["OR_JUNCTION", "XIC", "OTE"],
-    ["XIO", "OR_JUNCTION", "XIC", "OTE"], ["XIO", "XIC", "RES"],
+    ["OR_JUNCTION", "XIC", "XIO", "OTE"], ["OR_JUNCTION", "XIC", "OTE"],
+    ["XIC", "CTU"], ["XIO", "XIC", "RES"],
   ]);
   assert.equal(project.tags.find(t => t.name === "CV_Count").value.PRE, 5);
   assert.equal(hasConveyorTags(project), true);
@@ -49,8 +50,7 @@ test("start/stop inputs actuate conveyor through actual PracticeRoutine scans", 
   state = changePracticeScanProject(state, setTagValue(state.project, "Start_PB", false));
   state = tickPracticeScan(state);
   assert.equal(readConveyorBool(state.project, "Motor_Run"), true, "OR seal-in retains motor");
-  state = changePracticeScanProject(state, setTagValue(state.project, "Stop_PB", true));
-  state = tickPracticeScan(state);
+  state = applyConveyorMomentaryInput(state, "Stop_PB", true);
   assert.equal(readConveyorBool(state.project, "Motor_Run"), false, "STOP interlock has priority");
   state = stopPracticeScans(state);
   assert.equal(state.mode, "stopped");
