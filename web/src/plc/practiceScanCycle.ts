@@ -1,5 +1,5 @@
 import { getPracticeBuildSignature } from "./practiceBuild.ts";
-import { type PracticeProject } from "./practiceDocument.ts";
+import { setTagValue, type PracticeProject } from "./practiceDocument.ts";
 import {
   evaluateSeriesScan, prescanBitInstructions, stopAfterSeriesLogicEdit, stopSeriesScan,
   type SeriesScan,
@@ -79,6 +79,31 @@ export function startPracticeScans(state: PracticeScanState): PracticeScanState 
 /** Called by the periodic scheduler. No work occurs when PAUSED/STOPPED. */
 export function tickPracticeScan(state: PracticeScanState): PracticeScanState {
   return state.mode === "running" ? performScan(state, state.scanPeriodMs) : state;
+}
+
+/**
+ * UI momentary pushbuttons can be pressed and released in less than one
+ * configurable scan interval (50–500 ms). A scheduled scan could miss such
+ * a real user action entirely. Sample ONLY a new rising button input
+ * immediately while in RUN; pass elapsedMs=0 so TON/TOF/RTO are not
+ * accelerated by extra human actions. Releases remain instantaneous input
+ * updates, and the periodic scan continues unaffected.
+ *
+ * STOP/PAUSE never execute unscheduled scans. Redundant pointer events
+ * do not trigger extra samples.
+ */
+export function applyMomentaryBoolInput(
+  state: PracticeScanState, tagName: string, pressed: boolean,
+): PracticeScanState {
+  const tag = state.project.tags.find((item) => item.name === tagName);
+  if (!tag || tag.type !== "BOOL") {
+    throw new Error("El pulsador requiere un tag BOOL existente: " + tagName);
+  }
+  if (tag.value === pressed) return state;
+  const staged = changePracticeScanProject(
+    state, setTagValue(state.project, tagName, pressed),
+  );
+  return pressed && staged.mode === "running" ? performScan(staged, 0) : staged;
 }
 
 export function pausePracticeScans(state: PracticeScanState): PracticeScanState {

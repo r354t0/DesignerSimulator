@@ -9,6 +9,7 @@ import {
   initialPracticeScanState, changePracticeScanProject,
   startPracticeScans, stopPracticeScans, pausePracticeScans,
   resumePracticeScans, stepPracticeScan, tickPracticeScan, setScanPeriod,
+  applyMomentaryBoolInput,
   type PracticeScanState,
 } from "./plc/practiceScanCycle";
 import { isEditableKind, LADDER_DRAG_MIME } from "./plc/ladderDragDrop";
@@ -176,8 +177,9 @@ export default function App() {
     changeScan((state) => changePracticeScanProject(state, next)), [changeScan]);
 
   const setConveyorInput = useCallback((tag: "Start_PB" | "Stop_PB", value: boolean) => {
-    changeScan((state) => changePracticeScanProject(state,
-      setTagValue(state.project, tag, value)));
+    // A quick momentary press must reach the PLC even between timer ticks.
+    // Only the rising press samples a zero-elapsed scan in RUN mode.
+    changeScan((state) => applyMomentaryBoolInput(state, tag, value));
   }, [changeScan]);
   const resetConveyor = useCallback(() => {
     changeConveyor(() => initialConveyorState());
