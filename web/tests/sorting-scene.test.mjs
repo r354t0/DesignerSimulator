@@ -135,6 +135,8 @@ test("App exposes scene switch and independently saved MainRoutine sessions",()=
   assert.match(tags,/activeScene === "motor" \? "demo" : "practice"/);
   assert.match(tags,/MainRoutine · Clasificación de cajas/);
   assert.match(view,/Pilotos LED y producción/);
+  assert.match(view,/<Pilot label="SALIDA A" active=\{state\.sensorExitA\} color="green"\/>/);
+  assert.match(view,/<Pilot label="SALIDA B" active=\{state\.sensorExitB\} color="amber"\/>/);
   assert.match(view,/MomentaryPushButton name="START"/);
   assert.match(view,/onAddBox\("A"\)/);
   assert.match(view,/onAddBox\("B"\)/);

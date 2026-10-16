@@ -173,6 +173,7 @@ export function SortScene({
               <Pilot label="DESVIADOR B" active={divert} color="amber"/>
               <Pilot label="TIPO B" active={detection} color="blue"/>
               <Pilot label="SALIDA A" active={state.sensorExitA} color="green"/>
+              <Pilot label="SALIDA B" active={state.sensorExitB} color="amber"/>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-700 pt-2 text-center text-[11px]">
               <div><span className="text-slate-400">A</span>
