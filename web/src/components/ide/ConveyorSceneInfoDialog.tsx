@@ -60,10 +60,14 @@ export function ConveyorSceneInfoDialog({
             <BookOpen size={15} aria-hidden="true"/> Objetivo del ejercicio
           </h3>
           <p className="text-xs leading-relaxed text-slate-200">
-            Desarrolla un programa Ladder en MainRoutine que arranque y detenga la
-            faja con START y STOP, mantenga el motor en marcha hasta recibir la orden
-            de parada y contabilice una sola vez cada caja detectada por el sensor PE-01.
-            Comprueba su funcionamiento con Build y RUN.
+            Programa en MainRoutine un enclavamiento de marcha con ramas OR
+            (START o Motor_Run), protegido por una solicitud de parada.
+            Cuenta las cajas mediante CTU al cruzar PE-01, situado en la
+            descarga. Al completar un lote de cinco cajas, detén la faja
+            únicamente después de que la quinta salga por completo.
+            STOP debe detener la marcha sin borrar el conteo y RESET LOTE
+            debe reiniciar el contador solo con el sensor libre.
+            Verifica la lógica con Build, RUN y los pilotos de la escena.
           </p>
         </section>
 

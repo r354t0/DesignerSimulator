@@ -15,7 +15,9 @@ interface Props {
   mode: ScanMode;
   state: SortState;
   setupError: string | null;
-  onInputChange: (name: "Sort_StartPB" | "Sort_StopPB", pressed: boolean) => void;
+  onInputChange: (
+    name: "Sort_StartPB" | "Sort_StopPB" | "Sort_ResetPB", pressed: boolean,
+  ) => void;
   onAddBox: (kind: SortBoxType) => void;
   onReset: () => void;
   onPrepareTags: () => void;
@@ -51,6 +53,12 @@ export function SortScene({
   const start = readSortBool(project, "Sort_StartPB");
   const stop = readSortBool(project, "Sort_StopPB");
   const detection = readSortBool(project, "Sort_TypeB");
+  const resetAvailable = project.tags.some(
+    tag => tag.name === "Sort_ResetPB" && tag.type === "BOOL");
+  const reset = resetAvailable && readSortBool(project, "Sort_ResetPB");
+  const lotComplete = resetAvailable && project.tags.some(tag =>
+    tag.name === "Sort_CountTotal" && tag.type === "COUNTER" &&
+    typeof tag.value === "object" && tag.value.DN === true);
   const validTags = hasSortTags(project);
   const xAt = (position: number) => 78 + position * 550;
   const gateX = xAt(SORT_GATE_POSITION);
@@ -157,13 +165,18 @@ export function SortScene({
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="rounded-lg border border-slate-700 bg-[#172634] p-3">
             <h3 className="mb-3 text-xs font-semibold">Tablero de mando</h3>
-            <div className="flex gap-3">
+            <div className="flex flex-wrap gap-3">
               <MomentaryPushButton name="START" tone="start" pressed={start}
                 onChange={(v) => onInputChange("Sort_StartPB", v)}
                 icon={<Play size={18}/>}>START</MomentaryPushButton>
               <MomentaryPushButton name="STOP" tone="stop" pressed={stop}
                 onChange={(v) => onInputChange("Sort_StopPB", v)}
                 icon={<Pause size={18}/>}>STOP</MomentaryPushButton>
+              {resetAvailable && (
+                <MomentaryPushButton name="RESET LOTE" tone="drain" pressed={reset}
+                  onChange={(v) => onInputChange("Sort_ResetPB", v)}
+                  icon={<RotateCcw size={18}/>}>RESET</MomentaryPushButton>
+              )}
             </div>
           </div>
           <div className="rounded-lg border border-slate-700 bg-[#172634] p-3">
@@ -174,6 +187,12 @@ export function SortScene({
               <Pilot label="TIPO B" active={detection} color="blue"/>
               <Pilot label="SALIDA A" active={state.sensorExitA} color="green"/>
               <Pilot label="SALIDA B" active={state.sensorExitB} color="amber"/>
+              {resetAvailable && (
+                <>
+                  <Pilot label="LOTE COMPLETO" active={lotComplete} color="amber"/>
+                  <Pilot label="LÍNEAS LIBRES" active={state.lineClear} color="green"/>
+                </>
+              )}
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-700 pt-2 text-center text-[11px]">
               <div><span className="text-slate-400">A</span>
@@ -183,6 +202,20 @@ export function SortScene({
               <div><span className="text-slate-400">Desvíos erróneos</span>
                 <div className="font-mono text-sm font-bold text-red-300">{state.errors}</div></div>
             </div>
+            {resetAvailable && (
+              <div className="mt-2 grid grid-cols-2 gap-2 border-t border-slate-700 pt-2 text-center text-[11px]">
+                <div><span className="text-slate-400">Total del lote / 6</span>
+                  <div className="font-mono text-sm font-bold text-sky-300">
+                    {readSortCount(project, "Sort_CountTotal") ?? "—"}
+                  </div>
+                </div>
+                <div><span className="text-slate-400">Lotes terminados</span>
+                  <div className="font-mono text-sm font-bold text-emerald-300">
+                    {readSortCount(project, "Sort_Batches") ?? "—"}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
         {!validTags && (

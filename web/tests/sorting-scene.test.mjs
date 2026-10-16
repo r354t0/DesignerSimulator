@@ -7,7 +7,9 @@ import {
   initialPracticeScanState, setScanPeriod, startPracticeScans, tickPracticeScan,
 } from "../src/plc/practiceScanCycle.ts";
 import {
-  SORT_TAGS, initialSortProject, prepareSortTags, createSortExampleProject,
+  SORT_TAGS, SORT_TEMPLATE_TAGS, SORT_BATCH_SIZE,
+  applySortMomentaryInput, applySortSensorInput,
+  initialSortProject, prepareSortTags, createSortExampleProject,
   initialSortState, canAddSortBox, addSortBox, readSortBool, readSortCount,
   stepSortState,
 } from "../src/plc/sortSceneModel.ts";
@@ -27,16 +29,37 @@ test("scene 02 is a fully independent MainRoutine with only its nine wired tags"
   }
 });
 
-test("sorting template builds with latching motor, live diverter and two CTUs", () => {
+test("advanced sorting template builds three independent OR rungs and four CTUs", () => {
   const project = createSortExampleProject();
   const b = buildPracticeProject(project);
   assert.equal(b.success, true, JSON.stringify(b.diagnostics));
-  assert.deepEqual(project.rungs.map(r => r.instructions.map(i => i.kind)), [
-    ["XIC","OTL"], ["XIC","OTU"], ["XIC","OTE"], ["XIC","CTU"], ["XIC","CTU"],
+  assert.deepEqual(project.tags.map(tag=>tag.name),[
+    ...SORT_TAGS.map(tag=>tag.name),
+    ...SORT_TEMPLATE_TAGS.map(tag=>tag.name),
   ]);
-  assert.equal(readSortCount(project,"Sort_CountA"),0);
-  assert.equal(readSortCount(project,"Sort_CountB"),0);
-  assert.equal(project.tags.find(t => t.name === "Sort_CountA").value.PRE,10);
+  assert.deepEqual(project.rungs.map(r => r.instructions.map(i => i.kind)), [
+    ["OR_JUNCTION","XIC","XIO","OTE"],
+    ["OR_JUNCTION","XIC","OTE"],
+    ["XIC","XIC","OTE"],
+    ["XIC","CTU"],["XIC","CTU"],
+    ["OR_JUNCTION","XIC","CTU"],
+    ["XIC","XIC","CTU"],
+    ["XIC","XIC","RES"],["XIC","XIC","RES"],["XIC","XIC","RES"],
+  ]);
+  const [motor,stop,,,,total,batch] = project.rungs;
+  assert.deepEqual(motor.parallelBranches[0].instructions.map(i=>i.tag),
+    ["Sort_Motor"]);
+  assert.equal(motor.parallelBranches[0].endId,motor.instructions[1].id);
+  assert.deepEqual(stop.parallelBranches[0].instructions.map(i=>i.tag),
+    ["Sort_CountTotal.DN","Sort_LineClear"]);
+  assert.deepEqual(total.parallelBranches[0].instructions.map(i=>i.tag),
+    ["Sort_BExit"]);
+  assert.equal(batch.instructions[2].tag,"Sort_Batches");
+  for(const tag of ["Sort_CountA","Sort_CountB","Sort_CountTotal","Sort_Batches"])
+    assert.equal(readSortCount(project,tag),0);
+  assert.equal(project.tags.find(t => t.name === "Sort_CountTotal").value.PRE,SORT_BATCH_SIZE);
+  assert.equal(project.tags.find(t => t.name === "Sort_LineClear").value,true);
+  assert.equal(prepareSortTags(project),project);
 });
 
 test("sorter physics keeps boxes stationary unless MainRoutine motor is on", () => {
@@ -131,7 +154,7 @@ test("App exposes scene switch and independently saved MainRoutine sessions",()=
   assert.match(app,/sceneSessions\.current\[previous\] = stopPracticeScans\(current\)/);
   assert.match(app,/stopPracticeScans\(sceneSessions\.current\[next\]\)/);
   assert.match(app,/<SortScene project=\{practice\}/);
-  assert.match(app,/applySceneSensorBoolInput\(state, name, value\)/);
+  assert.match(app,/applySortSensorInput\(state, name, value\)/);
   assert.match(tags,/activeScene === "motor" \? "demo" : "practice"/);
   assert.match(tags,/MainRoutine · Clasificación de cajas/);
   assert.match(view,/Pilotos LED y producción/);

@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "react";
 import { BookOpen, Info, X } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
-import { SORT_TAGS, readSortBool, readSortCount } from "../../plc/sortSceneModel";
+import {
+  SORT_TAGS, SORT_TEMPLATE_TAGS, SORT_BATCH_SIZE, readSortBool, readSortCount,
+} from "../../plc/sortSceneModel";
 
 interface Props {
   open: boolean;
@@ -39,12 +41,16 @@ export function SortSceneInfoDialog({ open, project, onClose, onOpenTags, onLoad
             <BookOpen size={15}/> Objetivo del ejercicio
           </h3>
           <p className="text-xs leading-relaxed">
-            Programa en MainRoutine el arranque y paro de la faja clasificadora.
-            Identifica las cajas de tipo B mediante el sensor óptico y activa el
-            desviador para enviarlas a la salida B. Las cajas tipo A deben avanzar
-            por la salida A. Registra cada caja por separado en los contadores
-            de salida A y B. Comprueba la secuencia usando Build, RUN y los
-            indicadores de la escena.
+            Programa una línea de clasificación por lotes de {SORT_BATCH_SIZE} cajas.
+            Utiliza ramas OR para el enclavamiento START/MOTOR, la parada por
+            STOP o lote completo y el conteo combinado de ambas salidas.
+            Clasifica las cajas A/B con el sensor óptico y el desviador;
+            registra por separado las salidas A y B, el total del lote y los
+            lotes terminados mediante CTU. Al completar seis cajas, mantén
+            la marcha hasta vaciar ambas líneas y detén el motor.
+            RESET LOTE debe borrar los tres contadores del lote, pero conservar
+            el historial de lotes completados. Comprueba Build, RUN y los
+            pilotos del SCADA.
           </p>
         </section>
         <section>
@@ -64,7 +70,8 @@ export function SortSceneInfoDialog({ open, project, onClose, onOpenTags, onLoad
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-700/70">
-                {SORT_TAGS.map((spec) => {
+                {[...SORT_TAGS, ...SORT_TEMPLATE_TAGS.filter(spec =>
+                  project.tags.some(tag => tag.name === spec.name))].map((spec) => {
                   const actual = project.tags.find((item) => item.name === spec.name);
                   const valid = actual?.type === spec.type;
                   const value = !valid ? "Revisar" :
@@ -90,11 +97,18 @@ export function SortSceneInfoDialog({ open, project, onClose, onOpenTags, onLoad
               Orientación Ladder (opcional)
             </summary>
             <div className="mt-2 space-y-1 font-mono text-[11px] text-slate-300">
-              <p>Sort_StartPB → OTL Sort_Motor</p>
-              <p>Sort_StopPB → OTU Sort_Motor</p>
-              <p>Sort_TypeB → OTE Sort_Divert</p>
-              <p>Sort_AExit → CTU Sort_CountA</p>
-              <p>Sort_BExit → CTU Sort_CountB</p>
+              <p>R0: OR (Sort_StartPB | Sort_Motor) + XIO Sort_StopRequest → OTE Sort_Motor</p>
+              <p>R1: OR (Sort_StopPB | Sort_CountTotal.DN + Sort_LineClear) → OTE Sort_StopRequest</p>
+              <p>R2: Sort_Motor + Sort_TypeB → OTE Sort_Divert</p>
+              <p>R3: Sort_AExit → CTU Sort_CountA</p>
+              <p>R4: Sort_BExit → CTU Sort_CountB</p>
+              <p>R5: OR (Sort_AExit | Sort_BExit) → CTU Sort_CountTotal (PRE=6)</p>
+              <p>R6: Sort_CountTotal.DN + Sort_LineClear → CTU Sort_Batches</p>
+              <p>R7–R9: Sort_LineClear + Sort_ResetPB → RES CountA / CountB / CountTotal</p>
+              <p className="pt-2 font-sans text-slate-400">
+                La parada automática espera la descarga de todas las cajas.
+                RESET LOTE funciona solo con ambas líneas vacías y no borra Sort_Batches.
+              </p>
             </div>
           </details>
           <button type="button" onClick={() => { onClose(); onLoadExample(); }}
@@ -102,7 +116,9 @@ export function SortSceneInfoDialog({ open, project, onClose, onOpenTags, onLoad
             Cargar plantilla Ladder (reemplaza MainRoutine de esta escena)
           </button>
           <p className="mt-2 text-[11px] text-slate-400">
-            La plantilla solicita confirmación antes de reemplazar el programa del clasificador.
+            La plantilla avanzada requiere confirmación y añade cinco tags:
+            RESET, líneas vacías, solicitud de parada y dos contadores.
+            No modifica los programas de las otras escenas.
           </p>
         </section>
       </div>

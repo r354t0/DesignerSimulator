@@ -27,7 +27,8 @@ import {
 } from "./plc/tankSceneModel";
 import {
   addSortBox, createSortExampleProject, initialSortProject, initialSortState,
-  prepareSortTags, readSortBool, stepSortState, type SortBoxType, type SortState,
+  applySortMomentaryInput, applySortSensorInput, prepareSortTags,
+  readSortBool, stepSortState, type SortBoxType, type SortState,
 } from "./plc/sortSceneModel";
 import {
   CONVEYOR_SENSOR_TAG, addConveyorItem, createConveyorExampleProject,
@@ -220,11 +221,12 @@ export default function App() {
         ["Sort_TypeB", next.sensorTypeB],
         ["Sort_AExit", next.sensorExitA],
         ["Sort_BExit", next.sensorExitB],
+        ["Sort_LineClear", next.lineClear],
       ];
       for (const [name, value] of sensors) {
         const tag = scanRef.current.project.tags.find((item) => item.name === name);
         if (tag?.type === "BOOL" && tag.value !== value) {
-          changeScan((state) => applySceneSensorBoolInput(state, name, value));
+          changeScan((state) => applySortSensorInput(state, name, value));
         }
       }
     }, 50);
@@ -343,8 +345,11 @@ export default function App() {
     }
   }, [changeScan]);
 
-  const setSortInput = useCallback((tag: "Sort_StartPB" | "Sort_StopPB", value: boolean) => {
-    changeScan((state) => applyMomentaryBoolInput(state, tag, value));
+  const setSortInput = useCallback((
+    tag: "Sort_StartPB" | "Sort_StopPB" | "Sort_ResetPB", value: boolean,
+  ) => {
+    if (activeControllerScene.current !== "sorting") return;
+    changeScan((state) => applySortMomentaryInput(state, tag, value));
   }, [changeScan]);
   const resetSort = useCallback(() => {
     changeSort(() => initialSortState());
@@ -353,8 +358,13 @@ export default function App() {
       for (const name of ["Sort_TypeB", "Sort_AExit", "Sort_BExit"]) {
         if (next.project.tags.some((tag) =>
           tag.name === name && tag.type === "BOOL" && tag.value === true)) {
-          next = applySceneSensorBoolInput(next, name, false);
+          next = applySortSensorInput(next, name, false);
         }
+      }
+      // A physically cleared scene has both lines empty.
+      const clear = next.project.tags.find(tag => tag.name === "Sort_LineClear");
+      if (clear?.type === "BOOL" && clear.value !== true) {
+        next = applySortSensorInput(next, "Sort_LineClear", true);
       }
       return next;
     });
