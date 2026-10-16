@@ -62,12 +62,13 @@ export function TrafficScene({project,mode,state,onInputChange,onAddVehicle,onRe
   const pending=readTrafficBool(project,"Tr_PedPending");
   const fault=readTrafficBool(project,"Tr_Fault");
   const phase=TRAFFIC_PHASES.find(p=>readTrafficBool(project,p));
-  const phaseLabel={
+  const phaseLabels: Record<string,string> = {
     Tr_NSPhase:"VERDE N-S",Tr_NSYPhase:"AMARILLO N-S",
     Tr_Red1Phase:"ROJO DE SEGURIDAD",Tr_EWPhase:"VERDE E-O",
     Tr_EWYPhase:"AMARILLO E-O",Tr_Red2Phase:"ROJO DE SEGURIDAD",
     Tr_WalkPhase:"CRUCE PEATONAL",
-  }[phase??""]??"EN ESPERA";
+  };
+  const phaseLabel=phaseLabels[phase??""]??"EN ESPERA";
   const timer=Object.keys(TRAFFIC_TIMERS).find(name=>{
     const tag=project.tags.find(t=>t.name===name);
     return tag?.type==="TIMER"&&typeof tag.value==="object"&&tag.value.EN===true;
