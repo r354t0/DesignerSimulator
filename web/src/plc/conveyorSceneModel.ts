@@ -133,9 +133,12 @@ export function prepareConveyorTags(project: PracticeProject): PracticeProject {
 export function initialConveyorProject(): PracticeProject {
   const base = initialPracticeProject();
   const allowed = new Set(CONVEYOR_TAGS.map((tag) => tag.name));
-  return prepareConveyorTags({
+  const prepared = prepareConveyorTags({
     ...base, tags: base.tags.filter((tag) => allowed.has(tag.name)),
   });
+  // Display in scene wiring order: simulated inputs, actuator, then counter.
+  return { ...prepared, tags: CONVEYOR_TAGS.map((spec) =>
+    prepared.tags.find((tag) => tag.name === spec.name)!) };
 }
 
 /** Optional self-contained teaching example, applied only after explicit confirmation. */
