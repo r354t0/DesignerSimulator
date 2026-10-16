@@ -41,7 +41,7 @@ test("two consecutive boxes count twice at 500ms PLC scan without missing short 
   assert.equal(readConveyorBool(plc.project, "Motor_Run"), true);
   let belt = addConveyorItem(initialConveyorState());
   const edges = [];
-  let clearedWithTwoBoxes = false;
+  let clearedBetweenDischarges = false;
 
   for (let i = 0; i < 160; i++) {
     // Create the second box while the first one is further down the belt.
@@ -52,7 +52,9 @@ test("two consecutive boxes count twice at 500ms PLC scan without missing short 
     const next = stepConveyor(belt, readConveyorBool(plc.project, "Motor_Run"), 50);
     if (next.sensorActive !== belt.sensorActive) {
       edges.push(next.sensorActive);
-      if (!next.sensorActive && next.items.length === 2) clearedWithTwoBoxes = true;
+      if (!next.sensorActive && next.items.length === 1 && next.passed === 1) {
+        clearedBetweenDischarges = true;
+      }
       plc = applySceneSensorBoolInput(plc, CONVEYOR_SENSOR_TAG, next.sensorActive);
     }
     belt = next;
@@ -61,7 +63,8 @@ test("two consecutive boxes count twice at 500ms PLC scan without missing short 
   }
   assert.deepEqual(edges, [true, false, true, false],
     "both rising edges must be separated by a real false reading");
-  assert.ok(clearedWithTwoBoxes, "sensor clears while both boxes remain on the belt");
+  assert.ok(clearedBetweenDischarges,
+    "photoeye clears after first discharge while the next box is approaching");
   assert.equal(readConveyorCount(plc.project), 2);
   assert.equal(belt.passed, 2);
   assert.equal(readConveyorBool(plc.project, CONVEYOR_SENSOR_TAG), false);
@@ -92,7 +95,7 @@ test("closely spaced boxes are still detected separately by PE-01 and counted by
   plc = applyMomentaryBoolInput(plc, "Start_PB", true);
   plc = applyMomentaryBoolInput(plc, "Start_PB", false);
   let belt = addConveyorItem(initialConveyorState());
-  let gapAtSensor = false;
+  let gapAfterFirstExit = false;
   const sensorEdges = [];
 
   for (let i = 0; i < 155; i++) {
@@ -107,14 +110,17 @@ test("closely spaced boxes are still detected separately by PE-01 and counted by
     const next = stepConveyor(belt, readConveyorBool(plc.project, "Motor_Run"), 50);
     if (next.sensorActive !== belt.sensorActive) {
       sensorEdges.push(next.sensorActive);
-      if (!next.sensorActive && next.items.length === 2) gapAtSensor = true;
+      if (!next.sensorActive && next.items.length === 1 && next.passed === 1) {
+        gapAfterFirstExit = true;
+      }
       plc = applySceneSensorBoolInput(plc, CONVEYOR_SENSOR_TAG, next.sensorActive);
     }
     belt = next;
     if ((i + 1) % 10 === 0) plc = tickPracticeScan(plc);
   }
 
-  assert.equal(gapAtSensor, true, "PE-01 releases even for the minimum 6px separation");
+  assert.equal(gapAfterFirstExit, true,
+    "PE-01 releases between consecutive close boxes at the discharge mouth");
   assert.deepEqual(sensorEdges, [true, false, true, false],
     "the two close boxes must make two independent pulses");
   assert.equal(readConveyorCount(plc.project), 2, "CTU must count both close boxes");
