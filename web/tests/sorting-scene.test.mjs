@@ -160,7 +160,7 @@ test("App exposes scene switch and independently saved MainRoutine sessions",()=
   assert.match(view,/Pilotos LED y producción/);
   assert.match(view,/<Pilot label="SALIDA A" active=\{state\.sensorExitA\} color="green"\/>/);
   assert.match(view,/<Pilot label="SALIDA B" active=\{state\.sensorExitB\} color="amber"\/>/);
-  assert.match(view,/MomentaryPushButton name="START"/);
+  assert.match(view,/MomentaryPushButton compact name="START"/);
   assert.match(view,/onAddBox\("A"\)/);
   assert.match(view,/onAddBox\("B"\)/);
   assert.match(info,/Mapa E\/S · Señales del clasificador/);
