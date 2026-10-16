@@ -483,7 +483,8 @@ export function PracticeEditor({
       } else if (isPalette && isEditableKind(paletteKind)) {
         if (target.lane === "upper" && target.anchorId) {
           const id = nextId("instruction");
-          if (update(() => insertIntoIndependentOrUpper(project, rungId, target.anchorId, {
+          const anchorId = target.anchorId;
+          if (update(() => insertIntoIndependentOrUpper(project, rungId, anchorId, {
             id, tag: "", kind: paletteKind,
           }))) {
             setSelected(id);
