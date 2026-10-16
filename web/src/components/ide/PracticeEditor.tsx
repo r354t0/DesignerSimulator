@@ -684,11 +684,9 @@ export function PracticeEditor({
             const hasTimerOutputs = outputs.some((part) =>
               isTimerKind(part.kind) || isCounterKind(part.kind) || isMathKind(part.kind));
             const emptyOutputBranches = rung.emptyOutputBranches ?? [];
-            const layout = getWrappedRungLayout(
-              rung, canvasWidth, Boolean(draggingKind || moving),
-              draggingKind !== null && isOutputKind(draggingKind) &&
-                outputs.length + emptyOutputBranches.length < MAX_PARALLEL_OUTPUTS,
-            );
+            // Keep every rung at its persisted height while dragging.
+            // Insertion is shown as a non-layout-changing SVG overlay only.
+            const layout = getWrappedRungLayout(rung, canvasWidth);
             const { width, coilX, coilY, outputYs, emptyOutputYs, groups, rows } = layout;
             const svgHeight = layout.height;
             const rungLive = running && Boolean(runtimeView?.rungPower[rung.id]);
@@ -1167,18 +1165,37 @@ export function PracticeEditor({
                       })}
                       {dropPreview?.rungId === rung.id && (
                         <g pointerEvents="none">
-                          <rect x={dropPreview.x - (dropPreview.kind === "OTE" ? 42 : 32)}
-                            y={dropPreview.y - 27} width={dropPreview.kind === "OTE" ? 84 : 64}
-                            height="54" rx="5" fill="#dbeafe" fillOpacity="0.88"
-                            stroke="#2563eb" strokeWidth="1.4" strokeDasharray="4 3" />
-                          <path d={"M" + dropPreview.x + " " + (dropPreview.y - 33) + "v66"}
-                            stroke="#0284c7" strokeWidth="2" strokeDasharray="5 3" />
-                          <text x={dropPreview.x} y={dropPreview.y + 5} textAnchor="middle"
-                            fontSize="11" fontWeight="700" fill="#1d4ed8">{dropPreview.kind}</text>
-                          {dropPreview.lane === "parallel" && (
-                            <text x={dropPreview.x} y={dropPreview.y + 44}
-                              textAnchor="middle" fontSize="10" fill="#2563eb">Rama OR</text>
-                          )}
+                          {isOutputKind(dropPreview.kind) && outputs.length > 0 &&
+                            !dropPreview.branchId ? (
+                              // Mark a pending additional output without drawing below
+                              // the current rung or changing its height.
+                              <g>
+                                <circle cx={width - 50} cy={outputYs.at(-1) ?? coilY}
+                                  r="11" fill="#dbeafe" stroke="#2563eb"
+                                  strokeWidth="1.5" strokeDasharray="3 2"/>
+                                <path d={"M" + (width - 56) + " " + (outputYs.at(-1) ?? coilY) +
+                                  "h12 M" + (width - 50) + " " +
+                                  ((outputYs.at(-1) ?? coilY) - 6) + "v12"}
+                                  stroke="#2563eb" strokeWidth="2"/>
+                                <title>Añadir salida paralela al soltar</title>
+                              </g>
+                            ) : (
+                              <g>
+                                <rect x={dropPreview.x - (isOutputKind(dropPreview.kind) ? 42 : 32)}
+                                  y={dropPreview.y - 27}
+                                  width={isOutputKind(dropPreview.kind) ? 84 : 64}
+                                  height="54" rx="5" fill="#dbeafe" fillOpacity="0.88"
+                                  stroke="#2563eb" strokeWidth="1.4" strokeDasharray="4 3" />
+                                <path d={"M" + dropPreview.x + " " + (dropPreview.y - 33) + "v66"}
+                                  stroke="#0284c7" strokeWidth="2" strokeDasharray="5 3" />
+                                <text x={dropPreview.x} y={dropPreview.y + 5} textAnchor="middle"
+                                  fontSize="11" fontWeight="700" fill="#1d4ed8">{dropPreview.kind}</text>
+                                {dropPreview.lane === "parallel" && (
+                                  <text x={dropPreview.x} y={dropPreview.y + 44}
+                                    textAnchor="middle" fontSize="10" fill="#2563eb">Rama OR</text>
+                                )}
+                              </g>
+                            )}
                         </g>
                       )}
                     </svg>
