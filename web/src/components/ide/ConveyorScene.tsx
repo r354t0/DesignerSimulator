@@ -3,7 +3,7 @@ import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
 import {
   CONVEYOR_COUNT_TAG, CONVEYOR_SENSOR_TAG, CONVEYOR_SENSOR_POSITION,
-  addConveyorItem, hasConveyorTags, readConveyorBool, readConveyorCount,
+  hasConveyorTags, readConveyorBool, readConveyorCount,
   type ConveyorState,
 } from "../../plc/conveyorSceneModel";
 
