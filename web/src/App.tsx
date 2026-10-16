@@ -260,7 +260,8 @@ export default function App() {
     const id = window.setInterval(() => {
       const current = scanRef.current;
       if (current.mode !== "running" || activeControllerScene.current !== "traffic") return;
-      const next = stepTrafficState(trafficRef.current,
+      const previous = trafficRef.current;
+      const next = stepTrafficState(previous,
         readTrafficBool(current.project, "Tr_NS_Green"),
         readTrafficBool(current.project, "Tr_EW_Green"),
         readTrafficBool(current.project, "Tr_Walk"), 50);
@@ -270,8 +271,8 @@ export default function App() {
       changeScan(state => {
         let updated=state;
         for (const [tag,prev,now] of [
-          ["Tr_NSExit", trafficRef.current.exitedNS, next.exitedNS],
-          ["Tr_EWExit", trafficRef.current.exitedEW, next.exitedEW],
+          ["Tr_NSExit", previous.exitedNS, next.exitedNS],
+          ["Tr_EWExit", previous.exitedEW, next.exitedEW],
         ] as const) {
           const input=updated.project.tags.find(t=>t.name===tag);
           if (input?.type==="BOOL" && now>prev) {
