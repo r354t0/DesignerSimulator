@@ -12,16 +12,29 @@ import {
 export const SORT_TAGS: readonly {
   name: string; type: TagType; direction: "Entrada" | "Salida" | "Interna"; description: string;
 }[] = [
-  { name: "Sort_StartPB", type: "BOOL", direction: "Entrada", description: "Clasificador: pulsador START" },
-  { name: "Sort_StopPB", type: "BOOL", direction: "Entrada", description: "Clasificador: pulsador STOP" },
-  { name: "Sort_TypeB", type: "BOOL", direction: "Entrada", description: "Clasificador: sensor de caja tipo B" },
-  { name: "Sort_AExit", type: "BOOL", direction: "Entrada", description: "Clasificador: sensor de salida A" },
-  { name: "Sort_BExit", type: "BOOL", direction: "Entrada", description: "Clasificador: sensor de salida B" },
-  { name: "Sort_Motor", type: "BOOL", direction: "Salida", description: "Clasificador: motor de transporte principal" },
-  { name: "Sort_Divert", type: "BOOL", direction: "Salida", description: "Clasificador: accionamiento del desviador hacia línea B" },
-  { name: "Sort_CountA", type: "COUNTER", direction: "Interna", description: "Clasificador: cajas que cruzaron la salida A" },
-  { name: "Sort_CountB", type: "COUNTER", direction: "Interna", description: "Clasificador: cajas que cruzaron la salida B" },
+  { name: "Sort_StartPB", type: "BOOL", direction: "Entrada", description: "Pulsador START" },
+  { name: "Sort_StopPB", type: "BOOL", direction: "Entrada", description: "Pulsador STOP" },
+  { name: "Sort_TypeB", type: "BOOL", direction: "Entrada", description: "Sensor tipo B" },
+  { name: "Sort_AExit", type: "BOOL", direction: "Entrada", description: "Sensor salida A" },
+  { name: "Sort_BExit", type: "BOOL", direction: "Entrada", description: "Sensor salida B" },
+  { name: "Sort_Motor", type: "BOOL", direction: "Salida", description: "Motor principal" },
+  { name: "Sort_Divert", type: "BOOL", direction: "Salida", description: "Desviador línea B" },
+  { name: "Sort_CountA", type: "COUNTER", direction: "Interna", description: "Conteo salida A" },
+  { name: "Sort_CountB", type: "COUNTER", direction: "Interna", description: "Conteo salida B" },
 ];
+
+/** Keep user-edited descriptions; migrate only previously generated defaults. */
+const SORT_LEGACY_DESCRIPTIONS: Readonly<Record<string, string>> = {
+  Sort_StartPB: "Clasificador: pulsador START",
+  Sort_StopPB: "Clasificador: pulsador STOP",
+  Sort_TypeB: "Clasificador: sensor de caja tipo B",
+  Sort_AExit: "Clasificador: sensor de salida A",
+  Sort_BExit: "Clasificador: sensor de salida B",
+  Sort_Motor: "Clasificador: motor de transporte principal",
+  Sort_Divert: "Clasificador: accionamiento del desviador hacia línea B",
+  Sort_CountA: "Clasificador: cajas que cruzaron la salida A",
+  Sort_CountB: "Clasificador: cajas que cruzaron la salida B",
+};
 
 /** Installed only when the user accepts the advanced Ladder solution. */
 export const SORT_TEMPLATE_TAGS: readonly (typeof SORT_TAGS)[number][] = [
@@ -106,7 +119,8 @@ export function prepareSortTags(project: PracticeProject): PracticeProject {
   for (const spec of specs) {
     const old = result.tags.find((tag) => tag.name === spec.name);
     if (!old) result = createTag(result, spec.name, spec.description, spec.type);
-    else if (!old.description.trim()) {
+    else if (!old.description.trim() ||
+      old.description === SORT_LEGACY_DESCRIPTIONS[spec.name]) {
       result = { ...result, tags: result.tags.map((tag) =>
         tag.name === spec.name ? { ...tag, description: spec.description } : tag) };
     }
