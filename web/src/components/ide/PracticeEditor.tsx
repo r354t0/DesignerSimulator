@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, GripVertical, Hammer, Pause, Play, Square, StepForward, XCircle } from "lucide-react";
-import { Coil, Contact, TimerBlock, CounterBlock, ComparisonBlock, MathOutputBlock, LadderRails, Wire, type Instruction } from "./LadderSymbols";
+import { Coil, ResetCoil, Contact, TimerBlock, CounterBlock, ComparisonBlock, MathOutputBlock, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { CompareOperandEditor, type CompareOperandAnchor } from "./CompareOperandEditor";
 import { numericOperandLabel, setComparisonOperand } from "../../plc/practiceCompare";
 import { setMathSource } from "../../plc/practiceMath";
@@ -717,7 +717,8 @@ export function PracticeEditor({
             const contacts = rung.instructions.filter((part) => !isOutputKind(part.kind));
             const outputs = rung.instructions.filter((part) => isOutputKind(part.kind));
             const hasTimerOutputs = outputs.some((part) =>
-              isTimerKind(part.kind) || isCounterKind(part.kind) || isMathKind(part.kind));
+              (isTimerKind(part.kind) && part.kind !== "RES") ||
+              isCounterKind(part.kind) || isMathKind(part.kind));
             const emptyOutputBranches = rung.emptyOutputBranches ?? [];
             // Keep every rung at its persisted height while dragging.
             // Insertion is shown as a non-layout-changing SVG overlay only.
@@ -1156,13 +1157,23 @@ export function PracticeEditor({
                                           <Wire x1={coilX + 16} y1={coilRowY}
                                             x2={width - 30} y2={coilRowY} live={rungLive}/>
                                         </>
-                                      ) : (isCounterKind(output.kind) ||
-                                        (output.kind === "RES" && assignedTag?.type === "COUNTER")) ? (
+                                      ) : output.kind === "RES" ? (
+                                        <>
+                                          <Wire x1={coilX - (hasTimerOutputs ? 142 : 75)} y1={coilRowY}
+                                            x2={coilX - 24} y2={coilRowY} live={rungLive}/>
+                                          <ResetCoil x={coilX} y={coilRowY} tag={output.tag || "??"}
+                                            comment={assignedTag?.description} labelWidth={96}
+                                            selected={selected === output.id} online={running}
+                                            live={runtimeView?.instructionFlow[output.id]?.powerOut ?? false}/>
+                                          <Wire x1={coilX + 24} y1={coilRowY}
+                                            x2={width - 30} y2={coilRowY} live={rungLive}/>
+                                        </>
+                                      ) : isCounterKind(output.kind) ? (
                                         <>
                                           <Wire x1={coilX - 142} y1={coilRowY}
                                             x2={coilX - 120} y2={coilRowY} live={rungLive}/>
                                           <CounterBlock x={coilX - 52} y={coilRowY}
-                                            kind={output.kind as "CTU" | "CTD" | "RES"}
+                                            kind={output.kind as "CTU" | "CTD"}
                                             tag={output.tag || "??"}
                                             presetLabel={output.preset?.mode === "literal"
                                               ? String(output.preset.value)
@@ -1321,8 +1332,8 @@ export function PracticeEditor({
                     })}
                     {outputs.flatMap((output, index) => [
                       dragButton(output, coilX, outputYs[index]),
-                      ...(isTimerKind(output.kind) || isCounterKind(output.kind) ||
-                        isMathKind(output.kind)
+                      ...(((isTimerKind(output.kind) && output.kind !== "RES") ||
+                        isCounterKind(output.kind) || isMathKind(output.kind))
                         ? [structuredDragHandle(output, coilX, outputYs[index])] : []),
                       ...(!isMathKind(output.kind) ? [tagDragButton(output, coilX, outputYs[index])] :
                         (["A", ...(output.kind === "MOV" ? [] : ["B"]), "Dest"] as Array<"A" | "B" | "Dest">)

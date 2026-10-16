@@ -14,7 +14,7 @@ export const INSTRUCTIONS: { id: Instruction; label: string }[] = [
   { id: "TON", label: "Timer On Delay" },
   { id: "TOF", label: "Timer Off Delay" },
   { id: "RTO", label: "Retentive Timer" },
-  { id: "RES", label: "Reset Timer" },
+  { id: "RES", label: "Reset Timer / Counter" },
   { id: "TONOFF", label: "Dual On/Off Delay (custom simulator block)" },
   { id: "CTU", label: "Count Up" },
   { id: "CTD", label: "Count Down" },
@@ -163,7 +163,7 @@ export const SYMBOL_SCALE = 0.5;
 
 export function ToolbarSymbol({ kind }: { kind: Instruction }) {
   const isContact = kind === "XIC" || kind === "XIO" || kind === "ONS";
-  const isBlock = ["TON", "TOF", "RTO", "RES", "TONOFF", "CTU", "CTD", "EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ", "MOV", "ADD", "SUB", "MUL", "DIV"].includes(kind);
+  const isBlock = ["TON", "TOF", "RTO", "TONOFF", "CTU", "CTD", "EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ", "MOV", "ADD", "SUB", "MUL", "DIV"].includes(kind);
   return (
     <svg width="46" height="28" viewBox="0 0 92 50" aria-hidden="true">
       <g stroke="currentColor" strokeWidth="2.4" fill="none" strokeLinecap="square">
@@ -172,6 +172,8 @@ export function ToolbarSymbol({ kind }: { kind: Instruction }) {
             <path d="M4 25H34 M58 25H88 M34 8V42 M58 8V42" />
             {kind === "XIO" && <path d="M34 42L58 8" />}
           </>
+        ) : kind === "RES" ? (
+          <path d="M4 25H23 M69 25H88" />
         ) : isBlock ? (
           <path d="M4 25H23 M69 25H88 M23 4H69V46H23Z" />
         ) : (
@@ -180,9 +182,9 @@ export function ToolbarSymbol({ kind }: { kind: Instruction }) {
           </>
         )}
       </g>
-      {(kind === "OTL" || kind === "OTU" || kind === "ONS" || isBlock) && (
+      {(kind === "OTL" || kind === "OTU" || kind === "ONS" || kind === "RES" || isBlock) && (
         <text x="46" y="30" textAnchor="middle" fill="currentColor" fontSize={kind === "TONOFF" ? 8.5 : isBlock || kind === "ONS" ? 12 : 16} fontWeight="600" fontFamily="Arial, sans-serif">
-          {isBlock ? kind : kind === "ONS" ? "ONS" : kind === "OTL" ? "L" : "U"}
+          {kind === "RES" ? "(RES)" : isBlock ? kind : kind === "ONS" ? "ONS" : kind === "OTL" ? "L" : "U"}
         </text>
       )}
     </svg>
@@ -302,6 +304,40 @@ x: number; y: number; tag: string; comment?: string; online: boolean; live: bool
 }
 
 /**
+ * Studio-style RES is a compact output symbol (RES), not a TON/CTU function
+ * block. It accepts either a TIMER or COUNTER tag and has no PRE/ACC fields.
+ * Only rung power determines its online highlight; no BOOL output is stored.
+ */
+export function ResetCoil({
+  x, y, tag, comment, online, live, labelWidth, selected = false,
+}: {
+  x: number; y: number; tag: string; comment?: string;
+  online: boolean; live: boolean; labelWidth?: number; selected?: boolean;
+}) {
+  const energized = online && live;
+  const stroke = energized ? HOT : BASE;
+  return (
+    <g>
+      {selected && <SelectedInstructionFrame x={x} y={y} comment={comment} labelWidth={labelWidth}/>}
+      <g textAnchor="middle" fontFamily="Arial, sans-serif">
+        <SvgComment x={x} y={y} comment={comment} maxWidth={labelWidth}/>
+        <text x={x} y={y - 23} fontSize="12"
+          fill={selected ? "#ffffff" : "#1c354b"}>
+          <title>{tag}</title>
+          {labelWidth ? ellipsizeSvgLabel(tag, labelWidth) : tag}
+        </text>
+        <text x={x} y={y + 4} fontSize="12" fontWeight="600"
+          fill={stroke}>
+          (RES)
+        </text>
+      </g>
+      <Wire x1={x - 24} y1={y} x2={x - 21} y2={y} live={energized}/>
+      <Wire x1={x + 21} y1={y} x2={x + 24} y2={y} live={energized}/>
+    </g>
+  );
+}
+
+/**
  * Shared Ladder rail primitives for both editable and monitor-only routines.
  * A continuous column can be rendered over an entire routine or one row.
  */
@@ -375,7 +411,7 @@ export function RungFrame({
 export function TimerBlock({
   x, y, kind, tag, preset, presetLabel, accumulated, en, tt, dn, selected, online, live,
 }: {
-  x: number; y: number; kind: "TON" | "TOF" | "RTO" | "RES";
+  x: number; y: number; kind: "TON" | "TOF" | "RTO";
   tag: string; preset: number; presetLabel?: string; accumulated: number;
   en: boolean; tt: boolean; dn: boolean;
   selected?: boolean; online: boolean; live: boolean;
@@ -415,7 +451,7 @@ export function TimerBlock({
 export function CounterBlock({
   x, y, kind, tag, preset, presetLabel, accumulated, cu, cd, dn, ov, un, selected, online, live,
 }: {
-  x: number; y: number; kind: "CTU" | "CTD" | "RES";
+  x: number; y: number; kind: "CTU" | "CTD";
   tag: string; preset: number; presetLabel?: string; accumulated: number;
   cu: boolean; cd: boolean; dn: boolean; ov: boolean; un: boolean;
   selected?: boolean; online: boolean; live: boolean;
