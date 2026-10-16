@@ -123,21 +123,11 @@ export function SortScene({
         {/* Wide process graphic remains the focal point, with a real flow diagram. */}
         <section className="sort-panel rounded-lg border border-[#344c5e] p-3"
           aria-labelledby="sort-process-title">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <ScanLine size={16} className="text-sky-300" aria-hidden="true"/>
-              <h3 id="sort-process-title" className="text-xs font-semibold text-slate-100">
-                Vista de proceso
-              </h3>
-              <span className="rounded bg-[#213c50] px-2 py-0.5 font-mono text-[10px] text-slate-300">
-                TRANSPORTADOR · DV-01
-              </span>
-            </div>
-            <span className="inline-flex items-center gap-1.5 text-[10px] text-slate-400">
-              <span className={"size-2 rounded-full " +
-                (motor ? "bg-emerald-400" : "bg-slate-500")}/>
-              Motor {motor ? "activado" : "detenido"}
-            </span>
+          <div className="mb-3 flex items-center gap-2">
+            <ScanLine size={16} className="text-sky-300" aria-hidden="true"/>
+            <h3 id="sort-process-title" className="text-xs font-semibold text-slate-100">
+              Vista de proceso
+            </h3>
           </div>
           <SortProcessGraphic state={state} motor={motor}
             divert={divert} detection={detection}/>
