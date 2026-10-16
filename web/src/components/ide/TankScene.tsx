@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Droplets, Info, Pause, Play, RotateCcw } from "lucide-react";
+import { AlertTriangle, Clock3, Droplets, Info, Pause, Play, RotateCcw, ScanLine, Cog } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
 import { MomentaryPushButton } from "./MomentaryPushButton";
 import { TankSceneInfoDialog } from "./TankSceneInfoDialog";
 import {
-  hasTankTags, readTankBool, type TankState,
+  hasTankTags, readTankBool, TANK_BATCH_TARGET, TANK_TIMER_PRESETS, type TankState,
 } from "../../plc/tankSceneModel";
 
 interface Props {
@@ -14,7 +14,7 @@ interface Props {
   state: TankState;
   setupError: string | null;
   onInputChange: (
-    name: "Tank_StartPB" | "Tank_StopPB" | "Tank_DrainPB", pressed: boolean
+    name: "Tank_StartPB" | "Tank_StopPB" | "Tank_DrainPB" | "Tank_ResetPB", pressed: boolean
   ) => void;
   onReset: () => void;
   onPrepareTags: () => void;
@@ -50,6 +50,26 @@ export function TankScene({
   const pump = running && readTankBool(project, "Tank_Pump");
   const inlet = running && readTankBool(project, "Tank_InletValve");
   const drain = running && readTankBool(project, "Tank_DrainValve");
+  const mixer = running && readTankBool(project, "Tank_Mixer");
+  const alarm = readTankBool(project, "Tank_Alarm");
+  const auto = running && readTankBool(project, "Tank_RunCmd");
+  const filling = auto && readTankBool(project, "Tank_FillStage");
+  const mixing = auto && readTankBool(project, "Tank_MixStage");
+  const draining = auto && readTankBool(project, "Tank_DrainStage");
+  const batch = project.tags.find(t => t.name === "Tank_Batches");
+  const batches = batch?.type === "COUNTER" && typeof batch.value === "object"
+    ? batch.value.ACC : 0;
+  const complete = batches >= TANK_BATCH_TARGET;
+  const phase = alarm ? "ALARMA" : complete ? "LOTE FINALIZADO" :
+    filling ? "LLENANDO" : mixing ? "MEZCLANDO" : draining ? "DRENANDO" :
+      auto ? "PREPARANDO" : "EN ESPERA";
+  const timers = Object.entries(TANK_TIMER_PRESETS).map(([name, preset]) => {
+    const tag = project.tags.find(t => t.name === name);
+    const value = tag?.type === "TIMER" && typeof tag.value === "object"
+      ? tag.value : null;
+    return { name, preset: value?.PRE ?? preset, acc: value?.ACC ?? 0,
+      done: value?.DN === true };
+  });
   const low = readTankBool(project, "Tank_LowLS");
   const high = readTankBool(project, "Tank_HighLS");
   const level = Math.max(0, Math.min(100, state.levelPercent));
@@ -58,23 +78,42 @@ export function TankScene({
   const wired = hasTankTags(project);
 
   return (
-    <section aria-label="SCADA · Llenado de tanques"
-      className="flex h-full min-h-0 flex-col overflow-y-auto bg-[#111c27] text-slate-100">
-      <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
-        <div className="rounded-lg border border-slate-700 bg-[#172634] px-3 py-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <span className="inline-flex items-center gap-2 text-xs font-semibold text-slate-200">
-              <Droplets size={16} className="text-sky-400"/> Tanque TK-01
+    <section aria-label="SCADA · Llenado, mezclado y vaciado de tanques"
+      className="sort-scada-shell flex h-full min-h-0 flex-col overflow-y-auto text-slate-100">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
+        <header className="sort-panel flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#344c5e] px-3.5 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-[#335d76] bg-[#14344a] text-sky-300">
+              <Droplets size={21} aria-hidden="true"/>
+            </div>
+            <div>
+              <div className="text-[10px] font-semibold uppercase tracking-[.14em] text-sky-300">SCADA · ESTACIÓN TK-01</div>
+              <h2 className="text-sm font-bold text-slate-100">Llenado y mezclado por lotes</h2>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span role="status" className={"rounded border px-2.5 py-1.5 text-[10px] font-bold " +
+              (running ? "border-emerald-800 bg-emerald-950/45 text-emerald-300" :
+                mode === "paused" ? "border-amber-700 bg-amber-950/40 text-amber-300" :
+                  "border-slate-600 bg-slate-800 text-slate-300")}>
+              PLC · {running ? "RUN" : mode === "paused" ? "PAUSE" : "STOP"}
             </span>
             <button type="button" aria-haspopup="dialog" aria-expanded={infoOpen}
               onClick={() => setInfoOpen(true)}
               aria-label="Información de llenado de tanques"
-              className="inline-flex items-center gap-1.5 rounded border border-slate-600 px-2.5 py-1.5 text-[11px] font-medium text-sky-200 hover:border-sky-600 hover:bg-slate-700">
+              className="inline-flex items-center gap-1.5 rounded border border-[#456276] bg-[#1a3549] px-2.5 py-1.5 text-[11px] font-semibold text-sky-200 hover:border-sky-400 hover:bg-[#24475f]">
               <Info size={15} aria-hidden="true"/> Objetivo y mapa E/S
             </button>
           </div>
+        </header>
 
-          <div className="overflow-x-auto rounded border border-slate-600 bg-[#0f1d29]"
+        <section className="sort-panel rounded-lg border border-[#344c5e] p-3"
+          aria-labelledby="tank-process-title">
+          <div className="mb-3 flex items-center gap-2">
+            <ScanLine size={16} className="text-sky-300" aria-hidden="true"/>
+            <h3 id="tank-process-title" className="text-xs font-semibold">Vista de proceso</h3>
+          </div>
+          <div className="overflow-x-auto rounded-md border border-slate-600 bg-[#0f1d29]"
             role="img" aria-label={"TK-01 nivel " + level.toFixed(1) +
               " %, bomba " + (pump ? "encendida" : "apagada") +
               ", válvula de entrada " + (inlet ? "abierta" : "cerrada") +
@@ -88,6 +127,20 @@ export function TankScene({
                   <stop offset="100%" stopColor="#125a9b"/>
                 </linearGradient>
               </defs>
+              {/* Mechanical mixer M-02, driven strictly by the PLC output. */}
+              <rect x="379" y="12" width="50" height="27" rx="6"
+                fill={mixer ? "#25584d" : "#405569"}
+                stroke={mixer ? "#34d399" : "#8fa8b9"} strokeWidth="2"/>
+              <text x="404" y="30" fontSize="10" fill="#e0f2fe"
+                fontWeight="700" textAnchor="middle">M-02</text>
+              <path d="M404 39 V184" stroke="#98b0bf" strokeWidth="5"/>
+              <g className="conveyor-motor-spin"
+                style={{ transformOrigin: "404px 184px",
+                  animationPlayState: mixer ? "running" : "paused" }}>
+                <path d="M371 184 H437 M377 176 L431 192 M377 192 L431 176"
+                  fill="none" stroke={mixer ? "#6ee7b7" : "#a9c4d6"}
+                  strokeWidth="6" strokeLinecap="round"/>
+              </g>
               {/* Equipment frame and tank. */}
               <path d="M48 253 H705" stroke="#334b5b" strokeWidth="5" strokeLinecap="round"/>
               <path d="M319 240 L310 254 H333 L338 240 M472 240 L467 254 H490 L495 240"
@@ -191,12 +244,33 @@ export function TankScene({
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-[11px]">
             <span className="text-slate-400">Capacidad simulada: 1000 L</span>
-            <button type="button" onClick={onReset}
-              className="inline-flex items-center gap-1 rounded border border-slate-600 px-3 py-1.5 text-xs hover:bg-slate-700">
+            <button type="button" onClick={onReset} disabled={running}
+              title="Disponible solo con el PLC detenido"
+              className="inline-flex items-center gap-1 rounded border border-slate-600 px-3 py-1.5 text-xs hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40">
               <RotateCcw size={13}/> Reiniciar tanque
             </button>
           </div>
-        </div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-md border border-[#344c5e] bg-[#0d1d2b] p-3">
+            <span className="text-[11px] font-semibold text-slate-300">SECUENCIA</span>
+            <span role="status" className={"text-xs font-bold " +
+              (alarm ? "text-red-400" : complete ? "text-emerald-300" : "text-sky-300")}>{phase}</span>
+            <span className="font-mono text-xs text-slate-200">
+              Lotes: {batches} / {TANK_BATCH_TARGET}
+            </span>
+          </div>
+          <div className="mt-2 grid grid-cols-3 gap-2">
+            {(["LLENADO", "MEZCLADO", "VACIADO"] as const).map((label, index) => {
+              const active = [filling, mixing, draining][index];
+              return (
+                <div key={label} className={"rounded border px-2 py-2 text-center text-[10px] font-semibold " +
+                  (active ? "border-sky-500 bg-sky-950/60 text-sky-200" :
+                    "border-[#344c5e] bg-[#102130] text-slate-500")}>
+                  {label}
+                </div>
+              );
+            })}
+          </div>
+        </section>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="rounded-lg border border-slate-700 bg-[#172634] p-3">
@@ -214,6 +288,10 @@ export function TankScene({
                 pressed={readTankBool(project, "Tank_DrainPB")}
                 onChange={(pressed) => onInputChange("Tank_DrainPB", pressed)}
                 icon={<Droplets size={18} aria-hidden="true"/>}>DRENAR</MomentaryPushButton>
+              <MomentaryPushButton name="RESET" tone="drain"
+                pressed={readTankBool(project, "Tank_ResetPB")}
+                onChange={(pressed) => onInputChange("Tank_ResetPB", pressed)}
+                icon={<RotateCcw size={18} aria-hidden="true"/>}>RESET</MomentaryPushButton>
             </div>
           </div>
           <div className="rounded-lg border border-slate-700 bg-[#172634] p-3">
@@ -224,6 +302,9 @@ export function TankScene({
               <Pilot label="NIVEL BAJO" active={low} tone="amber"/>
               <Pilot label="NIVEL ALTO" active={high} tone="amber"/>
               <Pilot label="VÁLVULA DRENAJE" active={drain} tone="blue"/>
+              <Pilot label="AGITADOR M-02" active={mixer} tone="green"/>
+              <Pilot label="ALARMA" active={alarm} tone="amber"/>
+              <Pilot label="LOTE TERMINADO" active={complete} tone="green"/>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-700 pt-2 text-center text-[11px]">
               <div><span className="text-slate-400">Nivel</span>
@@ -239,6 +320,36 @@ export function TankScene({
                   {state.drainedLiters.toFixed(0)} L
                 </div></div>
             </div>
+          </div>
+        </div>
+
+        <div className="sort-panel rounded-lg border border-[#344c5e] p-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
+            <span className="flex items-center gap-2"><Clock3 size={15} className="text-sky-300"/> Temporizadores TON</span>
+            {alarm && <span className="flex items-center gap-1 text-red-400"><AlertTriangle size={13}/> Tiempo excedido</span>}
+          </div>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {timers.map(timer => (
+              <div key={timer.name} className="rounded-md border border-[#344c5e] bg-[#0e1c28] p-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-mono text-slate-200">{timer.name}</span>
+                  <span className={timer.done ? "text-emerald-300" : "text-slate-400"}>
+                    DN {timer.done ? "1" : "0"}
+                  </span>
+                </div>
+                <div className="mt-1 flex justify-between font-mono text-[10px] text-slate-400">
+                  <span>ACC {timer.acc} ms</span><span>PRE {timer.preset} ms</span>
+                </div>
+                <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#0b1722]">
+                  <div className="sort-progress-fill h-full bg-sky-500"
+                    style={{ width: Math.min(100,
+                      timer.preset > 0 ? timer.acc / timer.preset * 100 : 0) + "%" }}/>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 flex items-center gap-2 text-[10px] text-slate-400">
+            <Cog size={13}/> Motor, agitador y válvulas siguen únicamente las salidas Ladder.
           </div>
         </div>
 
