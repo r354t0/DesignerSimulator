@@ -8,10 +8,10 @@ import {
   tickPracticeScan, pausePracticeScans, stopPracticeScans,
 } from "../src/plc/practiceScanCycle.ts";
 import {
-  addConveyorItem, createConveyorExampleProject,
+  addConveyorItem, canAddConveyorItem, createConveyorExampleProject,
   initialConveyorState, readConveyorBool, readConveyorCount, stepConveyor,
   CONVEYOR_SENSOR_TAG, CONVEYOR_SENSOR_POSITION,
-  CONVEYOR_BELT_LENGTH_PX, CONVEYOR_BOX_WIDTH_PX,
+  CONVEYOR_BELT_LENGTH_PX, CONVEYOR_BOX_WIDTH_PX, MIN_BOX_GAP_UNITS,
 } from "../src/plc/conveyorSceneModel.ts";
 
 test("PE-01 goes LOW for a visually open gap, not a generous detection halo", () => {
@@ -71,12 +71,61 @@ test("box entry enforces enough clearance for a physical sensor to read separati
   let belt = addConveyorItem(initialConveyorState());
   for (let i = 0; i < 9; i++) belt = stepConveyor(belt, true, 50);
   assert.strictEqual(addConveyorItem(belt), belt, "entrance still blocked");
-  for (let i = 0; i < 6; i++) belt = stepConveyor(belt, true, 50);
+  assert.equal(canAddConveyorItem(belt), false, "button matches blocked spawn at 9 ticks");
+  belt = stepConveyor(belt, true, 50);
+  assert.equal(canAddConveyorItem(belt), true, "small gap is already available at 10 ticks");
+  const previous = belt;
   belt = addConveyorItem(belt);
   assert.equal(belt.items.length, 2);
   const clearance = belt.items[0].position - belt.items[1].position -
     CONVEYOR_BOX_WIDTH_PX / CONVEYOR_BELT_LENGTH_PX;
-  assert.ok(clearance >= 0.05, "visible minimum gap exists between physical boxes");
+  assert.ok(clearance >= MIN_BOX_GAP_UNITS, "minimal visible sensor gap");
+  assert.ok(clearance < 0.02, "small original image-like separation must be possible");
+  assert.equal(canAddConveyorItem(belt), false, "cannot spawn overlapping third box");
+  assert.equal(addConveyorItem(belt), belt, "same rule used to block extra boxes");
+  assert.equal(previous.items.length, 1);
+});
+
+test("closely spaced boxes are still detected separately by PE-01 and counted by CTU", () => {
+  let plc = startPracticeScans(setScanPeriod(
+    initialPracticeScanState(createConveyorExampleProject()), 500));
+  plc = applyMomentaryBoolInput(plc, "Start_PB", true);
+  plc = applyMomentaryBoolInput(plc, "Start_PB", false);
+  let belt = addConveyorItem(initialConveyorState());
+  let gapAtSensor = false;
+  const sensorEdges = [];
+
+  for (let i = 0; i < 155; i++) {
+    if (i === 10) {
+      assert.equal(canAddConveyorItem(belt), true,
+        "second box can appear when the first one is only 6–7px away");
+      belt = addConveyorItem(belt);
+      const gap = belt.items[0].position - belt.items[1].position -
+        CONVEYOR_BOX_WIDTH_PX / CONVEYOR_BELT_LENGTH_PX;
+      assert.ok(gap >= MIN_BOX_GAP_UNITS && gap < 0.02);
+    }
+    const next = stepConveyor(belt, readConveyorBool(plc.project, "Motor_Run"), 50);
+    if (next.sensorActive !== belt.sensorActive) {
+      sensorEdges.push(next.sensorActive);
+      if (!next.sensorActive && next.items.length === 2) gapAtSensor = true;
+      plc = applySceneSensorBoolInput(plc, CONVEYOR_SENSOR_TAG, next.sensorActive);
+    }
+    belt = next;
+    if ((i + 1) % 10 === 0) plc = tickPracticeScan(plc);
+  }
+
+  assert.equal(gapAtSensor, true, "PE-01 releases even for the minimum 6px separation");
+  assert.deepEqual(sensorEdges, [true, false, true, false],
+    "the two close boxes must make two independent pulses");
+  assert.equal(readConveyorCount(plc.project), 2, "CTU must count both close boxes");
+  assert.equal(belt.passed, 2);
+});
+
+test("SCADA add-box button uses the exact same predicate as scene physics", () => {
+  const view = readFileSync(new URL("../src/components/ide/ConveyorScene.tsx", import.meta.url), "utf8");
+  assert.match(view, /disabled=\{!canAddConveyorItem\(scene\)\}/);
+  assert.doesNotMatch(view, /item\.position < 0\.14/,
+    "outdated fixed cutoff must never prevent close box generation");
 });
 
 test("photocell changes cannot artificially tick TON or scan while PAUSE/STOP", () => {

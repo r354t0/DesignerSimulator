@@ -7,7 +7,7 @@ import type { ScanMode } from "../../plc/practiceScanCycle";
 import {
   CONVEYOR_SENSOR_TAG, CONVEYOR_SENSOR_POSITION,
   CONVEYOR_BELT_LENGTH_PX, CONVEYOR_BOX_WIDTH_PX,
-  hasConveyorTags, readConveyorBool, readConveyorCount,
+  canAddConveyorItem, hasConveyorTags, readConveyorBool, readConveyorCount,
   type ConveyorState,
 } from "../../plc/conveyorSceneModel";
 
@@ -189,7 +189,7 @@ export function ConveyorScene({
           </div>
           <div className="mt-4 flex flex-wrap items-center gap-2">
             <button type="button" onClick={onAddItem}
-              disabled={scene.items.length >= 8 || scene.items.some(item => item.position < 0.14)}
+              disabled={!canAddConveyorItem(scene)}
               className="rounded bg-sky-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-sky-600 disabled:cursor-not-allowed disabled:opacity-40">
               + Añadir caja
             </button>

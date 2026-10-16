@@ -56,8 +56,12 @@ const BELT_SPEED_UNITS_PER_SECOND = 0.20;
 export const CONVEYOR_BOX_WIDTH_PX = 44;
 export const CONVEYOR_BELT_LENGTH_PX = 505;
 const BOX_HALF_WIDTH_UNITS = CONVEYOR_BOX_WIDTH_PX / (2 * CONVEYOR_BELT_LENGTH_PX);
-/** Maintain a visible, physically detectable beam gap between adjacent boxes. */
-const MIN_BOX_GAP_UNITS = 0.05;
+/**
+ * Restore close-up box placement (about 6px between 44px boxes).
+ * The photoeye samples the scene every 50ms, while the belt moves 0.01
+ * normalized units per step: a >0.01 gap provides at least one LOW sample.
+ */
+export const MIN_BOX_GAP_UNITS = 0.012;
 const MIN_BOX_CENTER_SPACING = 2 * BOX_HALF_WIDTH_UNITS + MIN_BOX_GAP_UNITS;
 const ENTRY_POSITION = 0.045;
 const EXIT_POSITION = 1.02;
@@ -175,10 +179,15 @@ export function createConveyorExampleProject(): PracticeProject {
   return project;
 }
 
-/** Spawn only when the prior box clears the entrance with a visible gap. */
+/** Same rule for the SCADA button disabled state and conveyor physics. */
+export function canAddConveyorItem(state: ConveyorState): boolean {
+  return state.items.length < MAX_ITEMS && !state.items.some((item) =>
+    Math.abs(item.position - ENTRY_POSITION) < MIN_BOX_CENTER_SPACING);
+}
+
+/** Spawn closely spaced boxes once the preceding box clears the entrance. */
 export function addConveyorItem(state: ConveyorState): ConveyorState {
-  if (state.items.length >= MAX_ITEMS || state.items.some((item) =>
-    Math.abs(item.position - ENTRY_POSITION) < MIN_BOX_CENTER_SPACING)) return state;
+  if (!canAddConveyorItem(state)) return state;
   return {
     ...state, nextId: state.nextId + 1,
     items: [...state.items, { id: state.nextId, position: ENTRY_POSITION }],
