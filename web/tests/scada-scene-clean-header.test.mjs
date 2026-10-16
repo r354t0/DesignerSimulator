@@ -16,14 +16,21 @@ test("the simulation navigation is a single compact selector, not large secondar
   assert.doesNotMatch(app, /aria-pressed=\{simulationTab === "motor"\}/);
 });
 
-test("SCADA view has no extra documentation or PLC developer-status header", () => {
+test("scene 01 uses the same compact industrial SCADA title as scene 02", () => {
   assert.doesNotMatch(conveyor, /Escena 01 · Faja transportadora/);
   assert.doesNotMatch(conveyor, /Entradas físicas simuladas.*Controller Tags/);
   assert.doesNotMatch(conveyor, /PracticeRoutine (RUN|STOP|PAUSE)/);
   assert.doesNotMatch(conveyor, /Build y RUN se inician desde PracticeRoutine/);
   assert.doesNotMatch(conveyor, /Pulsadores tipo interruptor/);
-  assert.doesNotMatch(conveyor, /<header className=/);
-  assert.match(conveyor, /Línea de transporte/);
+  assert.match(conveyor, /<header className="sort-panel/);
+  assert.match(conveyor, /SCADA · ESTACIÓN CV-01/);
+  assert.match(conveyor, /Faja transportadora/);
+  assert.match(conveyor, /plcLabel = mode === "running" \? "PLC · RUN"/);
+  assert.match(conveyor, /mode === "paused" \? "PLC · PAUSE" : "PLC · STOP"/);
+  assert.match(conveyor, /\{plcLabel\}/);
+  assert.match(conveyor, /<Boxes size=\{21\} aria-hidden="true"\/>/);
+  assert.doesNotMatch(conveyor, /Línea de transporte/);
+  assert.doesNotMatch(conveyor, /processLabel|\{processLabel\}/);
   assert.doesNotMatch(conveyor, /Motor_Run = \{Number\(motorOn\)\}/);
   assert.match(conveyor, /Objetivo y mapa E\/S/);
   assert.match(conveyor, /Tablero de mando/);
@@ -31,7 +38,7 @@ test("SCADA view has no extra documentation or PLC developer-status header", () 
   assert.doesNotMatch(conveyor, /Señales de la escena/);
 });
 
-test("the information dialog remains accessible from a compact icon in the process card", () => {
+test("the information dialog remains accessible from the unified SCADA header", () => {
   assert.match(conveyor, /aria-label="Información de la escena"/);
   assert.match(conveyor, /aria-haspopup="dialog" aria-expanded=\{infoOpen\}/);
   assert.match(conveyor, /onClick=\{\(\) => setInfoOpen\(true\)\}/);

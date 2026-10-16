@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Boxes, CircleAlert, Gauge, Info, Pause, Play, RotateCcw } from "lucide-react";
+import { Boxes, CircleAlert, CircleHelp, Gauge, Pause, Play, RotateCcw } from "lucide-react";
 import { MomentaryPushButton } from "./MomentaryPushButton";
 import { ConveyorSceneInfoDialog } from "./ConveyorSceneInfoDialog";
 import type { PracticeProject } from "../../plc/practiceDocument";
@@ -62,30 +62,47 @@ export function ConveyorScene({
   const count = readConveyorCount(project);
   const wired = hasConveyorTags(project);
   const [infoOpen, setInfoOpen] = useState(false);
+  const plcLabel = mode === "running" ? "PLC · RUN"
+    : mode === "paused" ? "PLC · PAUSE" : "PLC · STOP";
 
   return (
-    <section className="flex h-full min-h-0 flex-col overflow-y-auto bg-[#111c27] text-slate-100"
+    <section className="sort-scada-shell flex h-full min-h-0 flex-col overflow-y-auto text-slate-100"
       aria-label="Escena de faja transportadora conectada a MainRoutine">
-
-
-      <div className="flex min-h-0 flex-1 flex-col gap-4 p-4">
-        <div className="rounded-lg border border-slate-700 bg-[#172634] px-3 py-4">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 text-xs">
-            <span className="flex items-center gap-2 font-semibold text-slate-200">
-              <Boxes size={16} className="text-sky-400"/> Línea de transporte
-            </span>
-            <div className="ml-auto flex items-center gap-3">
-              <button type="button" aria-haspopup="dialog" aria-expanded={infoOpen}
-                aria-label="Información de la escena"
-                title="Consultar objetivo del ejercicio y mapa E/S"
-                onClick={() => setInfoOpen(true)}
-                className="inline-flex items-center gap-1.5 rounded border border-slate-600 px-2.5 py-1.5 text-[11px] font-medium text-sky-200 hover:border-sky-600 hover:bg-slate-700 focus-visible:outline-2 focus-visible:outline-sky-500">
-                <Info size={15} aria-hidden="true"/>
-                Objetivo y mapa E/S
-              </button>
+      <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
+        <header className="sort-panel flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#344c5e] px-3.5 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-md border border-[#335d76] bg-[#14344a] text-sky-300">
+              <Boxes size={21} aria-hidden="true"/>
+            </div>
+            <div className="min-w-0">
+              <div className="text-[10px] font-semibold uppercase tracking-[.14em] text-sky-300">
+                SCADA · ESTACIÓN CV-01
+              </div>
+              <h2 className="truncate text-sm font-bold tracking-tight text-slate-100">
+                Faja transportadora
+              </h2>
             </div>
           </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <span role="status" className={"inline-flex items-center gap-1.5 rounded border px-2.5 py-1.5 text-[10px] font-bold tracking-wide " +
+              (running ? "border-emerald-800 bg-emerald-950/45 text-emerald-300" :
+                mode === "paused" ? "border-amber-700 bg-amber-950/40 text-amber-300" :
+                  "border-slate-600 bg-slate-800 text-slate-300")}>
+              <span aria-hidden="true" className={"size-1.5 rounded-full " +
+                (running ? "bg-emerald-400" : mode === "paused" ? "bg-amber-400" : "bg-slate-400")}/>
+              {plcLabel}
+            </span>
+            <button type="button" aria-haspopup="dialog" aria-expanded={infoOpen}
+              aria-label="Información de la escena"
+              title="Objetivo del ejercicio y mapa de entradas/salidas"
+              onClick={() => setInfoOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded border border-[#456276] bg-[#1a3549] px-2.5 py-1.5 text-[11px] font-semibold text-sky-200 hover:border-sky-400 hover:bg-[#24475f] focus-visible:outline-2 focus-visible:outline-sky-400">
+              <CircleHelp size={14} aria-hidden="true"/> Objetivo y mapa E/S
+            </button>
+          </div>
+        </header>
 
+        <div className="rounded-lg border border-slate-700 bg-[#172634] px-3 py-4">
           <div className="overflow-x-auto rounded-md border border-slate-600 bg-[#0f1b26]"
             role="img" aria-label={"Vista lateral de faja transportadora con " +
               scene.items.length + " cajas, motor " +
