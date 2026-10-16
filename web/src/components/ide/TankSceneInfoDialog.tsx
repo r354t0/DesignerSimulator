@@ -119,7 +119,7 @@ export function TankSceneInfoDialog({ open, project, onClose, onOpenTags, onLoad
             </summary>
             <div className="mt-2 space-y-1 font-mono text-[11px] text-slate-300">
               <p>R0: OR (StartPB | RunCmd) y XIO StopPB/Alarm/Batches.DN → OTE RunCmd</p>
-              <p>R1: RunCmd sin etapas activas → OTL FillStage (arranque inicial)</p>
+              <p>R1: OR (RunCmd + XIO FillStage/MixStage/DrainStage | ToFill) → OTL FillStage</p>
               <p>R2–R4: TON TStart, TON TFillMax y TON TDrainMax</p>
               <p>R5: OR (TFillMax.DN | TDrainMax.DN) → OTL Alarm</p>
               <p>R6–R7: ResetPB y XIO RunCmd → OTU Alarm; RES Batches</p>
@@ -135,12 +135,12 @@ export function TankSceneInfoDialog({ open, project, onClose, onOpenTags, onLoad
               <p>R19: DrainStage + LowLS → CTU Batches</p>
               <p>R20: DrainStage + LowLS + XIO Batches.DN → OTE ToFill</p>
               <p>R21: OR (LowLS | XIO RunCmd) → OTU DrainStage</p>
-              <p>R22: ToFill → OTL FillStage para el siguiente lote</p>
               <p className="pt-2 font-sans text-slate-400">
-                En cada transición primero se memoriza la condición con OTE,
-                luego se ejecuta OTU de la etapa saliente y finalmente OTL
-                de la entrante. Así se evita perder la condición en el mismo
-                scan y se mantienen las etapas mutuamente excluyentes.
+                Al finalizar el drenaje se captura ToFill (OTE) y se hace
+                OTU de DrainStage; en el scan siguiente el rung 1 vuelve a
+                activar FillStage por su rama OR. Para llenar y mezclar se
+                mantiene el orden OTE de transición, OTU saliente y OTL entrante.
+                De esta manera solo una etapa permanece activa.
               </p>
             </div>
           </details>
