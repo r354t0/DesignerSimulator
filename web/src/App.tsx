@@ -5,7 +5,7 @@ import { ControllerOrganizer, type EditorView } from "./components/ide/Controlle
 import { LadderEditor } from "./components/ide/LadderEditor";
 import { ControllerTags } from "./components/ide/ControllerTags";
 import { PracticeEditor } from "./components/ide/PracticeEditor";
-import { initialPracticeProject, type EditableKind, type PracticeProject } from "./plc/practiceDocument";
+import { initialPracticeProject, setTagValue, type EditableKind, type PracticeProject } from "./plc/practiceDocument";
 import {
   initialPracticeScanState, changePracticeScanProject,
   startPracticeScans, stopPracticeScans, pausePracticeScans,
@@ -17,6 +17,12 @@ import { type Instruction } from "./components/ide/LadderSymbols";
 import { evaluateDemo, initialDemoInputs, type DemoInputs, type InputTag } from "./plc/demoModel";
 import { initialDemoBlocks, resetDemoCounters, stepDemoBlocks, type DemoBlockRuntime } from "./plc/timerCounterDemo";
 import { SimulationScene } from "./components/ide/SimulationScene";
+import { ConveyorScene } from "./components/ide/ConveyorScene";
+import {
+  CONVEYOR_SENSOR_TAG, addConveyorItem, createConveyorExampleProject,
+  initialConveyorState, prepareConveyorTags, readConveyorBool, stepConveyor,
+  type ConveyorState,
+} from "./plc/conveyorSceneModel";
 import "flexlayout-react/style/dark.css";
 import "./workspace.css";
 
@@ -105,6 +111,35 @@ export default function App() {
     blocks: initialDemoBlocks(),
   }));
   const { inputs, motorLatched, blocks } = demo;
+  const [simulationTab, setSimulationTab] = useState<"conveyor" | "motor">("conveyor");
+  const [conveyor, setConveyor] = useState<ConveyorState>(initialConveyorState);
+  const conveyorRef = useRef(conveyor);
+  const changeConveyor = useCallback((operation: (state: ConveyorState) => ConveyorState) => {
+    const next = operation(conveyorRef.current);
+    if (next !== conveyorRef.current) {
+      conveyorRef.current = next;
+      setConveyor(next);
+    }
+  }, []);
+
+  // Each physics tick samples the REAL PracticeRoutine output and stages
+  // the photoelectric sensor before the next (serialized) Ladder scan.
+  useEffect(() => {
+    if (practiceMode !== "running") return;
+    const id = window.setInterval(() => {
+      const plc = scanRef.current;
+      if (plc.mode !== "running") return;
+      const motorOn = readConveyorBool(plc.project, "Motor_Run");
+      const next = stepConveyor(conveyorRef.current, motorOn, 50);
+      if (next !== conveyorRef.current) changeConveyor(() => next);
+      const sensorTag = plc.project.tags.find((tag) => tag.name === CONVEYOR_SENSOR_TAG);
+      if (sensorTag?.type === "BOOL" && sensorTag.value !== next.sensorActive) {
+        changeScan((current) => changePracticeScanProject(current,
+          setTagValue(current.project, CONVEYOR_SENSOR_TAG, next.sensorActive)));
+      }
+    }, 50);
+    return () => window.clearInterval(id);
+  }, [practiceMode, changeConveyor, changeScan]);
 
   // Advance the five fixed demo rungs with elapsed milliseconds, independent of
   // React render frequency. This is NOT a controller-quality real-time scan.
@@ -140,6 +175,28 @@ export default function App() {
   }, []);
   const handlePracticeChange = useCallback((next: PracticeProject) =>
     changeScan((state) => changePracticeScanProject(state, next)), [changeScan]);
+
+  const setConveyorInput = useCallback((tag: "Start_PB" | "Stop_PB", value: boolean) => {
+    changeScan((state) => changePracticeScanProject(state,
+      setTagValue(state.project, tag, value)));
+  }, [changeScan]);
+  const resetConveyor = useCallback(() => {
+    changeConveyor(() => initialConveyorState());
+    changeScan((state) => {
+      const sensor = state.project.tags.find((tag) => tag.name === CONVEYOR_SENSOR_TAG);
+      return sensor?.type === "BOOL" && sensor.value !== false
+        ? changePracticeScanProject(state, setTagValue(state.project, CONVEYOR_SENSOR_TAG, false))
+        : state;
+    });
+  }, [changeConveyor, changeScan]);
+  const prepareConveyor = useCallback(() => {
+    try {
+      changeScan((state) => changePracticeScanProject(state,
+        prepareConveyorTags(state.project)));
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "No se pudieron preparar los tags.");
+    }
+  }, [changeScan]);
 
   const startPractice = useCallback(() =>
     changeScan(startPracticeScans), [changeScan]);
@@ -177,6 +234,18 @@ export default function App() {
     }
     setEditorView(view);
   }, [model]);
+
+  const loadConveyorExample = useCallback(() => {
+    if (!window.confirm("Se reemplazará PracticeRoutine y sus Controller Tags por el ejemplo de faja. ¿Continuar?")) {
+      return;
+    }
+    changeScan((state) => ({
+      ...initialPracticeScanState(createConveyorExampleProject()),
+      scanPeriodMs: state.scanPeriodMs,
+    }));
+    changeConveyor(() => initialConveyorState());
+    openEditorView("practice");
+  }, [changeScan, changeConveyor, openEditorView]);
 
   const onToolbarDragStart = useCallback((event: DragEvent<HTMLButtonElement>, kind: Instruction) => {
     if (!isEditableKind(kind)) {
@@ -224,7 +293,35 @@ export default function App() {
         case "tags":
           return <ControllerTags project={practice} onChange={handlePracticeChange} practiceRunning={practiceMode !== "stopped"} practicePaused={practiceMode === "paused"} online={online} inputs={inputs} values={values} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
         case "simulation":
-          return <SimulationScene online={online} inputs={inputs} values={values} onTagChange={handleTagChange} />;
+          return (
+            <div className="flex h-full min-h-0 flex-col bg-[#111c27]">
+              <div className="flex shrink-0 gap-2 border-b border-slate-700 bg-[#1b2835] px-3 py-2">
+                <button type="button" onClick={() => setSimulationTab("conveyor")}
+                  aria-pressed={simulationTab === "conveyor"}
+                  className={"rounded px-3 py-1.5 text-xs font-semibold " +
+                    (simulationTab === "conveyor" ? "bg-sky-700 text-white" : "text-slate-300 hover:bg-slate-700")}>
+                  Faja transportadora
+                </button>
+                <button type="button" onClick={() => setSimulationTab("motor")}
+                  aria-pressed={simulationTab === "motor"}
+                  className={"rounded px-3 py-1.5 text-xs font-semibold " +
+                    (simulationTab === "motor" ? "bg-sky-700 text-white" : "text-slate-300 hover:bg-slate-700")}>
+                  Motor · DEMO
+                </button>
+              </div>
+              <div className="min-h-0 flex-1">
+                {simulationTab === "conveyor"
+                  ? <ConveyorScene project={practice} mode={practiceMode} scene={conveyor}
+                      onInputChange={setConveyorInput}
+                      onAddItem={() => changeConveyor(addConveyorItem)}
+                      onResetScene={resetConveyor}
+                      onPrepareTags={prepareConveyor}
+                      onLoadExample={loadConveyorExample}/>
+                  : <SimulationScene online={online} inputs={inputs} values={values}
+                      onTagChange={handleTagChange}/>}
+              </div>
+            </div>
+          );
         default:
           return <div className="p-4">Panel no disponible</div>;
       }
@@ -232,7 +329,8 @@ export default function App() {
     [online, inputs, values, blocks, practice, practiceMode, scanState, instruction,
       draggingKind, nextPracticeId, handlePracticeChange, startPractice, stopPractice,
       pausePractice, resumePractice, stepPractice, changeScanPeriod, handleTagChange,
-      handleResetCounters, openEditorView, onToolbarDragStart],
+      handleResetCounters, openEditorView, onToolbarDragStart, simulationTab, conveyor,
+      setConveyorInput, changeConveyor, resetConveyor, prepareConveyor, loadConveyorExample],
   );
 
   const syncTabSelection = useCallback((updatedModel: Model) => {
@@ -300,7 +398,7 @@ export default function App() {
         <span>VirtualPLC</span>
         <span className="text-slate-600">|</span>
         <span>{online ? "Monitoreo DEMO · Sin controlador físico" : "Sin conexión a controlador"}</span>
-        <span className="ml-auto">Fase 3 · Etapa B · Temporizadores TON / TOF / RTO / RES</span>
+        <span className="ml-auto">Fase 5 · Escena 01 · Faja transportadora (PracticeRoutine)</span>
       </footer>
     </div>
   );
