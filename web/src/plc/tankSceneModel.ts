@@ -169,10 +169,13 @@ export function createTankExampleProject(): PracticeProject {
   or("rung-1", [x("Tank_StartPB")], [x("Tank_RunCmd")],
     [nx("Tank_StopPB"), nx("Tank_Alarm"), nx("Tank_Batches.DN")],
     output("OTE", "Tank_RunCmd"));
-  // R1. No active stage -> start another fill when the cycle is enabled.
-  make("tank-begin", [x("Tank_RunCmd"), nx("Tank_FillStage"),
-    nx("Tank_MixStage"), nx("Tank_DrainStage"),
-    output("OTL", "Tank_FillStage")]);
+  // R1. Either start when the cycle has no active stages, OR accept the
+  // completed drain-to-fill transition from the previous PLC scan.
+  // The Tank_ToFill branch bypasses ALL four series contacts.
+  or("tank-begin",
+    [x("Tank_RunCmd"), nx("Tank_FillStage"),
+      nx("Tank_MixStage"), nx("Tank_DrainStage")],
+    [x("Tank_ToFill")], [], output("OTL", "Tank_FillStage"));
   make("tank-preopen", [x("Tank_FillStage"), x("Tank_RunCmd"),
     output("TON", "Tank_TStart")]);
   make("tank-fill-watchdog", [x("Tank_FillStage"), x("Tank_TStart.DN"),
@@ -220,15 +223,14 @@ export function createTankExampleProject(): PracticeProject {
   // Count the just-completed lot BEFORE deciding whether another is needed.
   make("tank-batch-counter", [x("Tank_DrainStage"), x("Tank_LowLS"),
     x("Tank_RunCmd"), output("CTU", "Tank_Batches")]);
-  // Drain → Fill: only for lots 1 and 2. At lot 3, Batches.DN inhibits
-  // the transition, and the first rung removes RunCmd at the next scan.
+  // Drain → Fill: for lots 1 and 2. Capture ToFill here, then OTU Drain.
+  // R1 reads ToFill and latches FillStage on the NEXT scan; at batch 3
+  // Batches.DN prevents the transition and RunCmd drops out.
   make("tank-to-fill", [x("Tank_DrainStage"), x("Tank_LowLS"),
     x("Tank_RunCmd"), nx("Tank_Batches.DN"), nx("Tank_Alarm"),
     output("OTE", "Tank_ToFill")]);
   or("tank-drain-end", [x("Tank_LowLS")], [nx("Tank_RunCmd")],
     [], output("OTU", "Tank_DrainStage"));
-  make("tank-fill-next", [x("Tank_ToFill"),
-    output("OTL", "Tank_FillStage")]);
   return p;
 }
 
