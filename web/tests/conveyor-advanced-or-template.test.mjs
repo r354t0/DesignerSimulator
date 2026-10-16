@@ -139,5 +139,5 @@ test("advanced SCADA controls, map E/S and help match optional template logic",(
   assert.match(info,/CONVEYOR_TEMPLATE_TAGS\.filter/);
   assert.match(info,/CV_Count\.DN/);
   assert.match(info,/RES CV_Count/);
-  assert.match(app,/tag === "CV_ResetPB"/);
+  assert.match(app,/applyConveyorMomentaryInput\(state, tag, value\)/);
 });

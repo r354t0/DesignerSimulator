@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { setTagValue } from "../src/plc/practiceDocument.ts";
-import { createConveyorExampleProject, readConveyorBool } from "../src/plc/conveyorSceneModel.ts";
 import {
-  initialPracticeScanState, startPracticeScans, tickPracticeScan,
-  changePracticeScanProject,
+  applyConveyorMomentaryInput, createConveyorExampleProject, readConveyorBool,
+} from "../src/plc/conveyorSceneModel.ts";
+import {
+  initialPracticeScanState, startPracticeScans,
 } from "../src/plc/practiceScanCycle.ts";
 
 const scene = readFileSync(new URL("../src/components/ide/ConveyorScene.tsx", import.meta.url), "utf8");
@@ -39,8 +39,7 @@ test("momentary button handles pointer, touch, cancel, keyboard and focus interr
 test("momentary START/STOP pulses still drive MainRoutine latch and unlatch", () => {
   let state = startPracticeScans(initialPracticeScanState(createConveyorExampleProject()));
   const input = (name, pressed) => {
-    state = changePracticeScanProject(state,setTagValue(state.project,name,pressed));
-    state = tickPracticeScan(state);
+    state = applyConveyorMomentaryInput(state, name, pressed);
   };
   input("Start_PB",true);
   assert.equal(readConveyorBool(state.project,"Motor_Run"),true);

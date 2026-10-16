@@ -10,34 +10,39 @@ import {
   stopPracticeScans, tickPracticeScan,
 } from "../src/plc/practiceScanCycle.ts";
 import {
-  createConveyorExampleProject, readConveyorBool,
+  applyConveyorMomentaryInput, createConveyorExampleProject, readConveyorBool,
 } from "../src/plc/conveyorSceneModel.ts";
 
 const input = (state, tag, pressed) =>
   applyMomentaryBoolInput(state, tag, pressed);
 const motor = (state) => readConveyorBool(state.project, "Motor_Run");
+const conveyorInput = (state, tag, pressed) =>
+  applyConveyorMomentaryInput(state, tag, pressed);
 
 test("quick START and STOP taps are never lost between 500ms cyclic scans", () => {
   let state = startPracticeScans(setScanPeriod(
     initialPracticeScanState(createConveyorExampleProject()), 500));
   const scanBefore = state.scanCount;
   // Both the down and up happen before the interval scheduler can tick.
-  state = input(state, "Start_PB", true);
+  state = conveyorInput(state, "Start_PB", true);
   assert.equal(motor(state), true, "start must energize motor at pointer down");
   assert.equal(state.scanCount, scanBefore + 1);
-  state = input(state, "Start_PB", false);
+  state = conveyorInput(state, "Start_PB", false);
   assert.equal(readConveyorBool(state.project, "Start_PB"), false,
     "the physical input must be momentary");
-  assert.equal(motor(state), true, "motor keeps its programmed OTL");
+  assert.equal(motor(state), true, "motor remains energized via OR seal-in");
   assert.equal(state.scanCount, scanBefore + 1,
     "releasing the input does not insert another artificial scan");
 
   const scanAfterStart = state.scanCount;
-  state = input(state, "Stop_PB", true);
-  assert.equal(motor(state), false, "stop must unlatch motor at pointer down");
-  state = input(state, "Stop_PB", false);
+  state = conveyorInput(state, "Stop_PB", true);
+  assert.equal(motor(state), false, "stop must propagate across R1 into R0 on pointer down");
+  assert.equal(state.scanCount, scanAfterStart + 2,
+    "the STOP request needs two consecutive zero-time evaluations");
+  state = conveyorInput(state, "Stop_PB", false);
   assert.equal(readConveyorBool(state.project, "Stop_PB"), false);
-  assert.equal(state.scanCount, scanAfterStart + 1);
+  assert.equal(state.scanCount, scanAfterStart + 3,
+    "STOP release must clear the internal request immediately");
   assert.equal(motor(state), false);
 });
 
@@ -96,7 +101,10 @@ test("duplicate pointer events don't add scans; ordinary Controller Tags remain 
     setTagValue(state.project, "Stop_PB", true));
   assert.equal(normal.scanCount, count);
   assert.equal(motor(normal), true);
-  assert.equal(motor(tickPracticeScan(normal)), false);
+  const first = tickPracticeScan(normal);
+  assert.equal(motor(first), true, "R0 reads previous CV_StopRequest in first scan");
+  assert.equal(motor(tickPracticeScan(first)), false,
+    "second cyclic scan sees STOP request from rung 1");
 });
 
 test("invalid or non-BOOL operator targets are refused rather than silently ignored", () => {
@@ -108,7 +116,8 @@ test("invalid or non-BOOL operator targets are refused rather than silently igno
 test("the SCADA button dispatcher routes to the immediate momentary sample", () => {
   const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
   const cycle = readFileSync(new URL("../src/plc/practiceScanCycle.ts", import.meta.url), "utf8");
-  assert.match(app, /applyMomentaryBoolInput\(state, tag, value\)/);
+  assert.match(app, /applyConveyorMomentaryInput\(state, tag, value\)/);
+  assert.match(app, /applyConveyorPhotoeyeInput\(current, next\.sensorActive\)/);
   assert.match(cycle, /\(pressed \|\| sampleRelease\) && staged\.mode === "running"/);
   assert.match(cycle, /performScan\(staged, 0\)/);
 });
