@@ -2,7 +2,7 @@ import { getCoilVisualState } from "../../plc/ladderCoilVisual";
 import type { ReactNode } from "react";
 import { getInstructionSelectionFrame, LADDER_SELECTION_BLUE } from "../../plc/ladderSelection";
 
-export type Instruction = "XIC" | "XIO" | "ONS" | "OTE" | "OTL" | "OTU" | "TON" | "TOF" | "RTO" | "RES" | "TONOFF" | "CTU" | "CTD" | "EQU" | "NEQ" | "LES" | "LEQ" | "GRT" | "GEQ";
+export type Instruction = "XIC" | "XIO" | "ONS" | "OTE" | "OTL" | "OTU" | "TON" | "TOF" | "RTO" | "RES" | "TONOFF" | "CTU" | "CTD" | "EQU" | "NEQ" | "LES" | "LEQ" | "GRT" | "GEQ" | "MOV" | "ADD" | "SUB" | "MUL" | "DIV";
 
 export const INSTRUCTIONS: { id: Instruction; label: string }[] = [
   { id: "XIC", label: "Examine If Closed" },
@@ -24,6 +24,11 @@ export const INSTRUCTIONS: { id: Instruction; label: string }[] = [
   { id: "LEQ", label: "Less Than or Equal" },
   { id: "GRT", label: "Greater Than" },
   { id: "GEQ", label: "Greater Than or Equal" },
+  { id: "MOV", label: "Move" },
+  { id: "ADD", label: "Add" },
+  { id: "SUB", label: "Subtract" },
+  { id: "MUL", label: "Multiply" },
+  { id: "DIV", label: "Divide" },
 ];
 
 const BASE = "#58636f";
@@ -158,7 +163,7 @@ export const SYMBOL_SCALE = 0.5;
 
 export function ToolbarSymbol({ kind }: { kind: Instruction }) {
   const isContact = kind === "XIC" || kind === "XIO" || kind === "ONS";
-  const isBlock = ["TON", "TOF", "RTO", "RES", "TONOFF", "CTU", "CTD", "EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ"].includes(kind);
+  const isBlock = ["TON", "TOF", "RTO", "RES", "TONOFF", "CTU", "CTD", "EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ", "MOV", "ADD", "SUB", "MUL", "DIV"].includes(kind);
   return (
     <svg width="46" height="28" viewBox="0 0 92 50" aria-hidden="true">
       <g stroke="currentColor" strokeWidth="2.4" fill="none" strokeLinecap="square">
@@ -482,6 +487,47 @@ export function ComparisonBlock({
         {ellipsizeSvgLabel(sourceB, 58)}
       </text>
       <title>{kind}: A = {sourceA}, B = {sourceB}{online ? " · Resultado " + Number(condition) : ""}</title>
+    </g>
+  );
+}
+
+
+/** Numeric transfer/math output with editable operands and live state. */
+export function MathOutputBlock({
+  x, y, kind, sourceA, sourceB, destination, selected, online, live, valid,
+}: {
+  x: number; y: number; kind: "MOV" | "ADD" | "SUB" | "MUL" | "DIV";
+  sourceA: string; sourceB: string; destination: string;
+  selected?: boolean; online?: boolean; live?: boolean; valid?: boolean;
+}) {
+  const height = kind === "MOV" ? 73 : 88;
+  const stroke = selected ? LADDER_SELECTION_BLUE : online && live ? HOT : BASE;
+  return (
+    <g>
+      <rect x={x - 68} y={y - 27} width={136} height={height} rx={3}
+        fill="#f9fafb" stroke={stroke} strokeWidth={selected ? 2 : 1.5}/>
+      <text x={x - 58} y={y - 13} fontSize={11} fontWeight="700" fill="#1c354b">{kind}</text>
+      <text x={x + 58} y={y - 13} textAnchor="end" fontSize={9} fontWeight="600"
+        fill={online && live ? HOT : "#64748b"}>{online ? valid ? "OK" : "—" : ""}</text>
+      <path d={"M" + (x - 62) + " " + (y - 8) + "h124"} stroke="#cbd5e1" strokeWidth={1}/>
+      <text x={x - 58} y={y + 5} fontSize={9} fill="#556372">Source</text>
+      <text x={x + 58} y={y + 5} textAnchor="end" fontFamily="monospace"
+        fontSize={10} fill="#1c354b">{ellipsizeSvgLabel(sourceA, 79)}</text>
+      {kind !== "MOV" && <>
+        <text x={x - 58} y={y + 21} fontSize={9} fill="#556372">Source B</text>
+        <text x={x + 58} y={y + 21} textAnchor="end" fontFamily="monospace"
+          fontSize={10} fill="#1c354b">{ellipsizeSvgLabel(sourceB, 79)}</text>
+      </>}
+      <path d={"M" + (x - 62) + " " + (y + (kind === "MOV" ? 16 : 32)) + "h124"}
+        stroke="#cbd5e1" strokeWidth={1}/>
+      <text x={x - 58} y={y + (kind === "MOV" ? 32 : 48)}
+        fontSize={9} fill="#556372">Dest</text>
+      <text x={x + 58} y={y + (kind === "MOV" ? 32 : 48)}
+        textAnchor="end" fontFamily="monospace" fontSize={10}
+        fill={selected ? LADDER_SELECTION_BLUE : "#1c354b"}>
+        {ellipsizeSvgLabel(destination, 83)}
+      </text>
+      <title>{kind} · A={sourceA}{kind === "MOV" ? "" : " · B=" + sourceB} · Dest={destination}</title>
     </g>
   );
 }

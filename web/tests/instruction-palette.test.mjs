@@ -52,6 +52,8 @@ test("timers and counters are editable in PracticeRoutine", () => {
 
 test("changing a category does not require supporting its unimplemented tools", () => {
   assert.equal(getPaletteCategory("compare").tools.filter((tool) => tool.editable).length, 6);
-  assert.equal(getPaletteCategory("move-logical").tools.some((tool) => tool.editable), false);
+  assert.deepEqual(getPaletteCategory("move-logical").tools.filter((tool) => tool.editable).map((tool) => tool.id), ["MOV"]);
+  assert.deepEqual(getPaletteCategory("compute-math").tools.filter((tool) => tool.editable).map((tool) => tool.id),
+    ["ADD", "SUB", "MUL", "DIV"]);
   assert.ok(getPaletteCategory("bit").tools.some((tool) => tool.editable));
 });

@@ -1,5 +1,6 @@
-import { isCompareKind, isCounterKind, isOutputKind, isTimerKind, isValidTimerPreset, type PracticeProject, type PracticeTag, type PracticeInstruction } from "./practiceDocument.ts";
+import { isMathKind, isCompareKind, isCounterKind, isOutputKind, isTimerKind, isValidTimerPreset, type PracticeProject, type PracticeTag, type PracticeInstruction } from "./practiceDocument.ts";
 import { compareValues, readComparisonOperand } from "./practiceCompare.ts";
+import { convertMathResult, evaluateMath, readNumericOperand } from "./practiceMath.ts";
 
 /**
  * Event-driven Ladder evaluation (Phase 2C): top-to-bottom rung order, left-to-
@@ -197,14 +198,17 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
   const branchPower: Record<string, boolean> = {};
   const joinedPower: Record<string, boolean> = {};
   const writes: Record<string, boolean> = {};
+  const numericWrites = new Map<string, number>();
+  const currentNumericTags = (): PracticeTag[] => project.tags.map((tag) =>
+    numericWrites.has(tag.name) ? { ...tag, value: numericWrites.get(tag.name)! } :
+    timerUpdates.has(tag.name) ? { ...tag, value: timerUpdates.get(tag.name)! } :
+    counterUpdates.has(tag.name) ? { ...tag, value: { ...counterUpdates.get(tag.name)! } } : tag);
 
   const evalContact = (instruction: PracticeInstruction, powerIn: boolean): boolean => {
     if (isCompareKind(instruction.kind)) {
       // Compare against the current scan's numeric states (including updated
       // timer and counter values from earlier rungs).
-      const currentTags = project.tags.map((tag) =>
-        timerUpdates.has(tag.name) ? { ...tag, value: timerUpdates.get(tag.name)! } :
-        counterUpdates.has(tag.name) ? { ...tag, value: { ...counterUpdates.get(tag.name)! } } : tag);
+      const currentTags = currentNumericTags();
       const a = readComparisonOperand(currentTags, instruction.kind, instruction.compareA);
       const b = readComparisonOperand(currentTags, instruction.kind, instruction.compareB);
       const condition = compareValues(instruction.kind, a, b);
@@ -293,6 +297,29 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
     }
 
     for (const instruction of rung.instructions.filter((item) => isOutputKind(item.kind))) {
+      if (isMathKind(instruction.kind)) {
+        let success = false;
+        if (power) {
+          const latest = currentNumericTags();
+          const a = readNumericOperand(latest, instruction.compareA);
+          const b = instruction.kind === "MOV" ? 0 : readNumericOperand(latest, instruction.compareB);
+          const result = evaluateMath(instruction.kind, a, b);
+          const destination = latest.find((tag) => tag.name === instruction.tag);
+          if (!destination || destination.constant) {
+            throw new Error(instruction.kind + ": Dest debe ser una variable numérica modificable.");
+          }
+          const converted = result === null ? null : convertMathResult(destination, result);
+          if (converted !== null && Number.isFinite(converted)) {
+            numericWrites.set(instruction.tag, converted);
+            success = true;
+          }
+        }
+        // Divide by zero, non-finite results and overflow preserve Dest.
+        instructionFlow[instruction.id] = {
+          powerIn: power, condition: success, powerOut: power && success, value: success,
+        };
+        continue;
+      }
       if (isCounterKind(instruction.kind) ||
           (instruction.kind === "RES" && counters.has(instruction.tag))) {
         const output = updateCounter(instruction, power);
@@ -327,6 +354,7 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
   }
 
   const changed = project.tags.some((tag) =>
+    (numericWrites.has(tag.name) && tag.value !== numericWrites.get(tag.name)) ||
     (Object.hasOwn(writes, tag.name) && tag.value !== writes[tag.name]) ||
     (timerUpdates.has(tag.name) && Object.entries(timerUpdates.get(tag.name)!).some(
       ([member, value]) => (tag.value as Record<string, number | boolean>)[member] !== value)) ||
@@ -336,6 +364,7 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
     ? {
         ...project,
         tags: project.tags.map((tag): PracticeTag =>
+          numericWrites.has(tag.name) ? { ...tag, value: numericWrites.get(tag.name)! } :
           Object.hasOwn(writes, tag.name) ? { ...tag, value: writes[tag.name] } :
           timerUpdates.has(tag.name) ? { ...tag, value: timerUpdates.get(tag.name)! } :
           counterUpdates.has(tag.name)

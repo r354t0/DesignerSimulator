@@ -5,7 +5,7 @@ import {
   type LadderGroupGeometry, type VisualLadderDropTarget,
 } from "./ladderDragDrop.ts";
 import {
-  MAX_PRACTICE_CONTACTS, isOutputKind, isTimerKind, isCounterKind, isCompareKind, contactCount, findInstruction,
+  MAX_PRACTICE_CONTACTS, isOutputKind, isTimerKind, isCounterKind, isCompareKind, isMathKind, contactCount, findInstruction,
   type EditableKind, type PracticeProject, type PracticeRung,
 } from "./practiceDocument.ts";
 
@@ -69,7 +69,7 @@ export function getWrappedRungLayout(
     value + (i ? gap : 0) + (group.right - group.left), lead);
   // Timer and counter blocks need identical horizontal clearance.
   const hasStructuredOutput = rung.instructions.some((item) =>
-    isTimerKind(item.kind) || isCounterKind(item.kind));
+    isTimerKind(item.kind) || isCounterKind(item.kind) || isMathKind(item.kind));
   const hasComparison = [...rung.instructions,
     ...(rung.parallelBranches ?? []).flatMap((branch) => branch.instructions)]
     .some((item) => isCompareKind(item.kind));
@@ -92,7 +92,9 @@ export function getWrappedRungLayout(
     const outputExtension = Math.max(0, outputs - 1) * OUTPUT_BRANCH_STEP;
     // Timer/counter blocks end 41px beneath the final output center; preserve
     // a 22px margin beneath their frame and status bits, even with OR outputs.
-    const structuredBottomClearance = index === packed.length - 1 && hasStructuredOutput ? 32 : 0;
+    const hasMathOutput = rung.instructions.some((item) => isMathKind(item.kind));
+    const structuredBottomClearance = index === packed.length - 1 && hasStructuredOutput
+      ? (hasMathOutput ? 48 : 32) : 0;
     const comparisonClearance = hasComparison ? 32 : 0;
     const height = Math.max(getPracticeRungHeight(maxLanes, showDropLane) + comparisonClearance,
       getPracticeRungHeight(0) + outputExtension + structuredBottomClearance + comparisonClearance

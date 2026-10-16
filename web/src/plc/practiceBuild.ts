@@ -1,5 +1,6 @@
 import { validateComparisonOperand, validateComparisonPair } from "./practiceCompare.ts";
-import { isCompareKind, MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, isOutputKind, isTimerKind, isCounterKind, isValidTimerPreset, isValidCounterPreset, type EditableKind, type PracticeInstruction,
+import { validateMathSource, validateMathDestination } from "./practiceMath.ts";
+import { isMathKind, isCompareKind, MAX_PRACTICE_CONTACTS, MAX_PARALLEL_OUTPUTS, isOutputKind, isTimerKind, isCounterKind, isValidTimerPreset, isValidCounterPreset, type EditableKind, type PracticeInstruction,
   type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
 
 export type DiagnosticSeverity = "error" | "warning";
@@ -106,7 +107,7 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
     }
     seenInstructions.add(id);
 
-    if (!["XIC", "XIO", "OTE", "OTL", "OTU", "ONS", "TON", "TOF", "RTO", "CTU", "CTD", "RES", "EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ"].includes(instruction.kind as EditableKind)) {
+    if (!["XIC", "XIO", "OTE", "OTL", "OTU", "ONS", "TON", "TOF", "RTO", "CTU", "CTD", "RES", "EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ", "MOV", "ADD", "SUB", "MUL", "DIV"].includes(instruction.kind as EditableKind)) {
       push("error", "UNSUPPORTED_INSTRUCTION",
         at + ": instrucción " + instruction.kind + " no admitida por el motor actual.",
         rung.id, rungIndex, id, branchId);
@@ -134,6 +135,39 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
       if (incompatible) {
         push("error", "INCOMPATIBLE_COMPARE_TYPES",
           at + ": " + instruction.kind + ": " + incompatible,
+          rung.id, rungIndex, id, branchId);
+      }
+      return;
+    }
+    if (isMathKind(instruction.kind)) {
+      if (instruction.preset) {
+        push("error", "INVALID_MATH_OPERAND",
+          at + ": " + instruction.kind + " no utiliza PRE.", rung.id, rungIndex, id, branchId);
+      }
+      const reason = validateMathDestination(project.tags, instruction.tag);
+      if (reason) {
+        push("error", "INVALID_MATH_DEST",
+          at + ": " + instruction.kind + " " + reason, rung.id, rungIndex, id, branchId);
+      } else {
+        const places = outputs.get(instruction.tag) ?? [];
+        places.push({ rung: rungIndex, kind: instruction.kind });
+        outputs.set(instruction.tag, places);
+      }
+      for (const [side, source] of [["A", instruction.compareA], ["B", instruction.compareB]] as const) {
+        if (side === "B" && instruction.kind === "MOV") {
+          if (source) push("error", "INVALID_MATH_OPERAND",
+            at + ": MOV no utiliza Source B.", rung.id, rungIndex, id, branchId);
+          continue;
+        }
+        const error = validateMathSource(project.tags, source);
+        if (error) push("error", "INVALID_MATH_OPERAND",
+          at + ": " + instruction.kind + " Source " + side + ": " + error,
+          rung.id, rungIndex, id, branchId);
+      }
+      if (instruction.kind === "DIV" &&
+          instruction.compareB?.mode === "literal" && instruction.compareB.value === 0) {
+        push("error", "DIVISION_BY_ZERO",
+          at + ": DIV no puede utilizar Source B = 0.",
           rung.id, rungIndex, id, branchId);
       }
       return;

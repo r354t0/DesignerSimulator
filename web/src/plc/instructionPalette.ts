@@ -69,14 +69,16 @@ export const PALETTE_CATEGORIES: readonly PaletteCategory[] = [
     tool("GEQ", "Greater Than or Equal · Source A ≥ Source B", true), tool("LIM", "Limit Test"),
   ] },
   { id: "move-logical", label: "Move/Logical", tools: [
-    tool("MOV", "Move"), tool("MVM", "Masked Move"), tool("COP", "Copy"),
+    tool("MOV", "Move · Source → Dest", true), tool("MVM", "Masked Move"), tool("COP", "Copy"),
     tool("CPS", "Synchronous Copy"), tool("AND", "Bitwise AND"),
     tool("OR", "Bitwise OR"), tool("XOR", "Bitwise XOR"),
     tool("NOT", "Bitwise NOT"),
   ] },
   { id: "compute-math", label: "Compute/Math", tools: [
-    tool("ADD", "Add"), tool("SUB", "Subtract"), tool("MUL", "Multiply"),
-    tool("DIV", "Divide"), tool("MOD", "Modulo"), tool("CPT", "Compute"),
+    tool("ADD", "Add · Source A + Source B → Dest", true),
+    tool("SUB", "Subtract · Source A − Source B → Dest", true),
+    tool("MUL", "Multiply · Source A × Source B → Dest", true),
+    tool("DIV", "Divide · Source A ÷ Source B → Dest", true), tool("MOD", "Modulo"), tool("CPT", "Compute"),
   ] },
   { id: "file-misc", label: "File/Misc.", tools: [
     tool("FLL", "File Fill"), tool("FSC", "File Search and Compare"),
@@ -94,6 +96,6 @@ export function getPaletteCategory(id: PaletteCategoryId): PaletteCategory {
 
 export function isImplementedPaletteInstruction(
   id: string,
-): id is "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" | "TON" | "TOF" | "RTO" | "CTU" | "CTD" | "RES" | "EQU" | "NEQ" | "LES" | "LEQ" | "GRT" | "GEQ" {
-  return ["XIC", "XIO", "OTE", "OTL", "OTU", "ONS", "TON", "TOF", "RTO", "CTU", "CTD", "RES", "EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ"].includes(id);
+): id is "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" | "TON" | "TOF" | "RTO" | "CTU" | "CTD" | "RES" | "EQU" | "NEQ" | "LES" | "LEQ" | "GRT" | "GEQ" | "MOV" | "ADD" | "SUB" | "MUL" | "DIV" {
+  return ["XIC", "XIO", "OTE", "OTL", "OTU", "ONS", "TON", "TOF", "RTO", "CTU", "CTD", "RES", "EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ", "MOV", "ADD", "SUB", "MUL", "DIV"].includes(id);
 }

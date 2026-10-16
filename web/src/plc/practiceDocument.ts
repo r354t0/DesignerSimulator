@@ -2,11 +2,15 @@
  * Immutable PLC practice document. Contact paths can contain XIC/XIO/ONS,
  * output banks can contain OTE/OTL/OTU. Nested OR remains out of scope.
  */
+export type MathKind = "MOV" | "ADD" | "SUB" | "MUL" | "DIV";
+export const MATH_KINDS: readonly MathKind[] = ["MOV", "ADD", "SUB", "MUL", "DIV"];
+export const isMathKind = (kind: string): kind is MathKind =>
+  (MATH_KINDS as readonly string[]).includes(kind);
 export type CompareKind = "EQU" | "NEQ" | "LES" | "LEQ" | "GRT" | "GEQ";
 export const COMPARE_KINDS: readonly CompareKind[] = ["EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ"];
 export const isCompareKind = (kind: string): kind is CompareKind =>
   (COMPARE_KINDS as readonly string[]).includes(kind);
-export type EditableKind = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" | "TON" | "TOF" | "RTO" | "CTU" | "CTD" | "RES" | CompareKind;
+export type EditableKind = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" | "TON" | "TOF" | "RTO" | "CTU" | "CTD" | "RES" | CompareKind | MathKind;
 export type TimerKind = "TON" | "TOF" | "RTO" | "RES";
 export const isTimerKind = (kind: EditableKind): kind is TimerKind =>
   (["TON", "TOF", "RTO", "RES"] as readonly string[]).includes(kind);
@@ -15,9 +19,9 @@ export const isCounterKind = (kind: EditableKind): kind is CounterKind =>
   kind === "CTU" || kind === "CTD";
 export const isTimerMemberOperand = (tag: string) =>
   /^[A-Za-z_][A-Za-z0-9_]*\.(EN|TT|DN)$/.test(tag);
-export type OutputKind = "OTE" | "OTL" | "OTU" | TimerKind | CounterKind;
+export type OutputKind = "OTE" | "OTL" | "OTU" | TimerKind | CounterKind | MathKind;
 export type ContactKind = "XIC" | "XIO" | "ONS" | CompareKind;
-export const OUTPUT_KINDS: readonly OutputKind[] = ["OTE", "OTL", "OTU", "TON", "TOF", "RTO", "CTU", "CTD", "RES"];
+export const OUTPUT_KINDS: readonly OutputKind[] = ["OTE", "OTL", "OTU", "TON", "TOF", "RTO", "CTU", "CTD", "RES", ...MATH_KINDS];
 export const CONTACT_KINDS: readonly ContactKind[] = ["XIC", "XIO", "ONS", ...COMPARE_KINDS];
 export const isOutputKind = (kind: EditableKind): kind is OutputKind =>
   (OUTPUT_KINDS as readonly string[]).includes(kind);
@@ -182,7 +186,11 @@ function ensureTag(project: PracticeProject, tag: string, kind: EditableKind): v
   if (extra !== undefined) throw new Error("Operando estructurado inválido.");
   const item = project.tags.find((entry) => entry.name === root);
   if (!item) throw new Error("Selecciona un tag existente.");
-  if (kind === "RES") {
+  if (isMathKind(kind)) {
+    if (member || !["INT", "DINT", "REAL"].includes(item.type)) {
+      throw new Error(kind + " requiere un destino INT, DINT o REAL.");
+    }
+  } else if (kind === "RES") {
     if (member || (item.type !== "TIMER" && item.type !== "COUNTER")) {
       throw new Error("RES requiere un tag TIMER o COUNTER.");
     }

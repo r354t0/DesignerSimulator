@@ -1,8 +1,8 @@
-import { isCounterKind, isTimerKind, type EditableKind, type PracticeTag } from "./practiceDocument.ts";
+import { isCounterKind, isTimerKind, isMathKind, type EditableKind, type PracticeTag } from "./practiceDocument.ts";
 
 export interface TagPickerRow {
   name: string;
-  type: "BOOL" | "DINT" | "TIMER" | "COUNTER";
+  type: "BOOL" | "INT" | "DINT" | "REAL" | "TIMER" | "COUNTER";
   description: string;
   selectable: boolean;
   depth: number;
@@ -30,6 +30,14 @@ export function getTagPickerRows(
   const rows: TagPickerRow[] = [];
   const boolContact = kind === "XIC" || kind === "XIO";
   for (const tag of roots) {
+    if (isMathKind(kind)) {
+      if (["INT", "DINT", "REAL"].includes(tag.type) && matches(tag.name, tag.description)) {
+        rows.push({ name: tag.name, type: tag.type as "INT" | "DINT" | "REAL",
+          description: tag.description, selectable: true, depth: 0,
+          expandable: false, expanded: false });
+      }
+      continue;
+    }
     if (isTimerKind(kind) || isCounterKind(kind)) {
       const valid = kind === "RES"
         ? tag.type === "TIMER" || tag.type === "COUNTER"

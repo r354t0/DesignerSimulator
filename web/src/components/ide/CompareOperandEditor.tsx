@@ -4,7 +4,7 @@ import { X } from "lucide-react";
 import {
   comparisonTagOptions, numericOperandLabel, parseComparisonOperand,
 } from "../../plc/practiceCompare";
-import type { ComparisonOperand, PracticeTag, CompareKind } from "../../plc/practiceDocument";
+import { isMathKind, type ComparisonOperand, type PracticeTag, type CompareKind, type MathKind } from "../../plc/practiceDocument";
 
 export interface CompareOperandAnchor {
   left: number;
@@ -19,7 +19,7 @@ export interface CompareOperandAnchor {
 export function CompareOperandEditor({
   kind, side, operand, tags, anchor, onSave, onClose,
 }: {
-  kind: CompareKind;
+  kind: CompareKind | MathKind;
   side: "A" | "B";
   operand?: ComparisonOperand;
   tags: readonly PracticeTag[];
@@ -33,14 +33,15 @@ export function CompareOperandEditor({
   const [dirty, setDirty] = useState(false);
   const panel = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
-  const options = useMemo(() => comparisonTagOptions(tags, kind), [tags, kind]);
+  const effectiveKind: CompareKind = isMathKind(kind) ? "GRT" : kind;
+  const options = useMemo(() => comparisonTagOptions(tags, effectiveKind), [tags, effectiveKind]);
   const search = !draft.trimStart().startsWith('"') && /[A-Za-z_]/.test(draft);
   const visible = search
     ? options.filter((row) => row.name.toLowerCase().includes(draft.trim().toLowerCase()))
     : options;
 
   const apply = (text: string): boolean => {
-    const parsed = parseComparisonOperand(text, tags, kind);
+    const parsed = parseComparisonOperand(text, tags, effectiveKind);
     if (!parsed.ok) {
       setError(parsed.message);
       input.current?.focus();

@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState, type DragEvent, type KeyboardEvent, type MouseEvent as ReactMouseEvent } from "react";
 import { createPortal } from "react-dom";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, GripVertical, Hammer, Pause, Play, Square, StepForward, XCircle } from "lucide-react";
-import { Coil, Contact, TimerBlock, CounterBlock, ComparisonBlock, LadderRails, Wire, type Instruction } from "./LadderSymbols";
+import { Coil, Contact, TimerBlock, CounterBlock, ComparisonBlock, MathOutputBlock, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { CompareOperandEditor, type CompareOperandAnchor } from "./CompareOperandEditor";
 import { numericOperandLabel, setComparisonOperand } from "../../plc/practiceCompare";
+import { setMathSource } from "../../plc/practiceMath";
+import type { NumericOperand } from "../../plc/practiceDocument";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
 import { TimerPresetEditor, type TimerPresetAnchor } from "./TimerPresetEditor";
@@ -46,6 +48,7 @@ import {
   isTimerKind,
   isCounterKind,
   isCompareKind,
+  isMathKind,
   setInstructionPreset,
   type EditableKind,
   type PracticeProject,
@@ -678,7 +681,8 @@ export function PracticeEditor({
           {project.rungs.map((rung, rungIndex) => {
             const contacts = rung.instructions.filter((part) => !isOutputKind(part.kind));
             const outputs = rung.instructions.filter((part) => isOutputKind(part.kind));
-            const hasTimerOutputs = outputs.some((part) => isTimerKind(part.kind) || isCounterKind(part.kind));
+            const hasTimerOutputs = outputs.some((part) =>
+              isTimerKind(part.kind) || isCounterKind(part.kind) || isMathKind(part.kind));
             const emptyOutputBranches = rung.emptyOutputBranches ?? [];
             const layout = getWrappedRungLayout(
               rung, canvasWidth, Boolean(draggingKind || moving),
@@ -1063,7 +1067,23 @@ export function PracticeEditor({
                                   const assignedTag = project.tags.find((tag) => tag.name === output.tag);
                                   return (
                                     <g key={output.id}>
-                                      {(isCounterKind(output.kind) ||
+                                      {isMathKind(output.kind) ? (
+                                        <>
+                                          <Wire x1={coilX - 142} y1={coilRowY}
+                                            x2={coilX - 120} y2={coilRowY} live={rungLive}/>
+                                          <MathOutputBlock x={coilX - 52} y={coilRowY}
+                                            kind={output.kind}
+                                            sourceA={numericOperandLabel(output.compareA)}
+                                            sourceB={numericOperandLabel(output.compareB)}
+                                            destination={output.tag || "??"}
+                                            selected={selected === output.id}
+                                            online={running}
+                                            valid={runtimeView?.instructionFlow[output.id]?.condition ?? false}
+                                            live={runtimeView?.instructionFlow[output.id]?.powerOut ?? false}/>
+                                          <Wire x1={coilX + 16} y1={coilRowY}
+                                            x2={width - 30} y2={coilRowY} live={rungLive}/>
+                                        </>
+                                      ) : (isCounterKind(output.kind) ||
                                         (output.kind === "RES" && assignedTag?.type === "COUNTER")) ? (
                                         <>
                                           <Wire x1={coilX - 142} y1={coilRowY}
@@ -1189,7 +1209,39 @@ export function PracticeEditor({
                     })}
                     {outputs.flatMap((output, index) => [
                       dragButton(output, coilX, outputYs[index]),
-                      tagDragButton(output, coilX, outputYs[index]),
+                      ...(!isMathKind(output.kind) ? [tagDragButton(output, coilX, outputYs[index])] :
+                        (["A", ...(output.kind === "MOV" ? [] : ["B"]), "Dest"] as Array<"A" | "B" | "Dest">)
+                        .map((side) => {
+                          const centerY = outputYs[index];
+                          const offsetY = side === "A" ? -8 : side === "B" ? 8 :
+                            output.kind === "MOV" ? 19 : 35;
+                          return <button key={"math-" + output.id + "-" + side} type="button"
+                            aria-label={"Editar " + (side === "Dest" ? "Dest" : "Source " + side) +
+                              " de " + output.kind}
+                            title={side === "Dest" ? "Elegir destino numérico INT/DINT/REAL" :
+                              "Escribir número o elegir variable numérica"}
+                            className="absolute z-30 cursor-text rounded border border-transparent bg-transparent hover:border-sky-500 hover:bg-sky-100/25 focus-visible:outline-2 focus-visible:outline-sky-500"
+                            style={{ left: coilX - 112, top: centerY + offsetY,
+                              width: 125, height: 16 }}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSelected(output.id);
+                              setSelectedOrBranch(null);
+                              setSelectedRungId(null);
+                              setEditingPresetId(null);
+                              if (side === "Dest") {
+                                setEditingCompare(null);
+                                openTagSelector(event, output.id, "suggestions");
+                              } else {
+                                setTagSelector(null);
+                                const rect = event.currentTarget.getBoundingClientRect();
+                                setEditingCompare({ id: output.id, side,
+                                  anchor: { left: rect.left, top: rect.top, bottom: rect.bottom } });
+                              }
+                            }}>
+                            <span className="sr-only">{side === "Dest" ? "Seleccionar Dest" : "Editar Source " + side}</span>
+                          </button>;
+                        })),
                     ])}
                     {outputs.filter((item) => ["TON", "TOF", "RTO", "CTU", "CTD"].includes(item.kind))
                       .map((item) => {
@@ -1271,14 +1323,16 @@ export function PracticeEditor({
 
       {editingCompare && (() => {
         const found = findInstruction(project, editingCompare.id);
-        if (!found || !isCompareKind(found.instruction.kind)) return null;
+        if (!found || (!isCompareKind(found.instruction.kind) && !isMathKind(found.instruction.kind))) return null;
         return <CompareOperandEditor
           key={editingCompare.id + "-" + editingCompare.side}
           kind={found.instruction.kind} side={editingCompare.side}
           operand={editingCompare.side === "A" ? found.instruction.compareA : found.instruction.compareB}
           tags={project.tags} anchor={editingCompare.anchor}
           onSave={(operand) => {
-            if (update(() => setComparisonOperand(project, editingCompare.id, editingCompare.side, operand))) {
+            if (update(() => isMathKind(found.instruction.kind)
+              ? setMathSource(project, editingCompare.id, editingCompare.side, operand as NumericOperand)
+              : setComparisonOperand(project, editingCompare.id, editingCompare.side, operand))) {
               setEditingCompare(null);
             }
           }}
