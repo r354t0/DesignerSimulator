@@ -5,7 +5,7 @@ import {
   type LadderGroupGeometry, type VisualLadderDropTarget,
 } from "./ladderDragDrop.ts";
 import {
-  MAX_PRACTICE_CONTACTS, isOutputKind, isTimerKind, isCounterKind, isCompareKind, isMathKind, contactCount, findInstruction,
+  OR_JUNCTION_KIND, MAX_PRACTICE_CONTACTS, isOutputKind, isTimerKind, isCounterKind, isCompareKind, isMathKind, contactCount, findInstruction,
   type EditableKind, type PracticeProject, type PracticeRung,
 } from "./practiceDocument.ts";
 
@@ -157,11 +157,15 @@ export function findWrappedLadderDropTarget(
       return { kind, lane: "main", branchId: emptyId, position: contacts.length,
         x: layout.coilX, y: layout.emptyOutputYs[emptyIndex] };
     }
-    return { kind, lane: "main", position: contacts.length,
+    const outputs = rung.instructions.filter((item) => isOutputKind(item.kind));
+    const slot = outputs.length
+      ? layout.outputYs.findIndex((centerY) => y < centerY - OUTPUT_BRANCH_STEP / 3)
+      : -1;
+    const outputIndex = slot >= 0 ? slot : outputs.length;
+    return { kind, lane: "main", position: contacts.length + outputIndex,
       x: layout.coilX,
-      y: layout.outputYs.at(-1) !== undefined
-        ? layout.outputYs.at(-1)! + (moving ? 0 : OUTPUT_BRANCH_STEP)
-        : layout.coilY };
+      y: outputs.length && outputIndex < outputs.length
+        ? layout.outputYs[outputIndex] : (layout.outputYs.at(-1) ?? layout.coilY) };
   }
 
   if (y - row.top >= 126) {
@@ -188,6 +192,20 @@ export function findWrappedLadderDropTarget(
 
   if (Math.abs(y - row.mainY) > 55 || x < 63 || x > layout.width - 48) return null;
   if (contactCount(rung) >= MAX_PRACTICE_CONTACTS && moving?.rungId !== rungId) return null;
+
+  // Upper path of an independent OR has its own explicit drop area.
+  // The space AFTER group.right remains a normal main-line insertion slot.
+  const orGroup = row.groups.find((group) => {
+    const anchor = rung.instructions.find((part) => part.id === group.anchorId);
+    return anchor?.kind === OR_JUNCTION_KIND &&
+      x >= group.mainCenters[0] + 16 && x <= group.right &&
+      y >= row.mainY - 36 && y <= row.mainY + 38;
+  });
+  if (orGroup && movingId !== orGroup.anchorId) {
+    const endIndex = contacts.findIndex((part) => part.id === orGroup.endId);
+    return { kind, lane: "upper", anchorId: orGroup.anchorId,
+      position: endIndex + 1, x: orGroup.right - 23, y: row.mainY };
+  }
 
   const slots: { x: number; position: number }[] = [];
   for (const group of row.groups) {

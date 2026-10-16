@@ -1,4 +1,4 @@
-import { MAX_PRACTICE_CONTACTS, isOutputKind, contactCount, findInstruction, type EditableKind, type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
+import { OR_JUNCTION_KIND, MAX_PRACTICE_CONTACTS, isOutputKind, contactCount, findInstruction, type EditableKind, type PracticeProject, type PracticeRung } from "./practiceDocument.ts";
 
 export const LADDER_DRAG_MIME = "application/x-designersimulator-ladder-instruction";
 export const LADDER_MOVE_MIME = "application/x-designersimulator-ladder-move";
@@ -67,11 +67,13 @@ export function getRungGeometry(rung: PracticeRung, viewportWidth = 760): Ladder
     const endIndex = branches.length ? contacts.findIndex((item) => item.id === endId) : index;
     const last = Math.max(index, endIndex);
     const main = contacts.slice(index, last + 1);
-    const count = Math.max(main.length, 1, ...branches.map((branch) => branch.instructions.length));
+    const count = Math.max(main.length, anchor.kind === OR_JUNCTION_KIND ? 2 : 1,
+      ...branches.map((branch) => branch.instructions.length));
     const firstX = FIRST_CONTACT_X + consumed;
     consumed += count * CONTACT_STEP;
     const centers = main.length <= 1
-      ? [firstX + (count - 1) * CONTACT_STEP / 2]
+      ? [anchor.kind === OR_JUNCTION_KIND ? firstX :
+        firstX + (count - 1) * CONTACT_STEP / 2]
       : main.map((_, i) => firstX + i * ((count - 1) * CONTACT_STEP) / (main.length - 1));
     const left = firstX - GROUP_HALF_WIDTH;
     const right = firstX + (count - 1) * CONTACT_STEP + GROUP_HALF_WIDTH;
@@ -106,7 +108,7 @@ export interface LadderDropTarget {
   x: number;
 }
 export interface VisualLadderDropTarget extends LadderDropTarget {
-  lane: "main" | "parallel";
+  lane: "main" | "parallel" | "upper";
   y: number;
   anchorId?: string;
   branchId?: string;
@@ -187,6 +189,19 @@ export function findVisualLadderDropTarget(
   }
 
   if (y < 13 || y > 125) return null;
+  if (!isOutputKind(kind)) {
+    const orGroup = geometry.groups.find((group) => {
+      const anchor = rung.instructions.find((part) => part.id === group.anchorId);
+      return anchor?.kind === OR_JUNCTION_KIND &&
+        x >= group.mainCenters[0] + 16 && x <= group.right &&
+        y >= PRACTICE_MAIN_Y - 36 && y <= PRACTICE_MAIN_Y + 38;
+    });
+    if (orGroup && movingId !== orGroup.anchorId) {
+      return { kind, lane: "upper", anchorId: orGroup.anchorId,
+        position: rung.instructions.findIndex((part) => part.id === orGroup.endId) + 1,
+        x: orGroup.right - 22, y: PRACTICE_MAIN_Y };
+    }
+  }
   if (moving && isOutputKind(moving.instruction.kind) && moving.rungId === rungId) {
     return { kind, lane: "main", position: rung.instructions.length - 1,
       x: geometry.coilX, y: PRACTICE_MAIN_Y };

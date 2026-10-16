@@ -722,7 +722,17 @@ export function moveInstruction(
   }
 
   if (isOutputKind(source.instruction.kind)) {
-    if (sameRung) return project;
+    if (sameRung) {
+      const contacts = target.instructions.filter((item) => !isOutputKind(item.kind));
+      const outputs = target.instructions.filter((item) => isOutputKind(item.kind));
+      const from = outputs.findIndex((item) => item.id === instructionId);
+      const to = Math.max(0, Math.min(outputs.length, position - contacts.length));
+      if (from < 0) return project;
+      const nextOutputs = outputs.filter((item) => item.id !== instructionId);
+      nextOutputs.splice(from < to ? to - 1 : to, 0, source.instruction);
+      return { ...project, rungs: project.rungs.map((rung) =>
+        rung.id === targetRungId ? { ...rung, instructions: [...contacts, ...nextOutputs] } : rung) };
+    }
     if (target.instructions.filter((item) => isOutputKind(item.kind)).length +
         (target.emptyOutputBranches?.length ?? 0) >= MAX_PARALLEL_OUTPUTS) {
       throw new Error("Máximo " + MAX_PARALLEL_OUTPUTS + " bobinas OTE en paralelo por rung.");
@@ -741,9 +751,15 @@ export function moveInstruction(
           const priorMain = rung.instructions
             .filter((item) => !isOutputKind(item.kind));
           const removedAt = priorMain.findIndex((item) => item.id === instructionId);
-          const endId = !sameRung && branch.endId === instructionId
-            ? (removedAt > 0 ? priorMain[removedAt - 1].id : branch.anchorId)
-            : branch.endId;
+          const independentUpperEnd = branch.endId === instructionId &&
+            priorMain.some((part) => part.id === branch.anchorId && part.kind === OR_JUNCTION_KIND);
+          const anchorIndex = priorMain.findIndex((item) => item.id === branch.anchorId);
+          const replacementEnd = removedAt > anchorIndex + 1
+            ? priorMain[removedAt - 1].id : undefined;
+          const endId = independentUpperEnd ? replacementEnd :
+            !sameRung && branch.endId === instructionId
+              ? (removedAt > 0 ? priorMain[removedAt - 1].id : branch.anchorId)
+              : branch.endId;
           return { ...branch, endId,
             instructions: branch.instructions.filter((item) => item.id !== instructionId) };
         }),
@@ -763,6 +779,39 @@ export function moveInstruction(
     }
   }
   return next;
+}
+
+/**
+ * Drag an existing XIC/XIO/ONS/comparison into the independent upper path.
+ * Its complete instruction object (including operand configuration) travels
+ * unchanged, and the OR node stays a separate structural element.
+ */
+export function moveToIndependentOrUpper(
+  project: PracticeProject, instructionId: string,
+  targetRungId: string, anchorId: string,
+): PracticeProject {
+  const source = findInstruction(project, instructionId);
+  if (!source) throw new Error("No se encontró la instrucción.");
+  if (isOutputKind(source.instruction.kind) || source.instruction.kind === OR_JUNCTION_KIND) {
+    throw new Error("La trayectoria superior OR solo admite contactos y comparaciones.");
+  }
+  const target = getRung(project, targetRungId);
+  if (!target.instructions.some((item) =>
+    item.id === anchorId && item.kind === OR_JUNCTION_KIND)) {
+    throw new Error("El destino no es un OR independiente.");
+  }
+  const branch = target.parallelBranches?.find((lane) => lane.anchorId === anchorId);
+  if (!branch) throw new Error("No se encontró la rama OR de destino.");
+  const main = target.instructions.filter((item) => !isOutputKind(item.kind));
+  const end = main.findIndex((item) => item.id === (branch.endId ?? anchorId));
+  if (source.rungId === targetRungId && source.lane === "main" &&
+      source.instruction.id === branch.endId) return project;
+  const moved = moveInstruction(project, instructionId, targetRungId, end + 1);
+  return { ...moved, rungs: moved.rungs.map((rung) => rung.id !== targetRungId ? rung : {
+    ...rung,
+    parallelBranches: rung.parallelBranches?.map((lane) =>
+      lane.anchorId === anchorId ? { ...lane, endId: instructionId } : lane),
+  }) };
 }
 
 /** Move an existing contact into any (possibly empty) OR branch. */

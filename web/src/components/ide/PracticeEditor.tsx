@@ -29,6 +29,7 @@ import {
   copyInstructionTag,
   createIndependentParallelBranch,
   insertIntoIndependentOrUpper,
+  moveToIndependentOrUpper,
   removeEmptyOutputBranch,
   fillEmptyOutputBranch,
 
@@ -467,7 +468,9 @@ export function PracticeEditor({
     setDropPreview(null);
     if (target) {
       if (isMove && sourceId && findInstruction(project, sourceId)) {
-        const done = update(() => target.lane === "parallel" && target.anchorId
+        const done = update(() => target.lane === "upper" && target.anchorId
+          ? moveToIndependentOrUpper(project, sourceId, rungId, target.anchorId)
+          : target.lane === "parallel" && target.anchorId
           ? moveToParallel(project, sourceId, rungId, target.anchorId, target.position, target.branchId)
           : target.branchId && !target.anchorId
             ? moveInstructionToEmptyOutputBranch(project, sourceId, rungId, target.branchId)
@@ -478,8 +481,19 @@ export function PracticeEditor({
           editorRef.current?.focus({ preventScroll: true });
         }
       } else if (isPalette && isEditableKind(paletteKind)) {
-        insertAt(rungId, target.position, paletteKind,
-          target.lane === "parallel" ? target.anchorId : undefined, target.branchId);
+        if (target.lane === "upper" && target.anchorId) {
+          const id = nextId("instruction");
+          if (update(() => insertIntoIndependentOrUpper(project, rungId, target.anchorId, {
+            id, tag: "", kind: paletteKind,
+          }))) {
+            setSelected(id);
+            setSelectedOrBranch(null);
+            editorRef.current?.focus({ preventScroll: true });
+          }
+        } else {
+          insertAt(rungId, target.position, paletteKind,
+            target.lane === "parallel" ? target.anchorId : undefined, target.branchId);
+        }
       }
     }
     setMoving(null);
@@ -780,6 +794,31 @@ export function PracticeEditor({
                 <span className="sr-only">Mover {item.tag}</span>
               </button>
             );
+            // Dedicated, visible drag handle for structured blocks. Their PRE,
+            // Source A/B and Dest hotspots are interactive and previously sat
+            // above the drag surface, trapping pointer events.
+            const structuredDragHandle = (
+              item: typeof contacts[number], x: number, centerY: number,
+            ) => (
+              <button key={"grip-" + item.id} type="button" draggable
+                aria-label={"Arrastrar instrucción " + item.kind + " a otra posición o rung"}
+                title={"Mover " + item.kind + " (conserva los operandos)"}
+                onDragStart={(event) => beginMove(event, item.id, item.kind)}
+                onDragEnd={() => { setMoving(null); setDropPreview(null); }}
+                onClick={() => {
+                  setSelected(item.id);
+                  setSelectedOrBranch(null);
+                  setSelectedRungId(null);
+                  setBitMenu(null);
+                }}
+                className="absolute z-40 flex h-[22px] w-[22px] cursor-grab items-center justify-center rounded border border-sky-400/60 bg-sky-50 text-sky-700 shadow-sm hover:bg-sky-100 active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-sky-600"
+                style={{
+                  left: x + (isOutputKind(item.kind) ? -111 : -43),
+                  top: centerY - 29,
+                }}>
+                <GripVertical size={15} aria-hidden="true"/>
+              </button>
+            );
             // The SVG keeps rendering the label; this invisible HTML hotspot
             // captures native dragstart reliably on top of the tag text only.
             const tagDragButton = (item: typeof contacts[number], x: number, centerY: number) => (
@@ -968,6 +1007,19 @@ export function PracticeEditor({
                                   })}
                                   {branches.length > 0 && (
                                     <g>
+                                      {mainItems[0]?.kind === OR_JUNCTION_KIND &&
+                                        mainItems.length === 1 && (
+                                          <g pointerEvents="none">
+                                            <rect x={group.x + 22} y={row.mainY - 15}
+                                              width={Math.max(28, group.right - group.x - 28)}
+                                              height="30" rx="4" fill="#eff6ff"
+                                              fillOpacity="0.65" stroke="#60a5fa"
+                                              strokeWidth="1.3" strokeDasharray="4 3"/>
+                                            <text x={(group.x + group.right + 22)/2}
+                                              y={row.mainY + 4} textAnchor="middle"
+                                              fontSize="10" fill="#2563eb">+ superior</text>
+                                          </g>
+                                        )}
                                       <Wire x1={group.left} y1={row.mainY} x2={group.left}
                                         y2={group.branchLanes.at(-1)!.y} live={inputPower} />
                                       <Wire x1={group.right} y1={row.mainY} x2={group.right}
@@ -1241,6 +1293,9 @@ export function PracticeEditor({
                         ...mainItems.flatMap((contact, index) => [
                           ...(contact.kind === OR_JUNCTION_KIND ? [] :
                             [dragButton(contact, group.mainCenters[index], group.mainY)]),
+                          ...(isCompareKind(contact.kind)
+                            ? [structuredDragHandle(contact, group.mainCenters[index], group.mainY)]
+                            : []),
                           ...(contact.kind === OR_JUNCTION_KIND
                             ? [<button key={"or-node-" + contact.id} type="button"
                                 aria-label="Seleccionar unión OR e insertar en la trayectoria superior"
@@ -1263,6 +1318,9 @@ export function PracticeEditor({
                           return branch.instructions.flatMap((part, partIndex) => [
                             dragButton(part, lane.centers[partIndex], lane.y),
                             ...(isCompareKind(part.kind)
+                              ? [structuredDragHandle(part, lane.centers[partIndex], lane.y)]
+                              : []),
+                            ...(isCompareKind(part.kind)
                               ? compareHotspots(part, lane.centers[partIndex], lane.y)
                               : [tagDragButton(part, lane.centers[partIndex], lane.y)]),
                           ]);
@@ -1271,6 +1329,9 @@ export function PracticeEditor({
                     })}
                     {outputs.flatMap((output, index) => [
                       dragButton(output, coilX, outputYs[index]),
+                      ...(isTimerKind(output.kind) || isCounterKind(output.kind) ||
+                        isMathKind(output.kind)
+                        ? [structuredDragHandle(output, coilX, outputYs[index])] : []),
                       ...(!isMathKind(output.kind) ? [tagDragButton(output, coilX, outputYs[index])] :
                         (["A", ...(output.kind === "MOV" ? [] : ["B"]), "Dest"] as Array<"A" | "B" | "Dest">)
                         .map((side) => {
