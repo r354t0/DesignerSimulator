@@ -57,8 +57,8 @@ export function TankScene({
   const mixing = auto && readTankBool(project, "Tank_MixStage");
   const draining = auto && readTankBool(project, "Tank_DrainStage");
   const batch = project.tags.find(t => t.name === "Tank_Batches");
-  const batches = batch?.type === "COUNTER" && typeof batch.value === "object"
-    ? batch.value.ACC : 0;
+  const batches = batch?.type === "COUNTER" && typeof batch.value === "object" &&
+    typeof batch.value.ACC === "number" ? batch.value.ACC : 0;
   const complete = batches >= TANK_BATCH_TARGET;
   const phase = alarm ? "ALARMA" : complete ? "LOTE FINALIZADO" :
     filling ? "LLENANDO" : mixing ? "MEZCLANDO" : draining ? "DRENANDO" :
@@ -67,7 +67,9 @@ export function TankScene({
     const tag = project.tags.find(t => t.name === name);
     const value = tag?.type === "TIMER" && typeof tag.value === "object"
       ? tag.value : null;
-    return { name, preset: value?.PRE ?? preset, acc: value?.ACC ?? 0,
+    return { name,
+      preset: typeof value?.PRE === "number" ? value.PRE : preset,
+      acc: typeof value?.ACC === "number" ? value.ACC : 0,
       done: value?.DN === true };
   });
   const low = readTankBool(project, "Tank_LowLS");
@@ -127,20 +129,6 @@ export function TankScene({
                   <stop offset="100%" stopColor="#125a9b"/>
                 </linearGradient>
               </defs>
-              {/* Mechanical mixer M-02, driven strictly by the PLC output. */}
-              <rect x="379" y="12" width="50" height="27" rx="6"
-                fill={mixer ? "#25584d" : "#405569"}
-                stroke={mixer ? "#34d399" : "#8fa8b9"} strokeWidth="2"/>
-              <text x="404" y="30" fontSize="10" fill="#e0f2fe"
-                fontWeight="700" textAnchor="middle">M-02</text>
-              <path d="M404 39 V184" stroke="#98b0bf" strokeWidth="5"/>
-              <g className="conveyor-motor-spin"
-                style={{ transformOrigin: "404px 184px",
-                  animationPlayState: mixer ? "running" : "paused" }}>
-                <path d="M371 184 H437 M377 176 L431 192 M377 192 L431 176"
-                  fill="none" stroke={mixer ? "#6ee7b7" : "#a9c4d6"}
-                  strokeWidth="6" strokeLinecap="round"/>
-              </g>
               {/* Equipment frame and tank. */}
               <path d="M48 253 H705" stroke="#334b5b" strokeWidth="5" strokeLinecap="round"/>
               <path d="M319 240 L310 254 H333 L338 240 M472 240 L467 254 H490 L495 240"
@@ -155,6 +143,20 @@ export function TankScene({
                     " T410 " + waterY + " T470 " + waterY + " T520 " + waterY}
                     stroke="#9ae8ff" strokeWidth="2.3" fill="none"/>
                 )}
+              </g>
+              {/* Mechanical mixer M-02, driven strictly by the PLC output. */}
+              <rect x="379" y="12" width="50" height="27" rx="6"
+                fill={mixer ? "#25584d" : "#405569"}
+                stroke={mixer ? "#34d399" : "#8fa8b9"} strokeWidth="2"/>
+              <text x="404" y="30" fontSize="10" fill="#e0f2fe"
+                fontWeight="700" textAnchor="middle">M-02</text>
+              <path d="M404 39 V184" stroke="#98b0bf" strokeWidth="5"/>
+              <g className="conveyor-motor-spin"
+                style={{ transformOrigin: "404px 184px",
+                  animationPlayState: mixer ? "running" : "paused" }}>
+                <path d="M371 184 H437 M377 176 L431 192 M377 192 L431 176"
+                  fill="none" stroke={mixer ? "#6ee7b7" : "#a9c4d6"}
+                  strokeWidth="6" strokeLinecap="round"/>
               </g>
               <g fontSize="11" textAnchor="end" fill="#cbd5e1">
                 <text x="280" y="77">100 %</text>
