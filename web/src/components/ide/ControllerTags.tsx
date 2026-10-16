@@ -9,7 +9,7 @@ import {
 import { demoTagMetadata, type DemoInputs, type DemoValues, type InputTag } from "../../plc/demoModel";
 
 interface Props {
-  activeScene: "conveyor" | "sorting" | "motor";
+  activeScene: "conveyor" | "sorting" | "tank" | "motor";
   project: PracticeProject;
   onChange: (next: PracticeProject) => void;
   practiceRunning: boolean;
@@ -360,6 +360,7 @@ export function ControllerTags({
         <span className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px]">
           {scope === "demo" ? "Motor · DEMO"
             : activeScene === "sorting" ? "MainRoutine · Clasificación de cajas"
+            : activeScene === "tank" ? "MainRoutine · Sistema de llenado de tanques"
             : "MainRoutine · Faja transportadora"}
         </span>
         <label className="flex items-center gap-1">

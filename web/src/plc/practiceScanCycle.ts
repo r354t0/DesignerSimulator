@@ -94,6 +94,7 @@ export function tickPracticeScan(state: PracticeScanState): PracticeScanState {
  */
 export function applyMomentaryBoolInput(
   state: PracticeScanState, tagName: string, pressed: boolean,
+  sampleRelease = false,
 ): PracticeScanState {
   const tag = state.project.tags.find((item) => item.name === tagName);
   if (!tag || tag.type !== "BOOL") {
@@ -103,7 +104,10 @@ export function applyMomentaryBoolInput(
   const staged = changePracticeScanProject(
     state, setTagValue(state.project, tagName, pressed),
   );
-  return pressed && staged.mode === "running" ? performScan(staged, 0) : staged;
+  // A direct-acting output (e.g. drain solenoid) also requires immediate
+  // release. START/STOP retain their established rising-only semantics.
+  return (pressed || sampleRelease) && staged.mode === "running"
+    ? performScan(staged, 0) : staged;
 }
 
 /**

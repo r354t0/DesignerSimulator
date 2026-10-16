@@ -68,3 +68,15 @@ button.ide-tree-row:hover {
     animation-duration: 6s;
   }
 }
+
+
+/* Tank process flow: purely cosmetic, gated by PLC-driven fluid physics. */
+@keyframes tank-water-stream {
+  to { stroke-dashoffset: -32; }
+}
+.tank-flow-motion {
+  animation: tank-water-stream 0.7s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .tank-flow-motion { animation-duration: 4s; }
+}

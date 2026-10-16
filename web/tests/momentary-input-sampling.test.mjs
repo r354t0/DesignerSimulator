@@ -109,5 +109,6 @@ test("the SCADA button dispatcher routes to the immediate momentary sample", () 
   const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
   const cycle = readFileSync(new URL("../src/plc/practiceScanCycle.ts", import.meta.url), "utf8");
   assert.match(app, /applyMomentaryBoolInput\(state, tag, value\)/);
-  assert.match(cycle, /pressed && staged\.mode === "running" \? performScan\(staged, 0\) : staged/);
+  assert.match(cycle, /\(pressed \|\| sampleRelease\) && staged\.mode === "running"/);
+  assert.match(cycle, /performScan\(staged, 0\)/);
 });

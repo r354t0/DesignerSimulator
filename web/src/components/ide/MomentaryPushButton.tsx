@@ -4,7 +4,7 @@ interface Props {
   name: string;
   pressed: boolean;
   onChange: (pressed: boolean) => void;
-  tone: "start" | "stop";
+  tone: "start" | "stop" | "drain";
   icon: ReactNode;
   children: ReactNode;
 }
@@ -75,9 +75,13 @@ export function MomentaryPushButton({
     ? pressed
       ? "border-emerald-300 bg-emerald-600 text-white"
       : "border-emerald-700 bg-emerald-950 text-emerald-300"
-    : pressed
-      ? "border-red-300 bg-red-600 text-white"
-      : "border-red-700 bg-red-950 text-red-300";
+    : tone === "stop"
+      ? pressed
+        ? "border-red-300 bg-red-600 text-white"
+        : "border-red-700 bg-red-950 text-red-300"
+      : pressed
+        ? "border-sky-300 bg-sky-600 text-white"
+        : "border-sky-700 bg-sky-950 text-sky-300";
 
   return (
     <button type="button" aria-label={name} aria-pressed={pressed}

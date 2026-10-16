@@ -19,6 +19,12 @@ import { initialDemoBlocks, resetDemoCounters, stepDemoBlocks, type DemoBlockRun
 import { SimulationScene } from "./components/ide/SimulationScene";
 import { ConveyorScene } from "./components/ide/ConveyorScene";
 import { SortScene } from "./components/ide/SortScene";
+import { TankScene } from "./components/ide/TankScene";
+import {
+  createTankExampleProject, initialTankProject, initialTankState,
+  prepareTankTags, readTankBool, stepTankState, tankSensorInputs,
+  type TankState,
+} from "./plc/tankSceneModel";
 import {
   addSortBox, createSortExampleProject, initialSortProject, initialSortState,
   prepareSortTags, readSortBool, stepSortState, type SortBoxType, type SortState,
@@ -64,8 +70,8 @@ const layoutConfig: IJsonModel = {
   },
 };
 
-type SimulationTab = "conveyor" | "sorting" | "motor";
-type ProgrammingScene = "conveyor" | "sorting";
+type SimulationTab = "conveyor" | "sorting" | "tank" | "motor";
+type ProgrammingScene = "conveyor" | "sorting" | "tank";
 
 interface DemoMachineState {
   inputs: DemoInputs;
@@ -95,6 +101,7 @@ export default function App() {
   // Separate Ladder programs per SCADA scene; no accidental tag mixing.
   const sceneSessions = useRef<Record<ProgrammingScene, PracticeScanState>>({
     conveyor: scanState, sorting: initialPracticeScanState(initialSortProject()),
+    tank: initialPracticeScanState(initialTankProject()),
   });
   const activeControllerScene = useRef<ProgrammingScene>("conveyor");
   const practice = scanState.project;
@@ -124,6 +131,16 @@ export default function App() {
   }));
   const { inputs, motorLatched, blocks } = demo;
   const [simulationTab, setSimulationTab] = useState<SimulationTab>("conveyor");
+  const [tankSetupError, setTankSetupError] = useState<string | null>(null);
+  const [tankState, setTankState] = useState<TankState>(initialTankState);
+  const tankRef = useRef(tankState);
+  const changeTank = useCallback((operation: (state: TankState) => TankState) => {
+    const next = operation(tankRef.current);
+    if (next !== tankRef.current) {
+      tankRef.current = next;
+      setTankState(next);
+    }
+  }, []);
   const [sortSetupError, setSortSetupError] = useState<string | null>(null);
   const [sortState, setSortState] = useState<SortState>(initialSortState);
   const sortRef = useRef(sortState);
@@ -213,6 +230,40 @@ export default function App() {
     return () => window.clearInterval(id);
   }, [practiceMode, simulationTab, changeSort, changeScan]);
 
+  // Tank process physics follows the real PLC output values and is never
+  // active while this scene is stopped, paused, or not the selected controller.
+  useEffect(() => {
+    if (practiceMode !== "running" || activeControllerScene.current !== "tank") return;
+    const id = window.setInterval(() => {
+      const current = scanRef.current;
+      if (current.mode !== "running" || activeControllerScene.current !== "tank") return;
+      const next = stepTankState(tankRef.current,
+        readTankBool(current.project, "Tank_Pump"),
+        readTankBool(current.project, "Tank_InletValve"),
+        readTankBool(current.project, "Tank_DrainValve"), 50);
+      if (next !== tankRef.current) changeTank(() => next);
+      const sensorValues = tankSensorInputs(next.levelPercent);
+      changeScan((state) => {
+        let result = state;
+        // Publish the REAL level first, then scan on BOOL level switches.
+        const valueTag = result.project.tags.find(t => t.name === "Tank_LevelPct");
+        if (valueTag?.type === "REAL" && valueTag.value !== sensorValues.Tank_LevelPct) {
+          result = changePracticeScanProject(result,
+            setTagValue(result.project, "Tank_LevelPct", sensorValues.Tank_LevelPct));
+        }
+        for (const name of ["Tank_LowLS", "Tank_HighLS"] as const) {
+          const value = sensorValues[name];
+          const tag = result.project.tags.find(t => t.name === name);
+          if (tag?.type === "BOOL" && tag.value !== value) {
+            result = applySceneSensorBoolInput(result, name, value);
+          }
+        }
+        return result;
+      });
+    }, 50);
+    return () => window.clearInterval(id);
+  }, [practiceMode, simulationTab, changeTank, changeScan]);
+
   // Advance the five fixed demo rungs with elapsed milliseconds, independent of
   // React render frequency. This is NOT a controller-quality real-time scan.
   useEffect(() => {
@@ -247,6 +298,49 @@ export default function App() {
   }, []);
   const handlePracticeChange = useCallback((next: PracticeProject) =>
     changeScan((state) => changePracticeScanProject(state, next)), [changeScan]);
+
+  const setTankInput = useCallback((
+    tag: "Tank_StartPB" | "Tank_StopPB" | "Tank_DrainPB", pressed: boolean,
+  ) => {
+    // React may unmount a held momentary input when the scene changes.
+    // Never dispatch that release event into a different MainRoutine project.
+    if (activeControllerScene.current !== "tank") return;
+    changeScan(state => applyMomentaryBoolInput(
+      state, tag, pressed, tag === "Tank_DrainPB",
+    ));
+  }, [changeScan]);
+
+  const resetTank = useCallback(() => {
+    changeTank(() => initialTankState());
+    changeScan(current => {
+      const initial = tankSensorInputs(initialTankState().levelPercent);
+      let next = current;
+      if (next.project.tags.some(t => t.name === "Tank_LevelPct" && t.type === "REAL")) {
+        next = changePracticeScanProject(next,
+          setTagValue(next.project, "Tank_LevelPct", initial.Tank_LevelPct));
+      }
+      for (const name of ["Tank_LowLS", "Tank_HighLS"] as const) {
+        const tag = next.project.tags.find(t => t.name === name);
+        if (tag?.type === "BOOL" && tag.value !== initial[name]) {
+          next = applySceneSensorBoolInput(next, name, initial[name]);
+        }
+      }
+      return next;
+    });
+  }, [changeTank, changeScan]);
+
+  const prepareTank = useCallback(() => {
+    try {
+      changeScan(state => {
+        const project = prepareTankTags(state.project);
+        return project === state.project ? state : changePracticeScanProject(state, project);
+      });
+      setTankSetupError(null);
+    } catch (error) {
+      setTankSetupError(error instanceof Error
+        ? error.message : "No se pudieron preparar los tags del tanque.");
+    }
+  }, [changeScan]);
 
   const setSortInput = useCallback((tag: "Sort_StartPB" | "Sort_StopPB", value: boolean) => {
     changeScan((state) => applyMomentaryBoolInput(state, tag, value));
@@ -310,7 +404,8 @@ export default function App() {
   useEffect(() => {
     if (simulationTab === "conveyor") prepareConveyor();
     else if (simulationTab === "sorting") prepareSort();
-  }, [simulationTab, prepareConveyor, prepareSort]);
+    else if (simulationTab === "tank") prepareTank();
+  }, [simulationTab, prepareConveyor, prepareSort, prepareTank]);
 
   const startPractice = useCallback(() =>
     changeScan(startPracticeScans), [changeScan]);
@@ -346,6 +441,18 @@ export default function App() {
     }
     setEditorView(view);
   }, [model]);
+
+  const loadTankExample = useCallback(() => {
+    if (!window.confirm(
+      "Se reemplazará MainRoutine y sus Controller Tags de la escena TANQUE por la plantilla Ladder. ¿Continuar?",
+    )) return;
+    changeScan(state => ({
+      ...initialPracticeScanState(createTankExampleProject()),
+      scanPeriodMs: state.scanPeriodMs,
+    }));
+    changeTank(() => initialTankState());
+    openEditorView("practice");
+  }, [changeScan, changeTank, openEditorView]);
 
   const loadSortExample = useCallback(() => {
     if (!window.confirm(
@@ -428,6 +535,7 @@ export default function App() {
                   className="max-w-full cursor-pointer rounded border border-slate-600 bg-[#1c2e3e] px-2 py-1 text-[11px] font-medium text-slate-200 outline-none hover:border-slate-400 focus-visible:border-sky-500">
                   <option value="conveyor">Faja transportadora</option>
                   <option value="sorting">Clasificación de cajas</option>
+                  <option value="tank">Sistema de llenado de tanques</option>
                   <option value="motor">Motor · DEMO</option>
                 </select>
               </div>
@@ -450,7 +558,15 @@ export default function App() {
                         setupError={sortSetupError}
                         onOpenTags={() => openEditorView("tags")}
                         onLoadExample={loadSortExample}/>
-                    : <SimulationScene online={online} inputs={inputs} values={values}
+                    : simulationTab === "tank"
+                      ? <TankScene project={practice} mode={practiceMode} state={tankState}
+                          onInputChange={setTankInput}
+                          onReset={resetTank}
+                          onPrepareTags={prepareTank}
+                          setupError={tankSetupError}
+                          onOpenTags={() => openEditorView("tags")}
+                          onLoadExample={loadTankExample}/>
+                      : <SimulationScene online={online} inputs={inputs} values={values}
                         onTagChange={handleTagChange}/>}
               </div>
             </div>
@@ -466,7 +582,8 @@ export default function App() {
       setConveyorInput, changeConveyor, resetConveyor, prepareConveyor,
       conveyorTagSetupError, loadConveyorExample, sortState, setSortInput,
       changeSort, resetSort, prepareSort, sortSetupError, loadSortExample,
-      chooseSimulationTab],
+      chooseSimulationTab, tankState, changeTank, setTankInput, resetTank,
+      prepareTank, tankSetupError, loadTankExample],
   );
 
   const syncTabSelection = useCallback((updatedModel: Model) => {
