@@ -31,7 +31,8 @@ export function getTagPickerRows(
   const boolContact = kind === "XIC" || kind === "XIO";
   for (const tag of roots) {
     if (isMathKind(kind)) {
-      if (["INT", "DINT", "REAL"].includes(tag.type) && matches(tag.name, tag.description)) {
+      if (!tag.constant && ["INT", "DINT", "REAL"].includes(tag.type) &&
+          matches(tag.name, tag.description)) {
         rows.push({ name: tag.name, type: tag.type as "INT" | "DINT" | "REAL",
           description: tag.description, selectable: true, depth: 0,
           expandable: false, expanded: false });

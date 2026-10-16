@@ -134,7 +134,7 @@ test("invalid BOOL reference and unsupported opcode fail fast", () => {
   p = createTag(p, "Analog_SP", "setpoint", "REAL");
   damaged = { ...p, rungs: p.rungs.map((rung) => ({
     ...rung, instructions: rung.instructions.map((i) => i.id === "start"
-      ? { ...i, kind: "MOV" } : i),
+      ? { ...i, kind: "MOD" } : i),
   })) };
   assert.throws(() => evaluateSeriesScan(damaged), /no ejecutable/);
 });
