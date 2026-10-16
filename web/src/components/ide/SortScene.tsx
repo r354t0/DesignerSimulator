@@ -1,7 +1,7 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import {
-  AlertTriangle, ArrowRight, Box, CircleHelp, Factory, Gauge,
-  GitBranch, Pause, Play, RotateCcw, ScanLine,
+  ArrowRight, Box, CircleHelp, Factory,
+  Pause, Play, RotateCcw, ScanLine,
 } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
@@ -50,36 +50,6 @@ function Pilot({ label, active, color }: {
   );
 }
 
-function Metric({ label, value, unit, tone = "neutral", icon }: {
-  label: string; value: number | string; unit?: string;
-  tone?: "neutral" | "blue" | "amber" | "red" | "green";
-  icon: ReactNode;
-}) {
-  const colors = {
-    neutral: "text-slate-100",
-    blue: "text-sky-300",
-    amber: "text-amber-300",
-    red: "text-rose-300",
-    green: "text-emerald-300",
-  };
-  return (
-    <div className="sort-kpi flex min-w-0 flex-col justify-between gap-2 rounded-lg border border-[#314557] bg-[#142532] p-3">
-      <div className="flex items-start justify-between gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-[.09em] text-slate-400">
-          {label}
-        </span>
-        <span className="shrink-0 text-[#7c9db1]" aria-hidden="true">{icon}</span>
-      </div>
-      <div className="flex items-baseline gap-1.5">
-        <span className={"font-mono text-[23px] font-bold leading-none tabular-nums " + colors[tone]}>
-          {value}
-        </span>
-        {unit && <span className="text-[10px] text-slate-400">{unit}</span>}
-      </div>
-    </div>
-  );
-}
-
 /** PLC-controlled SCADA. No simulation state or process commands are faked by the UI. */
 export function SortScene({
   project, mode, state, setupError, onInputChange, onAddBox, onReset,
@@ -100,10 +70,7 @@ export function SortScene({
     typeof tag.value === "object" && tag.value.DN === true);
   const validTags = hasSortTags(project);
 
-  const countA = readSortCount(project, "Sort_CountA");
-  const countB = readSortCount(project, "Sort_CountB");
   const countTotal = resetAvailable ? readSortCount(project, "Sort_CountTotal") : null;
-  const batches = resetAvailable ? readSortCount(project, "Sort_Batches") : null;
   const configuredPreset = project.tags.find(tag => tag.name === "Sort_CountTotal");
   const batchTarget = configuredPreset?.type === "COUNTER" &&
     typeof configuredPreset.value === "object" &&
@@ -160,27 +127,6 @@ export function SortScene({
             </button>
           </div>
         </header>
-
-        {/* Numeric KPIs read exclusively from PLC COUNTER tags and physical errors. */}
-        <div className="grid gap-2" style={{
-          gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 140px), 1fr))",
-        }}>
-          <Metric label="Salida A" value={countA ?? "—"} unit="cajas" tone="blue"
-            icon={<Box size={16}/>}/>
-          <Metric label="Salida B" value={countB ?? "—"} unit="cajas" tone="amber"
-            icon={<Box size={16}/>}/>
-          {resetAvailable && (
-            <>
-              <Metric label="Total del lote" value={countTotal ?? "—"}
-                unit={"/ " + batchTarget} tone="blue" icon={<Gauge size={16}/>}/>
-              <Metric label="Lotes terminados" value={batches ?? "—"}
-                tone="green" icon={<GitBranch size={16}/>}/>
-            </>
-          )}
-          <Metric label="Desvíos erróneos" value={state.errors}
-            tone={state.errors > 0 ? "red" : "neutral"}
-            icon={<AlertTriangle size={16}/>}/>
-        </div>
 
         {/* Wide process graphic remains the focal point, with a real flow diagram. */}
         <section className="sort-panel rounded-lg border border-[#344c5e] p-3"

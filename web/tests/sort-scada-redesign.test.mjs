@@ -41,17 +41,22 @@ test("new process is its own large responsive SVG, without simulated UI-only mot
     "visual layer must not invent independent process physics");
 });
 
-test("professional KPI strips show real PLC counters, error tally and configured PRE", () => {
-  assert.match(view, /readSortCount\(project, "Sort_CountA"\)/);
-  assert.match(view, /readSortCount\(project, "Sort_CountB"\)/);
+test("SCADA process follows the header directly, without redundant KPI cards", () => {
+  const headerEnd = view.indexOf("</header>");
+  const graphicStart = view.indexOf('<section className="sort-panel', headerEnd);
+  assert.ok(headerEnd >= 0 && graphicStart > headerEnd);
+  const between = view.slice(headerEnd, graphicStart);
+  assert.doesNotMatch(between, /<Metric|Salida A|Salida B|Total del lote|Lotes terminados|Desvíos erróneos/);
+  assert.doesNotMatch(view, /function Metric\(|sort-kpi/);
+  assert.doesNotMatch(styles, /\.sort-kpi/);
+  assert.match(view, /<SortProcessGraphic state=\{state\} motor=\{motor\}/);
+  // Bottom pilot panel retains its compact batch progress, sourced from PLC tags.
   assert.match(view, /readSortCount\(project, "Sort_CountTotal"\)/);
   assert.match(view, /readSortCount\(project, "Sort_Batches"\)/);
   assert.match(view, /typeof configuredPreset\.value\.PRE === "number"/);
-  assert.match(view, /<Metric label="Desvíos erróneos" value=\{state\.errors\}/);
   assert.match(view, /role="progressbar" aria-label="Cajas del lote"/);
   assert.match(view, /aria-valuemax=\{batchTarget\}/);
   assert.match(view, /style=\{\{ width: progress \+ "%" \}\}/);
-  assert.match(styles, /\.sort-kpi/);
   assert.match(styles, /\.sort-progress-fill/);
 });
 
