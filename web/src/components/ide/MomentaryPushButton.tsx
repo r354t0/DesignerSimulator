@@ -7,6 +7,8 @@ interface Props {
   tone: "start" | "stop" | "drain";
   icon: ReactNode;
   children: ReactNode;
+  /** Smaller SCADA layout, preserving the same momentary event handling. */
+  compact?: boolean;
 }
 
 /**
@@ -15,7 +17,7 @@ interface Props {
  * always de-energize the input. Native pointer events avoid synthetic clicks.
  */
 export function MomentaryPushButton({
-  name, pressed, onChange, tone, icon, children,
+  name, pressed, onChange, tone, icon, children, compact = false,
 }: Props) {
   const pointer = useRef<number | null>(null);
   const keys = useRef<Set<string>>(new Set());
@@ -93,7 +95,9 @@ export function MomentaryPushButton({
       onKeyDown={onKeyDown}
       onKeyUp={onKeyUp}
       onBlur={releaseAll}
-      className={"flex h-16 w-20 touch-none select-none flex-col items-center justify-center gap-0.5 rounded-md border-2 text-xs font-bold focus-visible:outline-2 focus-visible:outline-sky-500 " + background}>
+      className={"flex touch-none select-none flex-col items-center justify-center gap-0.5 rounded-md border-2 font-bold focus-visible:outline-2 focus-visible:outline-sky-500 " +
+        (compact ? "h-12 min-h-12 w-full px-1.5 text-[10px] leading-tight" : "h-16 w-20 text-xs") +
+        " " + background}>
       {icon}
       {children}
     </button>
