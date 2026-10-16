@@ -66,7 +66,7 @@ export function ConveyorScene({
     : mode === "paused" ? "PLC · PAUSE" : "PLC · STOP";
 
   return (
-    <section className="sort-scada-shell flex h-full min-h-0 flex-col overflow-y-auto text-slate-100"
+    <section className="sort-scada-shell scada-control-shell flex h-full min-h-0 flex-col overflow-y-auto text-slate-100"
       aria-label="Escena de faja transportadora conectada a MainRoutine">
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
         <header className="sort-panel flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#344c5e] px-3.5 py-3">
@@ -231,28 +231,30 @@ export function ConveyorScene({
           </div>
         </section>
 
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <div className="rounded-lg border border-slate-700 bg-[#172634] p-3">
-            <div className="mb-3 flex items-center gap-1.5 text-xs font-semibold text-slate-200">
-              <Gauge size={15}/> Tablero de mando
+        <div className="scada-dashboard-grid grid gap-3">
+          <section className="sort-panel rounded-lg border border-[#344c5e] p-2.5"
+            aria-label="Tablero de mando">
+            <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-slate-200">
+              <Gauge size={14} aria-hidden="true"/> Tablero de mando
             </div>
-            <div className="flex flex-wrap items-center gap-3">
-              <MomentaryPushButton name="START" tone="start" pressed={start}
+            <div className="scada-command-buttons grid max-w-[210px] grid-cols-2 gap-2">
+              <MomentaryPushButton compact name="START" tone="start" pressed={start}
                 onChange={(pressed) => onInputChange("Start_PB", pressed)}
-                icon={<Play size={18} aria-hidden="true"/>}>START</MomentaryPushButton>
-              <MomentaryPushButton name="STOP" tone="stop" pressed={stop}
+                icon={<Play size={15} aria-hidden="true"/>}>START</MomentaryPushButton>
+              <MomentaryPushButton compact name="STOP" tone="stop" pressed={stop}
                 onChange={(pressed) => onInputChange("Stop_PB", pressed)}
-                icon={<Pause size={18} aria-hidden="true"/>}>STOP</MomentaryPushButton>
+                icon={<Pause size={15} aria-hidden="true"/>}>STOP</MomentaryPushButton>
               {resetAvailable && (
-                <MomentaryPushButton name="RESET LOTE" tone="drain" pressed={reset}
+                <MomentaryPushButton compact name="RESET LOTE" tone="drain" pressed={reset}
                   onChange={(pressed) => onInputChange("CV_ResetPB", pressed)}
-                  icon={<RotateCcw size={18} aria-hidden="true"/>}>RESET</MomentaryPushButton>
+                  icon={<RotateCcw size={15} aria-hidden="true"/>}>RESET</MomentaryPushButton>
               )}
             </div>
-          </div>
-          <div className="rounded-lg border border-slate-700 bg-[#172634] p-3">
-            <div className="mb-3 text-xs font-semibold text-slate-200">Pilotos LED</div>
-            <div className="grid grid-cols-1 gap-2 xl:grid-cols-3">
+          </section>
+          <section className="sort-panel min-w-0 rounded-lg border border-[#344c5e] p-3"
+            aria-label="Pilotos LED">
+            <div className="mb-2 text-xs font-semibold text-slate-200">Pilotos LED</div>
+            <div className="scada-pilot-grid grid grid-cols-2 gap-2">
               <PilotLed label="EN MARCHA" lit={motorOn} tone="green"/>
               <PilotLed label="DETENIDA" lit={!motorOn} tone="red"/>
               <PilotLed label="PE-01 · CAJA" lit={sensor} tone="amber"/>
@@ -267,7 +269,7 @@ export function ConveyorScene({
                 {count ?? "—"}
               </output>
             </div>
-          </div>
+          </section>
         </div>
 
         {!wired && (
