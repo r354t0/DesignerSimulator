@@ -12,8 +12,8 @@ const scene = readFileSync(new URL("../src/components/ide/ConveyorScene.tsx", im
 const button = readFileSync(new URL("../src/components/ide/MomentaryPushButton.tsx", import.meta.url), "utf8");
 
 test("SCADA START/STOP are momentary digital inputs instead of toggle buttons", () => {
-  assert.match(scene,/MomentaryPushButton name="START"/);
-  assert.match(scene,/MomentaryPushButton name="STOP"/);
+  assert.match(scene,/MomentaryPushButton compact name="START"/);
+  assert.match(scene,/MomentaryPushButton compact name="STOP"/);
   assert.match(scene,/onChange=\{\(pressed\) => onInputChange\("Start_PB", pressed\)\}/);
   assert.match(scene,/onChange=\{\(pressed\) => onInputChange\("Stop_PB", pressed\)\}/);
   assert.doesNotMatch(scene,/onClick=\{\(\) => onInputChange\("Start_PB", !start\)\}/);
