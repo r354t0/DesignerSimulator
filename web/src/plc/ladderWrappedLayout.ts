@@ -41,7 +41,7 @@ export interface WrappedRungLayout {
  * avoiding broken bypass paths.
  */
 export function getWrappedRungLayout(
-  rung: PracticeRung, viewport = 760, showDropLane = false, previewOutput = false,
+  rung: PracticeRung, viewport = 760,
 ): WrappedRungLayout {
   const base = getRungGeometry(rung, viewport);
   const maxGroupSpan = Math.max(0, ...base.groups.map((group) => group.right - group.left));
@@ -87,7 +87,7 @@ export function getWrappedRungLayout(
     const maxLanes = Math.max(0, ...sourceGroups.map((item) => item.branchLanes.length));
     const outputs = index === packed.length - 1
       ? rung.instructions.filter((item) => isOutputKind(item.kind)).length +
-        (rung.emptyOutputBranches?.length ?? 0) + (previewOutput ? 1 : 0)
+        (rung.emptyOutputBranches?.length ?? 0)
       : 0;
     const outputExtension = Math.max(0, outputs - 1) * OUTPUT_BRANCH_STEP;
     // Timer/counter blocks end 41px beneath the final output center; preserve
@@ -96,7 +96,7 @@ export function getWrappedRungLayout(
     const structuredBottomClearance = index === packed.length - 1 && hasStructuredOutput
       ? (hasMathOutput ? 48 : 32) : 0;
     const comparisonClearance = hasComparison ? 32 : 0;
-    const height = Math.max(getPracticeRungHeight(maxLanes, showDropLane) + comparisonClearance,
+    const height = Math.max(getPracticeRungHeight(maxLanes) + comparisonClearance,
       getPracticeRungHeight(0) + outputExtension + structuredBottomClearance + comparisonClearance
     ) + (index < packed.length - 1 ? 29 : 0);
     const actual: WrappedGroup[] = [];
@@ -137,8 +137,10 @@ export function findWrappedLadderDropTarget(
 ): VisualLadderDropTarget | null {
   const rung = project.rungs.find((item) => item.id === rungId);
   if (!rung || !Number.isFinite(x) || !Number.isFinite(y)) return null;
-  const layout = getWrappedRungLayout(rung, viewport, true,
-    isOutputKind(kind) && !movingId && !(rung.emptyOutputBranches?.length));
+  // Hit-testing must use exactly the same geometry as the rendered rung.
+  // A dragged tool must not insert provisional OR/output rows and push
+  // hundreds of existing rungs downward.
+  const layout = getWrappedRungLayout(rung, viewport);
   const row = layout.rows.find((candidate) =>
     y >= candidate.top && y <= candidate.top + candidate.height);
   if (!row) return null;
