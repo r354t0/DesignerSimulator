@@ -303,13 +303,13 @@ export default function App() {
     changeScan((state) => changePracticeScanProject(state, next)), [changeScan]);
 
   const setTankInput = useCallback((
-    tag: "Tank_StartPB" | "Tank_StopPB" | "Tank_DrainPB", pressed: boolean,
+    tag: "Tank_StartPB" | "Tank_StopPB" | "Tank_DrainPB" | "Tank_ResetPB", pressed: boolean,
   ) => {
     // React may unmount a held momentary input when the scene changes.
     // Never dispatch that release event into a different MainRoutine project.
     if (activeControllerScene.current !== "tank") return;
     changeScan(state => applyMomentaryBoolInput(
-      state, tag, pressed, tag === "Tank_DrainPB",
+      state, tag, pressed, tag === "Tank_DrainPB" || tag === "Tank_ResetPB",
     ));
   }, [changeScan]);
 
