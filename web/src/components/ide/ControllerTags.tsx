@@ -361,6 +361,7 @@ export function ControllerTags({
           {scope === "demo" ? "Motor · DEMO"
             : activeScene === "sorting" ? "MainRoutine · Clasificación de cajas"
             : activeScene === "tank" ? "MainRoutine · Sistema de llenado de tanques"
+            : activeScene === "traffic" ? "MainRoutine · Intersección semaforizada"
             : "MainRoutine · Faja transportadora"}
         </span>
         <label className="flex items-center gap-1">
