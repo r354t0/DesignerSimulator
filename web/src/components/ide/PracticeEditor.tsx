@@ -727,17 +727,10 @@ export function PracticeEditor({
             const rungLive = running && Boolean(runtimeView?.rungPower[rung.id]);
             const drawContact = (item: typeof contacts[number], x: number, centerY: number) => {
               const flow = runtimeView?.instructionFlow[item.id];
-              if (item.kind === OR_JUNCTION_KIND) return (
-                <g key={item.id}>
-                  <rect x={x - 18} y={centerY - 17} width={36} height={34}
-                    rx={5} fill={selected === item.id ? "#dbeafe" : "#f1f5f9"}
-                    stroke={selected === item.id ? "#0284c7" : "#64748b"}
-                    strokeWidth={selected === item.id ? 2 : 1.5}/>
-                  <text x={x} y={centerY + 4} fontSize="11"
-                    fontWeight="700" textAnchor="middle" fill="#1e40af">OR</text>
-                  <title>Unión OR independiente · clic y paleta para ampliar camino superior</title>
-                </g>
-              );
+              // A Studio 5000-style branch has only conductors and contacts.
+              // Keep the junction in the data model for hit-testing, but do
+              // not draw an OR box, label or any permanent placeholder.
+              if (item.kind === OR_JUNCTION_KIND) return <g key={item.id} />;
               if (isCompareKind(item.kind)) return (
                 <ComparisonBlock key={item.id} x={x} y={centerY} kind={item.kind}
                   sourceA={numericOperandLabel(item.compareA)}
@@ -795,9 +788,9 @@ export function PracticeEditor({
                 <span className="sr-only">Mover {item.tag}</span>
               </button>
             );
-            // Dedicated, visible drag handle for structured blocks. Their PRE,
-            // Source A/B and Dest hotspots are interactive and previously sat
-            // above the drag surface, trapping pointer events.
+            // Invisible header drag surface: native dragstart remains usable
+            // even when PRE/Source/Dest edit hotspots cover the block body.
+            // This keeps the Studio 5000-style graphic free of grip icons.
             const structuredDragHandle = (
               item: typeof contacts[number], x: number, centerY: number,
             ) => (
@@ -812,12 +805,15 @@ export function PracticeEditor({
                   setSelectedRungId(null);
                   setBitMenu(null);
                 }}
-                className="absolute z-40 flex h-[22px] w-[22px] cursor-grab items-center justify-center rounded border border-sky-400/60 bg-sky-50 text-sky-700 shadow-sm hover:bg-sky-100 active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-sky-600"
+                data-ladder-drag-surface
+                className="absolute z-40 cursor-grab rounded border-0 bg-transparent p-0 active:cursor-grabbing focus-visible:outline-2 focus-visible:outline-sky-600"
                 style={{
-                  left: x + (isOutputKind(item.kind) ? -111 : -43),
-                  top: centerY - 29,
+                  left: x + (isOutputKind(item.kind) ? -116 : -38),
+                  top: centerY - 26,
+                  width: isOutputKind(item.kind) ? 60 : 36,
+                  height: 18,
                 }}>
-                <GripVertical size={15} aria-hidden="true"/>
+                <span className="sr-only">Arrastrar {item.kind}</span>
               </button>
             );
             // The SVG keeps rendering the label; this invisible HTML hotspot
@@ -975,7 +971,10 @@ export function PracticeEditor({
                                   <Wire x1={before} y1={row.mainY} x2={group.left} y2={row.mainY}
                                     live={inputPower} />
                                   <Wire x1={group.left} y1={row.mainY}
-                                    x2={group.mainCenters[0] - (isCompareKind(mainItems[0]?.kind) ? 41 : 22)} y2={row.mainY} live={inputPower} />
+                                    x2={group.mainCenters[0] -
+                                      (mainItems[0]?.kind === OR_JUNCTION_KIND ? 0 :
+                                        isCompareKind(mainItems[0]?.kind) ? 41 : 22)}
+                                    y2={row.mainY} live={inputPower} />
                                   {mainItems.map((contact, mainIndex) => {
                                     const center = group.mainCenters[mainIndex];
                                     const following = mainIndex + 1 < mainItems.length
@@ -987,9 +986,14 @@ export function PracticeEditor({
                                     return (
                                       <g key={contact.id}>
                                         {drawContact(contact, center, row.mainY)}
-                                        <Wire x1={center + (isCompareKind(contact.kind) ? 41 : 22)} y1={row.mainY}
-                                          x2={following} y2={row.mainY} live={power} />
-                                        <line x1={center + (isCompareKind(contact.kind) ? 41 : 22)} y1={row.mainY}
+                                        <Wire x1={center +
+                                            (contact.kind === OR_JUNCTION_KIND ? 0 :
+                                              isCompareKind(contact.kind) ? 41 : 22)}
+                                          y1={row.mainY} x2={following} y2={row.mainY} live={power} />
+                                        <line x1={center +
+                                            (contact.kind === OR_JUNCTION_KIND ? 0 :
+                                              isCompareKind(contact.kind) ? 41 : 22)}
+                                          y1={row.mainY}
                                           x2={following} y2={row.mainY}
                                           stroke="transparent" strokeWidth="16" pointerEvents="stroke"
                                           role="button" tabIndex={0}
@@ -1008,19 +1012,6 @@ export function PracticeEditor({
                                   })}
                                   {branches.length > 0 && (
                                     <g>
-                                      {mainItems[0]?.kind === OR_JUNCTION_KIND &&
-                                        mainItems.length === 1 && (
-                                          <g pointerEvents="none">
-                                            <rect x={group.x + 22} y={row.mainY - 15}
-                                              width={Math.max(28, group.right - group.x - 28)}
-                                              height="30" rx="4" fill="#eff6ff"
-                                              fillOpacity="0.65" stroke="#60a5fa"
-                                              strokeWidth="1.3" strokeDasharray="4 3"/>
-                                            <text x={(group.x + group.right + 22)/2}
-                                              y={row.mainY + 4} textAnchor="middle"
-                                              fontSize="10" fill="#2563eb">+ superior</text>
-                                          </g>
-                                        )}
                                       <Wire x1={group.left} y1={row.mainY} x2={group.left}
                                         y2={group.branchLanes.at(-1)!.y} live={inputPower} />
                                       <Wire x1={group.right} y1={row.mainY} x2={group.right}
