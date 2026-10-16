@@ -31,7 +31,7 @@ import {
   createEmptyOutputBranch,
   removeEmptyOutputBranch,
   fillEmptyOutputBranch,
-  MAX_PARALLEL_OUTPUTS,
+
   getParallelBranchTarget,
   getPaletteInsertionTarget,
   insertRungBelow,
