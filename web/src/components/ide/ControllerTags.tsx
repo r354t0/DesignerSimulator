@@ -9,7 +9,7 @@ import {
 import { demoTagMetadata, type DemoInputs, type DemoValues, type InputTag } from "../../plc/demoModel";
 
 interface Props {
-  activeScene: "conveyor" | "sorting" | "tank" | "motor";
+  activeScene: "conveyor" | "sorting" | "tank" | "traffic" | "motor";
   project: PracticeProject;
   onChange: (next: PracticeProject) => void;
   practiceRunning: boolean;
