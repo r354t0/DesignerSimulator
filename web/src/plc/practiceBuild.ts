@@ -90,7 +90,10 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
   const seenInstructions = new Set<string>();
   const outputs = new Map<string, { rung: number; kind: string }[]>();
   const onsStorage = new Map<string, { rungId: string; rungIndex: number; id: string }[]>();
-  let executableRungs = 0;
+  // A rung is executable even without a coil: XIC/XIO, compare and OR logic
+  // are evaluated during the scan. Only a completely empty routine has
+  // nothing to execute; physical actuators are never required.
+  let programmedRungs = 0;
 
   function checkInstruction(
     instruction: PracticeInstruction,
@@ -324,20 +327,22 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
           at + ": supera el máximo de " + MAX_PRACTICE_CONTACTS + " contactos que admite esta versión.",
           rung.id, rungIndex);
       }
-      if (coils.length === 0) {
-        push("warning", "NO_OUTPUT", at + ": no contiene una salida OTE/OTL/OTU.", rung.id, rungIndex);
-      } else {
-        executableRungs++;
-      }
+      // An output-free rung is legal (e.g. a standalone compare network).
+      // Do not confuse missing physical actuators with invalid Ladder logic.
+      programmedRungs++;
       if (coils.length + (rung.emptyOutputBranches?.length ?? 0) > MAX_PARALLEL_OUTPUTS) {
         push("error", "OUTPUT_LIMIT",
           at + ": supera el máximo de " + MAX_PARALLEL_OUTPUTS + " salidas por rung.",
           rung.id, rungIndex);
       }
-      if (contacts.length === 0 && coils.length > 0) {
+      // MOV/ADD/SUB/MUL/DIV, timers and counters can run every scan by design.
+      // Preserve the useful warning only for unconditional BOOL coils.
+      const unconditionalBitCoil = contacts.length === 0
+        ? coils.find((item) => ["OTE", "OTL", "OTU"].includes(item.kind)) : undefined;
+      if (unconditionalBitCoil) {
         push("warning", "UNCONDITIONAL_OUTPUT",
-          at + ": salida sin contactos de condición (incondicional).",
-          rung.id, rungIndex, coils[0].id);
+          at + ": bobina BOOL sin contactos de condición (incondicional).",
+          rung.id, rungIndex, unconditionalBitCoil.id);
       }
       const firstCoilIndex = instructions.findIndex((item) => isOutputKind(item.kind));
       if (firstCoilIndex !== -1 &&
@@ -408,9 +413,9 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
     }
   });
 
-  if (project.rungs.length && executableRungs === 0) {
+  if (project.rungs.length && programmedRungs === 0) {
     push("error", "NO_EXECUTABLE_RUNG",
-      "La rutina no tiene ningún rung con bobina OTE para ejecutar.");
+      "La rutina solo contiene rungs vacíos; añade alguna instrucción para ejecutar.");
   }
 
   for (const [tag, places] of outputs) {
