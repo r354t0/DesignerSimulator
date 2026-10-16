@@ -118,19 +118,29 @@ export function TankSceneInfoDialog({ open, project, onClose, onOpenTags, onLoad
               Orientación Ladder (opcional)
             </summary>
             <div className="mt-2 space-y-1 font-mono text-[11px] text-slate-300">
-              <p>R0: OR (Tank_StartPB | Tank_RunCmd), XIO StopPB/Alarm/Batches.DN → OTE RunCmd</p>
-              <p>R1: RunCmd sin etapas activas → OTL FillStage</p>
-              <p>R2–R4: FillStage → TON TStart, TON TFillMax; DrainStage → TON TDrainMax</p>
+              <p>R0: OR (StartPB | RunCmd) y XIO StopPB/Alarm/Batches.DN → OTE RunCmd</p>
+              <p>R1: RunCmd sin etapas activas → OTL FillStage (arranque inicial)</p>
+              <p>R2–R4: TON TStart, TON TFillMax y TON TDrainMax</p>
               <p>R5: OR (TFillMax.DN | TDrainMax.DN) → OTL Alarm</p>
               <p>R6–R7: ResetPB y XIO RunCmd → OTU Alarm; RES Batches</p>
-              <p>R8–R9: FillStage → OTE InletValve; TStart.DN → OTE Pump</p>
-              <p>R10–R13: HighLS → MixStage; TON TMix → Mixer</p>
-              <p>R14–R16: TMix.DN → DrainStage; OR (DrainStage | DrainPB) → DrainValve</p>
-              <p>R17–R18: DrainStage y LowLS → CTU Batches; finalizar DrainStage</p>
+              <p>R8–R9: OTE InletValve y OTE Pump con enclavamientos</p>
+              <p>R10: FillStage + HighLS → OTE ToMix (capturar transición)</p>
+              <p>R11: OR (ToMix | XIO RunCmd) → OTU FillStage</p>
+              <p>R12: ToMix → OTL MixStage</p>
+              <p>R13–R14: TON TMix y OTE Mixer</p>
+              <p>R15: MixStage + TMix.DN → OTE ToDrain</p>
+              <p>R16: OR (ToDrain | XIO RunCmd) → OTU MixStage</p>
+              <p>R17: ToDrain → OTL DrainStage</p>
+              <p>R18: OR (DrainStage | DrainPB) → OTE DrainValve, con interbloqueos</p>
+              <p>R19: DrainStage + LowLS → CTU Batches</p>
+              <p>R20: DrainStage + LowLS + XIO Batches.DN → OTE ToFill</p>
+              <p>R21: OR (LowLS | XIO RunCmd) → OTU DrainStage</p>
+              <p>R22: ToFill → OTL FillStage para el siguiente lote</p>
               <p className="pt-2 font-sans text-slate-400">
-                STOP y alarmas cierran los actuadores. No se puede drenar
-                manualmente durante el ciclo. Los rungs OR de fin de etapa
-                desactivan las memorias cuando corresponde.
+                En cada transición primero se memoriza la condición con OTE,
+                luego se ejecuta OTU de la etapa saliente y finalmente OTL
+                de la entrante. Así se evita perder la condición en el mismo
+                scan y se mantienen las etapas mutuamente excluyentes.
               </p>
             </div>
           </details>
