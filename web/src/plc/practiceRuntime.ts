@@ -1,6 +1,6 @@
 import { isMathKind, isCompareKind, isCounterKind, isOutputKind, isTimerKind, isValidTimerPreset, type PracticeProject, type PracticeTag, type PracticeInstruction } from "./practiceDocument.ts";
 import { compareValues, readComparisonOperand } from "./practiceCompare.ts";
-import { convertMathResult, evaluateMath, readNumericOperand } from "./practiceMath.ts";
+import { convertMathResult, evaluateMath, readMathSource } from "./practiceMath.ts";
 
 /**
  * Event-driven Ladder evaluation (Phase 2C): top-to-bottom rung order, left-to-
@@ -301,8 +301,8 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
         let success = false;
         if (power) {
           const latest = currentNumericTags();
-          const a = readNumericOperand(latest, instruction.compareA);
-          const b = instruction.kind === "MOV" ? 0 : readNumericOperand(latest, instruction.compareB);
+          const a = readMathSource(latest, instruction.compareA);
+          const b = instruction.kind === "MOV" ? 0 : readMathSource(latest, instruction.compareB);
           const result = evaluateMath(instruction.kind, a, b);
           const destination = latest.find((tag) => tag.name === instruction.tag);
           if (!destination || destination.constant) {

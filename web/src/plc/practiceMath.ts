@@ -1,9 +1,9 @@
 import {
   changeInstructionTag, findInstruction, isMathKind,
-  type MathKind, type NumericOperand, type PracticeProject, type PracticeTag,
+  type MathKind, type NumericOperand, type ComparisonOperand, type PracticeProject, type PracticeTag,
 } from "./practiceDocument.ts";
 import {
-  numericTagOptions, parseNumericOperand, readNumericOperand, validateNumericOperand,
+  numericTagOptions, parseNumericOperand, readComparisonOperand, validateComparisonOperand,
 } from "./practiceCompare.ts";
 
 export const MATH_DEST_TYPES = ["INT", "DINT", "REAL"] as const;
@@ -14,9 +14,15 @@ export function mathDestinationOptions(tags: readonly PracticeTag[]): PracticeTa
 }
 
 export function validateMathSource(
-  tags: readonly PracticeTag[], operand: NumericOperand | undefined,
+  tags: readonly PracticeTag[], operand: ComparisonOperand | undefined,
 ): string | null {
-  return validateNumericOperand(tags, operand);
+  return validateComparisonOperand(tags, "GRT", operand);
+}
+
+export function readMathSource(
+  tags: readonly PracticeTag[], operand: ComparisonOperand | undefined,
+): number {
+  return readComparisonOperand(tags, "GRT", operand) as number;
 }
 
 export function validateMathDestination(tags: readonly PracticeTag[], name: string): string | null {
@@ -61,7 +67,7 @@ export function setMathDestination(
   return changeInstructionTag(project, id, name);
 }
 
-export { numericTagOptions, parseNumericOperand, readNumericOperand };
+export { numericTagOptions, parseNumericOperand };
 
 /** Simulated numeric instruction; leave destination unchanged if invalid. */
 export function evaluateMath(kind: MathKind, a: number, b = 0): number | null {
