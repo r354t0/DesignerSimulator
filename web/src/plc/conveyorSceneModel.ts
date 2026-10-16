@@ -73,12 +73,20 @@ export const CONVEYOR_TEMPLATE_TAGS: readonly ConveyorTagDefinition[] = [
     description: "Parada STOP/lote",
     legacyDescriptions: ["Faja: solicitud de parada por STOP o lote completo"] },
 ];
-export const CONVEYOR_SENSOR_POSITION = 0.90;
 const BELT_SPEED_UNITS_PER_SECOND = 0.20;
 /** Same box size and belt span used by the lateral SVG (44px over 505px). */
 export const CONVEYOR_BOX_WIDTH_PX = 44;
 export const CONVEYOR_BELT_LENGTH_PX = 505;
 const BOX_HALF_WIDTH_UNITS = CONVEYOR_BOX_WIDTH_PX / (2 * CONVEYOR_BELT_LENGTH_PX);
+/**
+ * PE-01 is at the discharge mouth, just after the last roller. A box is
+ * removed only when its trailing edge has crossed the end of the housing.
+ * The photoeye must still be ON in the last frame before that removal:
+ * otherwise the batch-stop rung would stop the belt with the final box
+ * still physically resting on its end.
+ */
+export const CONVEYOR_SENSOR_POSITION = 1.015;
+export const CONVEYOR_EXIT_POSITION = 1.05;
 /**
  * Restore close-up box placement (about 6px between 44px boxes).
  * The photoeye samples the scene every 50ms, while the belt moves 0.01
@@ -87,7 +95,6 @@ const BOX_HALF_WIDTH_UNITS = CONVEYOR_BOX_WIDTH_PX / (2 * CONVEYOR_BELT_LENGTH_P
 export const MIN_BOX_GAP_UNITS = 0.012;
 const MIN_BOX_CENTER_SPACING = 2 * BOX_HALF_WIDTH_UNITS + MIN_BOX_GAP_UNITS;
 const ENTRY_POSITION = 0.045;
-const EXIT_POSITION = 1.02;
 const MAX_ITEMS = 8;
 
 export interface ConveyorItem {
@@ -303,12 +310,13 @@ export function stepConveyor(
   const nextItems: ConveyorItem[] = [];
   for (const item of state.items) {
     const next = item.position + delta;
-    if (next >= EXIT_POSITION) passed++;
+    if (next >= CONVEYOR_EXIT_POSITION) passed++;
     else nextItems.push({ ...item, position: next });
   }
-  // A narrow photoeye sees a box only while its drawn horizontal footprint
-  // actually intersects the beam. Between two separated boxes it goes LOW.
-  // The same 44px-wide rectangles are drawn in ConveyorScene.tsx.
+  // Beam matches the rendered 44px box footprint, distinguishing even
+  // minimal gaps. On final discharge the item disappears and beam goes LOW;
+  // the PLC's batch stop is therefore issued only after its trailing edge
+  // has left the physical belt.
   const sensorActive = nextItems.some((item) =>
     Math.abs(item.position - CONVEYOR_SENSOR_POSITION) <= BOX_HALF_WIDTH_UNITS);
   return { ...state, items: nextItems, passed, sensorActive };

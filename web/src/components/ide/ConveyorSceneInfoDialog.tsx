@@ -139,8 +139,9 @@ export function ConveyorSceneInfoDialog({
               <p>Rung 2: CV_BoxSensor → CTU CV_Count (PRE=5)</p>
               <p>Rung 3: XIO CV_BoxSensor + CV_ResetPB → RES CV_Count</p>
               <p className="pt-2 font-sans text-slate-400">
-                PE-01 se ubica cerca de la salida. Tras cinco detecciones y
-                con el sensor libre, la faja se detiene.
+                PE-01 está en la boca de descarga. Tras cinco detecciones,
+                la faja se detiene cuando la última caja sale por completo
+                y deja libre el sensor.
                 RESET LOTE solo opera con el sensor libre; después pulsa START
                 para comenzar otro lote. STOP detiene sin perder el conteo.
               </p>

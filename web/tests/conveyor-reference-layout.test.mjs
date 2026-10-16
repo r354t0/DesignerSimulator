@@ -3,7 +3,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { editTag } from "../src/plc/practiceDocument.ts";
 import {
-  CONVEYOR_SENSOR_POSITION, CONVEYOR_TAGS, CONVEYOR_TEMPLATE_TAGS,
+  CONVEYOR_SENSOR_POSITION, CONVEYOR_EXIT_POSITION,
+  CONVEYOR_BELT_LENGTH_PX, CONVEYOR_BOX_WIDTH_PX,
+  CONVEYOR_TAGS, CONVEYOR_TEMPLATE_TAGS,
   applyConveyorMomentaryInput, applyConveyorPhotoeyeInput,
   addConveyorItem, canAddConveyorItem, createConveyorExampleProject,
   initialConveyorProject, initialConveyorState, prepareConveyorTags,
@@ -38,8 +40,17 @@ test("scene 1 solution follows the image: motor, stop request, CTU and RES in th
     ["CV_BoxSensor","CV_ResetPB","CV_Count"]);
 });
 
-test("PE-01 sits near end and the fifth box stops the belt before leaving", () => {
-  assert.ok(CONVEYOR_SENSOR_POSITION>=0.88 && CONVEYOR_SENSOR_POSITION<1);
+test("PE-01 stops the five-box batch only once the final box fully exits the belt", () => {
+  // In SVG coordinates the roller housing ends at x=82+507. The last box
+  // physically exits only when its LEFT/trailing edge exceeds that boundary.
+  const rearEdgeAtExit = 82 +
+    CONVEYOR_EXIT_POSITION * CONVEYOR_BELT_LENGTH_PX -
+    CONVEYOR_BOX_WIDTH_PX / 2;
+  assert.ok(CONVEYOR_SENSOR_POSITION>=1.0 && CONVEYOR_SENSOR_POSITION<1.04);
+  assert.ok(rearEdgeAtExit>=82+507,"whole box must be beyond the housing");
+  assert.ok(CONVEYOR_SENSOR_POSITION>=
+    CONVEYOR_EXIT_POSITION - CONVEYOR_BOX_WIDTH_PX/(2*CONVEYOR_BELT_LENGTH_PX),
+    "PE-01 must remain occupied until the fifth box is removed");
   let plc=startPracticeScans(setScanPeriod(
     initialPracticeScanState(createConveyorExampleProject()),500));
   plc=applyConveyorMomentaryInput(plc,"Start_PB",true);
@@ -66,17 +77,35 @@ test("PE-01 sits near end and the fifth box stops the belt before leaving", () =
   assert.equal(readConveyorCount(plc.project),5);
   assert.ok(stoppedAt>=0,"batch must stop at five");
   assert.equal(readConveyorBool(plc.project,"CV_StopRequest"),true);
-  assert.ok(belt.items.some(item=>item.id===5),
-    "fifth box must remain on the belt when the motor stops");
-  const fifth=belt.items.find(item=>item.id===5);
-  assert.ok(fifth.position>CONVEYOR_SENSOR_POSITION,
-    "fifth box must have cleared the sensor");
-  assert.ok(fifth.position<1,
-    "fifth box should still be on the visual transport belt");
+  assert.equal(belt.passed,5,
+    "all five physical boxes must have completed discharge before batch stop");
+  assert.equal(belt.items.length,0,
+    "none of the five boxes may remain on the conveyor");
+  assert.equal(belt.sensorActive,false,
+    "PE-01 is clear once the fifth box passes the outlet");
   for(let i=0;i<20;i++){
     const next=stepConveyor(belt,readConveyorBool(plc.project,"Motor_Run"),50);
     assert.strictEqual(next,belt,"stationary motor must not move boxes");
   }
+});
+
+test("photoeye stays HIGH until a box completely leaves the discharge mouth",()=>{
+  let belt={
+    ...initialConveyorState(),
+    items:[{id:5,position:CONVEYOR_EXIT_POSITION-0.015}],
+    nextId:6,passed:4,sensorActive:true,
+  };
+  const nearly=stepConveyor(belt,true,50);
+  assert.equal(nearly.items.length,1,
+    "box remains in scene until its trailing edge clears the discharge");
+  assert.equal(nearly.sensorActive,true,
+    "photoeye cannot go LOW and stop the motor while the box is still visible");
+  assert.equal(nearly.passed,4);
+  const discharged=stepConveyor(nearly,true,50);
+  assert.equal(discharged.items.length,0,"box leaves the scene");
+  assert.equal(discharged.passed,5);
+  assert.equal(discharged.sensorActive,false,
+    "the falling photoeye edge occurs in the SAME frame as final discharge");
 });
 
 test("quick STOP works with motor rung before stop-request rung, and release permits restart",()=>{
