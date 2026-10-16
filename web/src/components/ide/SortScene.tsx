@@ -85,7 +85,7 @@ export function SortScene({
 
   return (
     <section aria-label="SCADA · Clasificación de cajas"
-      className="sort-scada-shell flex h-full min-h-0 flex-col overflow-y-auto text-slate-100">
+      className="sort-scada-shell scada-control-shell flex h-full min-h-0 flex-col overflow-y-auto text-slate-100">
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
         {/* Process header: compact, real status only. */}
         <header className="sort-panel flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#344c5e] px-3.5 py-3">
