@@ -112,6 +112,7 @@ export default function App() {
   }));
   const { inputs, motorLatched, blocks } = demo;
   const [simulationTab, setSimulationTab] = useState<"conveyor" | "motor">("conveyor");
+  const [conveyorTagSetupError, setConveyorTagSetupError] = useState<string | null>(null);
   const [conveyor, setConveyor] = useState<ConveyorState>(initialConveyorState);
   const conveyorRef = useRef(conveyor);
   const changeConveyor = useCallback((operation: (state: ConveyorState) => ConveyorState) => {
@@ -191,12 +192,24 @@ export default function App() {
   }, [changeConveyor, changeScan]);
   const prepareConveyor = useCallback(() => {
     try {
-      changeScan((state) => changePracticeScanProject(state,
-        prepareConveyorTags(state.project)));
+      changeScan((state) => {
+        const next = prepareConveyorTags(state.project);
+        // No redundant state update or PLC scan reset when revisiting the scene.
+        return next === state.project ? state : changePracticeScanProject(state, next);
+      });
+      setConveyorTagSetupError(null);
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "No se pudieron preparar los tags.");
+      setConveyorTagSetupError(error instanceof Error
+        ? error.message : "No se pudieron registrar los tags de la escena.");
     }
   }, [changeScan]);
+
+  // The scene registers all linked Controller Tags upon entry. Returning to
+  // the conveyor safely restores any missing declarations without touching
+  // existing Ladder logic, tag values, or personalized descriptions.
+  useEffect(() => {
+    if (simulationTab === "conveyor") prepareConveyor();
+  }, [simulationTab, prepareConveyor]);
 
   const startPractice = useCallback(() =>
     changeScan(startPracticeScans), [changeScan]);
@@ -316,6 +329,8 @@ export default function App() {
                       onAddItem={() => changeConveyor(addConveyorItem)}
                       onResetScene={resetConveyor}
                       onPrepareTags={prepareConveyor}
+                      setupError={conveyorTagSetupError}
+                      onOpenTags={() => openEditorView("tags")}
                       onLoadExample={loadConveyorExample}/>
                   : <SimulationScene online={online} inputs={inputs} values={values}
                       onTagChange={handleTagChange}/>}
@@ -330,7 +345,8 @@ export default function App() {
       draggingKind, nextPracticeId, handlePracticeChange, startPractice, stopPractice,
       pausePractice, resumePractice, stepPractice, changeScanPeriod, handleTagChange,
       handleResetCounters, openEditorView, onToolbarDragStart, simulationTab, conveyor,
-      setConveyorInput, changeConveyor, resetConveyor, prepareConveyor, loadConveyorExample],
+      setConveyorInput, changeConveyor, resetConveyor, prepareConveyor,
+      conveyorTagSetupError, loadConveyorExample],
   );
 
   const syncTabSelection = useCallback((updatedModel: Model) => {

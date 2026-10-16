@@ -1,6 +1,6 @@
 import {
   createRung, createTag, initialPracticeProject, insertInstruction,
-  setTagValue, type PracticeProject,
+  setTagValue, type PracticeProject, type TagType,
 } from "./practiceDocument.ts";
 
 /** Phase 5 / Scene 01 — a simulated conveyor, never a physical controller. */
@@ -9,6 +9,42 @@ export const CONVEYOR_COUNT_TAG = "CV_Count";
 export const CONVEYOR_MOTOR_TAG = "Motor_Run";
 export const CONVEYOR_START_TAG = "Start_PB";
 export const CONVEYOR_STOP_TAG = "Stop_PB";
+
+/** Single source of truth for the PLC tags wired to the conveyor scene. */
+export interface ConveyorTagDefinition {
+  name: string;
+  type: TagType;
+  direction: "Entrada" | "Salida" | "Interna";
+  description: string;
+  initialDescription?: string;
+}
+
+export const CONVEYOR_TAGS: readonly ConveyorTagDefinition[] = [
+  {
+    name: CONVEYOR_START_TAG, type: "BOOL", direction: "Entrada",
+    description: "Faja: pulsador START de marcha (entrada digital simulada)",
+    initialDescription: "Pulsador de arranque",
+  },
+  {
+    name: CONVEYOR_STOP_TAG, type: "BOOL", direction: "Entrada",
+    description: "Faja: pulsador STOP de parada (entrada digital simulada)",
+    initialDescription: "Pulsador de parada",
+  },
+  {
+    name: CONVEYOR_SENSOR_TAG, type: "BOOL", direction: "Entrada",
+    description: "Faja: sensor fotoeléctrico de presencia de caja (PE-01)",
+  },
+  {
+    name: CONVEYOR_MOTOR_TAG, type: "BOOL", direction: "Salida",
+    description: "Faja: orden de marcha del motor transportador (salida digital)",
+    initialDescription: "Motor habilitado",
+  },
+  {
+    name: CONVEYOR_COUNT_TAG, type: "COUNTER", direction: "Interna",
+    description: "Faja: contador CTU de cajas detectadas por PE-01",
+    initialDescription: "Piezas que cruzaron el sensor",
+  },
+];
 export const CONVEYOR_SENSOR_POSITION = 0.67;
 const BELT_SPEED_UNITS_PER_SECOND = 0.20;
 const SENSOR_HALF_WIDTH = 0.065;
@@ -42,20 +78,44 @@ export function readConveyorCount(project: PracticeProject): number | null {
 }
 
 export function hasConveyorTags(project: PracticeProject): boolean {
-  return project.tags.some((tag) =>
-    tag.name === CONVEYOR_SENSOR_TAG && tag.type === "BOOL") &&
-    project.tags.some((tag) => tag.name === CONVEYOR_COUNT_TAG && tag.type === "COUNTER");
+  return CONVEYOR_TAGS.every((spec) => project.tags.some((tag) =>
+    tag.name === spec.name && tag.type === spec.type));
 }
 
-/** Adds only the two scene-specific tags; all existing user logic is retained. */
+/**
+ * Idempotent scene registration, safe on first visit and when revisiting.
+ * No rungs, existing tag values, custom descriptions, or user-owned tags are
+ * overwritten. Validate the full catalog before creating any declaration.
+ */
 export function prepareConveyorTags(project: PracticeProject): PracticeProject {
+  for (const spec of CONVEYOR_TAGS) {
+    const existing = project.tags.find((tag) =>
+      tag.name.toLowerCase() === spec.name.toLowerCase());
+    if (existing && existing.name !== spec.name) {
+      throw new Error("La escena requiere el nombre exacto «" + spec.name +
+        "». Ya existe «" + existing.name + "». Renómbralo desde Controller Tags.");
+    }
+    if (existing && existing.type !== spec.type) {
+      throw new Error("El tag «" + spec.name + "» debe ser " + spec.type +
+        " para la faja; actualmente es " + existing.type +
+        ". Corrígelo desde Controller Tags.");
+    }
+  }
+
   let result = project;
-  const sensor = result.tags.find((tag) => tag.name === CONVEYOR_SENSOR_TAG);
-  const count = result.tags.find((tag) => tag.name === CONVEYOR_COUNT_TAG);
-  if (sensor && sensor.type !== "BOOL") throw new Error(CONVEYOR_SENSOR_TAG + " debe ser BOOL.");
-  if (count && count.type !== "COUNTER") throw new Error(CONVEYOR_COUNT_TAG + " debe ser COUNTER.");
-  if (!sensor) result = createTag(result, CONVEYOR_SENSOR_TAG, "Sensor de presencia de caja", "BOOL");
-  if (!count) result = createTag(result, CONVEYOR_COUNT_TAG, "Piezas que cruzaron el sensor", "COUNTER");
+  for (const spec of CONVEYOR_TAGS) {
+    const existing = result.tags.find((tag) => tag.name === spec.name);
+    if (!existing) {
+      result = createTag(result, spec.name, spec.description, spec.type);
+    } else if (!existing.description.trim() ||
+      existing.description === spec.initialDescription) {
+      result = {
+        ...result,
+        tags: result.tags.map((tag) => tag.name === spec.name
+          ? { ...tag, description: spec.description } : tag),
+      };
+    }
+  }
   return result;
 }
 
