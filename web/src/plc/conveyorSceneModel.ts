@@ -52,7 +52,14 @@ export const CONVEYOR_TAGS: readonly ConveyorTagDefinition[] = [
 ];
 export const CONVEYOR_SENSOR_POSITION = 0.67;
 const BELT_SPEED_UNITS_PER_SECOND = 0.20;
-const SENSOR_HALF_WIDTH = 0.065;
+/** Same box size and belt span used by the lateral SVG (44px over 505px). */
+export const CONVEYOR_BOX_WIDTH_PX = 44;
+export const CONVEYOR_BELT_LENGTH_PX = 505;
+const BOX_HALF_WIDTH_UNITS = CONVEYOR_BOX_WIDTH_PX / (2 * CONVEYOR_BELT_LENGTH_PX);
+/** Maintain a visible, physically detectable beam gap between adjacent boxes. */
+const MIN_BOX_GAP_UNITS = 0.05;
+const MIN_BOX_CENTER_SPACING = 2 * BOX_HALF_WIDTH_UNITS + MIN_BOX_GAP_UNITS;
+const ENTRY_POSITION = 0.045;
 const EXIT_POSITION = 1.02;
 const MAX_ITEMS = 8;
 
@@ -168,12 +175,13 @@ export function createConveyorExampleProject(): PracticeProject {
   return project;
 }
 
-/** Spawn items only when the entrance is free, without hiding an existing one. */
+/** Spawn only when the prior box clears the entrance with a visible gap. */
 export function addConveyorItem(state: ConveyorState): ConveyorState {
-  if (state.items.length >= MAX_ITEMS || state.items.some((item) => item.position < 0.14)) return state;
+  if (state.items.length >= MAX_ITEMS || state.items.some((item) =>
+    Math.abs(item.position - ENTRY_POSITION) < MIN_BOX_CENTER_SPACING)) return state;
   return {
     ...state, nextId: state.nextId + 1,
-    items: [...state.items, { id: state.nextId, position: 0.045 }],
+    items: [...state.items, { id: state.nextId, position: ENTRY_POSITION }],
   };
 }
 
@@ -191,7 +199,10 @@ export function stepConveyor(
     if (next >= EXIT_POSITION) passed++;
     else nextItems.push({ ...item, position: next });
   }
+  // A narrow photoeye sees a box only while its drawn horizontal footprint
+  // actually intersects the beam. Between two separated boxes it goes LOW.
+  // The same 44px-wide rectangles are drawn in ConveyorScene.tsx.
   const sensorActive = nextItems.some((item) =>
-    Math.abs(item.position - CONVEYOR_SENSOR_POSITION) <= SENSOR_HALF_WIDTH);
+    Math.abs(item.position - CONVEYOR_SENSOR_POSITION) <= BOX_HALF_WIDTH_UNITS);
   return { ...state, items: nextItems, passed, sensorActive };
 }

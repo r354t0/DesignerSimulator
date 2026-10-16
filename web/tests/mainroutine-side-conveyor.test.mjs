@@ -60,7 +60,7 @@ test("Controller Tags shows only the active scene scope",()=>{
 test("motorized side profile visually includes 2D drive, pulleys, boxes and photoeye",()=>{
  assert.match(scene,/viewBox="0 0 760 260"/);
  assert.match(scene,/Vista lateral de faja transportadora/);
- assert.match(scene,/CONVEYOR_SENSOR_POSITION \* 505/);
+ assert.match(scene,/CONVEYOR_SENSOR_POSITION \* CONVEYOR_BELT_LENGTH_PX/);
  assert.match(scene,/scene\.items\.map/);
  assert.match(scene,/conveyor-motor-spin/);
  assert.match(scene,/conveyor-belt-motion/);

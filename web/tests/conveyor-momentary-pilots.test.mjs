@@ -62,7 +62,7 @@ test("drive motor is on the left, no longer a right-side appendage", () => {
   assert.doesNotMatch(scene,/x="625" y="176" width="78"/);
   assert.doesNotMatch(scene,/transformOrigin: "664px 206px"/);
   assert.match(scene,/scene\.items\.map/);
-  assert.match(scene,/CONVEYOR_SENSOR_POSITION \* 505/);
+  assert.match(scene,/CONVEYOR_SENSOR_POSITION \* CONVEYOR_BELT_LENGTH_PX/);
   assert.match(scene,/animationPlayState: motorOn \? "running" : "paused"/);
 });
 

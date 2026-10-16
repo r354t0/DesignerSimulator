@@ -6,6 +6,7 @@ import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
 import {
   CONVEYOR_SENSOR_TAG, CONVEYOR_SENSOR_POSITION,
+  CONVEYOR_BELT_LENGTH_PX, CONVEYOR_BOX_WIDTH_PX,
   hasConveyorTags, readConveyorBool, readConveyorCount,
   type ConveyorState,
 } from "../../plc/conveyorSceneModel";
@@ -131,8 +132,9 @@ export function ConveyorScene({
               ))}
               {/* Conveyor boxes sit on the belt; positions use the actual scene physics. */}
               {scene.items.map((item) => (
-                <g key={item.id} transform={"translate(" + (82 + item.position * 505) + " 0)"}>
-                  <rect x="-22" y="67" width="44" height="40" rx="2"
+                <g key={item.id} transform={"translate(" + (82 + item.position * CONVEYOR_BELT_LENGTH_PX) + " 0)"}>
+                  <rect x={-CONVEYOR_BOX_WIDTH_PX / 2} y="67"
+                    width={CONVEYOR_BOX_WIDTH_PX} height="40" rx="2"
                     fill="#bb813f" stroke="#f3bc6c" strokeWidth="2"/>
                   <path d="M-22 78 H22 M0 67 V107" stroke="#8a562a"
                     strokeWidth="1.5" strokeOpacity=".6"/>
@@ -143,7 +145,7 @@ export function ConveyorScene({
                 </g>
               ))}
               {/* One optoelectronic sensor and its optical beam. */}
-              <g transform={"translate(" + (82 + CONVEYOR_SENSOR_POSITION * 505) + " 0)"}>
+              <g transform={"translate(" + (82 + CONVEYOR_SENSOR_POSITION * CONVEYOR_BELT_LENGTH_PX) + " 0)"}>
                 <rect x="-8" y="43" width="16" height="15" rx="3"
                   fill={sensor ? "#fbbf24" : "#38bdf8"}
                   stroke="#bfdbfe" strokeWidth="1.3"/>

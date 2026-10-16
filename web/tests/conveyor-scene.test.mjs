@@ -103,7 +103,7 @@ test("belt physics activates photoeye for multiple frames before box exits", () 
 test("spawn respects entrance clearance and does not erase existing items", () => {
   let state = addConveyorItem(initialConveyorState());
   assert.equal(addConveyorItem(state), state, "entrance blocked");
-  for (let i = 0; i < 13; i++) state = stepConveyor(state, true, 50);
+  for (let i = 0; i < 15; i++) state = stepConveyor(state, true, 50);
   const withSecond = addConveyorItem(state);
   assert.equal(withSecond.items.length, 2);
   assert.deepEqual(withSecond.items.map(i => i.id), [1, 2]);

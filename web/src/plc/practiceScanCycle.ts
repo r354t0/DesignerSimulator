@@ -106,6 +106,27 @@ export function applyMomentaryBoolInput(
   return pressed && staged.mode === "running" ? performScan(staged, 0) : staged;
 }
 
+/**
+ * An optical sensor may see a short box-to-box gap between browser scans.
+ * Apply both the falling (clear beam) and rising (new box) edges to the
+ * Ladder immediately so CTU.CU returns to FALSE before the next count.
+ * This is a discrete-event simulation scan with zero elapsed virtual time;
+ * it must never accelerate TON/TOF/RTO or run while PAUSED/STOPPED.
+ */
+export function applySceneSensorBoolInput(
+  state: PracticeScanState, tagName: string, detected: boolean,
+): PracticeScanState {
+  const tag = state.project.tags.find((item) => item.name === tagName);
+  if (!tag || tag.type !== "BOOL") {
+    throw new Error("El sensor requiere un tag BOOL existente: " + tagName);
+  }
+  if (tag.value === detected) return state;
+  const updated = changePracticeScanProject(
+    state, setTagValue(state.project, tagName, detected),
+  );
+  return updated.mode === "running" ? performScan(updated, 0) : updated;
+}
+
 export function pausePracticeScans(state: PracticeScanState): PracticeScanState {
   return state.mode === "running" ? { ...state, mode: "paused" } : state;
 }

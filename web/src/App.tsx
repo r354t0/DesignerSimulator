@@ -9,7 +9,7 @@ import {
   initialPracticeScanState, changePracticeScanProject,
   startPracticeScans, stopPracticeScans, pausePracticeScans,
   resumePracticeScans, stepPracticeScan, tickPracticeScan, setScanPeriod,
-  applyMomentaryBoolInput,
+  applyMomentaryBoolInput, applySceneSensorBoolInput,
   type PracticeScanState,
 } from "./plc/practiceScanCycle";
 import { isEditableKind, LADDER_DRAG_MIME } from "./plc/ladderDragDrop";
@@ -122,8 +122,9 @@ export default function App() {
     }
   }, []);
 
-  // Each physics tick samples the REAL MainRoutine output and stages
-  // the photoelectric sensor before the next (serialized) Ladder scan.
+  // Physics samples the REAL MainRoutine output. Both photoeye edges are
+  // evaluated immediately in RUN (zero elapsed time), so short gaps never
+  // disappear between cyclic scans and CTU can count the next box.
   useEffect(() => {
     if (practiceMode !== "running") return;
     const id = window.setInterval(() => {
@@ -134,8 +135,8 @@ export default function App() {
       if (next !== conveyorRef.current) changeConveyor(() => next);
       const sensorTag = plc.project.tags.find((tag) => tag.name === CONVEYOR_SENSOR_TAG);
       if (sensorTag?.type === "BOOL" && sensorTag.value !== next.sensorActive) {
-        changeScan((current) => changePracticeScanProject(current,
-          setTagValue(current.project, CONVEYOR_SENSOR_TAG, next.sensorActive)));
+        changeScan((current) =>
+          applySceneSensorBoolInput(current, CONVEYOR_SENSOR_TAG, next.sensorActive));
       }
     }, 50);
     return () => window.clearInterval(id);
