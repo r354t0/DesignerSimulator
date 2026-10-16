@@ -81,7 +81,7 @@ export function TankScene({
 
   return (
     <section aria-label="SCADA · Llenado, mezclado y vaciado de tanques"
-      className="sort-scada-shell flex h-full min-h-0 flex-col overflow-y-auto text-slate-100">
+      className="sort-scada-shell scada-control-shell flex h-full min-h-0 flex-col overflow-y-auto text-slate-100">
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
         <header className="sort-panel flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#344c5e] px-3.5 py-3">
           <div className="flex min-w-0 items-center gap-3">
@@ -274,31 +274,33 @@ export function TankScene({
           </div>
         </section>
 
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <div className="rounded-lg border border-slate-700 bg-[#172634] p-3">
-            <h3 className="mb-3 text-xs font-semibold">Tablero de mando</h3>
-            <div className="flex flex-wrap gap-3">
-              <MomentaryPushButton name="START" tone="start"
+        <div className="scada-dashboard-grid grid gap-3">
+          <section className="sort-panel rounded-lg border border-[#344c5e] p-2.5"
+            aria-label="Tablero de mando">
+            <h3 className="mb-2 text-[11px] font-semibold">Tablero de mando</h3>
+            <div className="scada-command-buttons grid max-w-[210px] grid-cols-2 gap-2">
+              <MomentaryPushButton compact name="START" tone="start"
                 pressed={readTankBool(project, "Tank_StartPB")}
                 onChange={(pressed) => onInputChange("Tank_StartPB", pressed)}
-                icon={<Play size={18} aria-hidden="true"/>}>START</MomentaryPushButton>
-              <MomentaryPushButton name="STOP" tone="stop"
+                icon={<Play size={15} aria-hidden="true"/>}>START</MomentaryPushButton>
+              <MomentaryPushButton compact name="STOP" tone="stop"
                 pressed={readTankBool(project, "Tank_StopPB")}
                 onChange={(pressed) => onInputChange("Tank_StopPB", pressed)}
-                icon={<Pause size={18} aria-hidden="true"/>}>STOP</MomentaryPushButton>
-              <MomentaryPushButton name="DRENAR" tone="drain"
+                icon={<Pause size={15} aria-hidden="true"/>}>STOP</MomentaryPushButton>
+              <MomentaryPushButton compact name="DRENAR" tone="drain"
                 pressed={readTankBool(project, "Tank_DrainPB")}
                 onChange={(pressed) => onInputChange("Tank_DrainPB", pressed)}
-                icon={<Droplets size={18} aria-hidden="true"/>}>DRENAR</MomentaryPushButton>
-              <MomentaryPushButton name="RESET" tone="drain"
+                icon={<Droplets size={15} aria-hidden="true"/>}>DRENAR</MomentaryPushButton>
+              <MomentaryPushButton compact name="RESET" tone="drain"
                 pressed={readTankBool(project, "Tank_ResetPB")}
                 onChange={(pressed) => onInputChange("Tank_ResetPB", pressed)}
-                icon={<RotateCcw size={18} aria-hidden="true"/>}>RESET</MomentaryPushButton>
+                icon={<RotateCcw size={15} aria-hidden="true"/>}>RESET</MomentaryPushButton>
             </div>
-          </div>
-          <div className="rounded-lg border border-slate-700 bg-[#172634] p-3">
-            <h3 className="mb-3 text-xs font-semibold">Pilotos LED y nivel</h3>
-            <div className="grid grid-cols-2 gap-2">
+          </section>
+          <section className="sort-panel min-w-0 rounded-lg border border-[#344c5e] p-3"
+            aria-label="Pilotos LED y nivel">
+            <h3 className="mb-2 text-xs font-semibold">Pilotos LED y nivel</h3>
+            <div className="scada-pilot-grid grid grid-cols-2 gap-2">
               <Pilot label="BOMBA" active={pump} tone="green"/>
               <Pilot label="VÁLVULA ENTRADA" active={inlet} tone="blue"/>
               <Pilot label="NIVEL BAJO" active={low} tone="amber"/>
@@ -322,7 +324,7 @@ export function TankScene({
                   {state.drainedLiters.toFixed(0)} L
                 </div></div>
             </div>
-          </div>
+          </section>
         </div>
 
         <div className="sort-panel rounded-lg border border-[#344c5e] p-3">
