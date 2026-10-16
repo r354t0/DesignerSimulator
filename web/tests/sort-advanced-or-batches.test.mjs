@@ -138,7 +138,7 @@ test("SCADA, physical inputs and tutorial mention advanced control and count wid
   const view=readFileSync(new URL("../src/components/ide/SortScene.tsx",import.meta.url),"utf8");
   const info=readFileSync(new URL("../src/components/ide/SortSceneInfoDialog.tsx",import.meta.url),"utf8");
   const app=readFileSync(new URL("../src/App.tsx",import.meta.url),"utf8");
-  assert.match(view,/MomentaryPushButton name="RESET LOTE"/);
+  assert.match(view,/MomentaryPushButton compact name="RESET LOTE"/);
   assert.match(view,/Pilot label="LOTE COMPLETO"/);
   assert.match(view,/Pilot label="LÍNEAS LIBRES"/);
   assert.match(view,/Sort_CountTotal/);
