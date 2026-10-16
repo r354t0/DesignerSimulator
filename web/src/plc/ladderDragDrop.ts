@@ -67,16 +67,24 @@ export function getRungGeometry(rung: PracticeRung, viewportWidth = 760): Ladder
     const endIndex = branches.length ? contacts.findIndex((item) => item.id === endId) : index;
     const last = Math.max(index, endIndex);
     const main = contacts.slice(index, last + 1);
-    const count = Math.max(main.length, anchor.kind === OR_JUNCTION_KIND ? 2 : 1,
+    const independentOr = anchor.kind === OR_JUNCTION_KIND;
+    // A junction is a zero-width electrical node, not a Ladder contact.
+    // Reserve columns only for instructions actually drawn in each path.
+    // At least one column remains for an empty OR's future drop target.
+    const visibleMainCount = main.length - (independentOr ? 1 : 0);
+    const count = Math.max(1, visibleMainCount,
       ...branches.map((branch) => branch.instructions.length));
     const firstX = FIRST_CONTACT_X + consumed;
     consumed += count * CONTACT_STEP;
-    const centers = main.length <= 1
-      ? [anchor.kind === OR_JUNCTION_KIND ? firstX :
-        firstX + (count - 1) * CONTACT_STEP / 2]
-      : main.map((_, i) => firstX + i * ((count - 1) * CONTACT_STEP) / (main.length - 1));
     const left = firstX - GROUP_HALF_WIDTH;
     const right = firstX + (count - 1) * CONTACT_STEP + GROUP_HALF_WIDTH;
+    const centers = independentOr
+      // The invisible anchor sits directly on the left bifurcation rail;
+      // the first real upper contact aligns with the first lower contact.
+      ? [left, ...main.slice(1).map((_, i) => firstX + i * CONTACT_STEP)]
+      : main.length <= 1
+        ? [firstX + (count - 1) * CONTACT_STEP / 2]
+        : main.map((_, i) => firstX + i * ((count - 1) * CONTACT_STEP) / (main.length - 1));
     groups.push({
       anchorId: anchor.id, endId: main.at(-1)?.id ?? anchor.id,
       mainIds: main.map((item) => item.id), mainCenters: centers,
