@@ -17,18 +17,22 @@ export interface ConveyorTagDefinition {
   direction: "Entrada" | "Salida" | "Interna";
   description: string;
   initialDescription?: string;
+  /** Generated descriptions from older simulator versions; safe to refresh. */
+  legacyDescriptions?: readonly string[];
 }
 
 export const CONVEYOR_TAGS: readonly ConveyorTagDefinition[] = [
   {
     name: CONVEYOR_START_TAG, type: "BOOL", direction: "Entrada",
-    description: "Faja: pulsador START de marcha (entrada digital simulada)",
+    description: "Faja: pulsador START de marcha",
     initialDescription: "Pulsador de arranque",
+    legacyDescriptions: ["Faja: pulsador START de marcha (entrada digital simulada)"],
   },
   {
     name: CONVEYOR_STOP_TAG, type: "BOOL", direction: "Entrada",
-    description: "Faja: pulsador STOP de parada (entrada digital simulada)",
+    description: "Faja: pulsador STOP de parada",
     initialDescription: "Pulsador de parada",
+    legacyDescriptions: ["Faja: pulsador STOP de parada (entrada digital simulada)"],
   },
   {
     name: CONVEYOR_SENSOR_TAG, type: "BOOL", direction: "Entrada",
@@ -36,8 +40,9 @@ export const CONVEYOR_TAGS: readonly ConveyorTagDefinition[] = [
   },
   {
     name: CONVEYOR_MOTOR_TAG, type: "BOOL", direction: "Salida",
-    description: "Faja: orden de marcha del motor transportador (salida digital)",
+    description: "Faja: orden de marcha del motor transportador",
     initialDescription: "Motor habilitado",
+    legacyDescriptions: ["Faja: orden de marcha del motor transportador (salida digital)"],
   },
   {
     name: CONVEYOR_COUNT_TAG, type: "COUNTER", direction: "Interna",
@@ -108,7 +113,8 @@ export function prepareConveyorTags(project: PracticeProject): PracticeProject {
     if (!existing) {
       result = createTag(result, spec.name, spec.description, spec.type);
     } else if (!existing.description.trim() ||
-      existing.description === spec.initialDescription) {
+      existing.description === spec.initialDescription ||
+      spec.legacyDescriptions?.includes(existing.description)) {
       result = {
         ...result,
         tags: result.tags.map((tag) => tag.name === spec.name

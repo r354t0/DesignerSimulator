@@ -1,9 +1,11 @@
-import { Activity, Boxes, CircleAlert, Gauge, Pause, Play, RotateCcw } from "lucide-react";
+import { useState } from "react";
+import { Activity, Boxes, CircleAlert, Gauge, Info, Pause, Play, RotateCcw } from "lucide-react";
+import { ConveyorSceneInfoDialog } from "./ConveyorSceneInfoDialog";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
 import {
   CONVEYOR_COUNT_TAG, CONVEYOR_SENSOR_TAG, CONVEYOR_SENSOR_POSITION,
-  CONVEYOR_TAGS, hasConveyorTags, readConveyorBool, readConveyorCount,
+  hasConveyorTags, readConveyorBool, readConveyorCount,
   type ConveyorState,
 } from "../../plc/conveyorSceneModel";
 
@@ -32,6 +34,7 @@ export function ConveyorScene({
   const sensor = readConveyorBool(project, CONVEYOR_SENSOR_TAG);
   const count = readConveyorCount(project);
   const wired = hasConveyorTags(project);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   return (
     <section className="flex h-full min-h-0 flex-col overflow-y-auto bg-[#111c27] text-slate-100"
@@ -44,15 +47,22 @@ export function ConveyorScene({
               Entradas físicas simuladas → Controller Tags → PracticeRoutine → Motor_Run
             </p>
           </div>
-          <span className={"inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] " +
-            (mode === "running"
-              ? "border-emerald-700 bg-emerald-950 text-emerald-300"
-              : mode === "paused"
-                ? "border-amber-700 bg-amber-950 text-amber-300"
-                : "border-slate-600 bg-slate-800 text-slate-300")}>
-            <Activity size={12}/> {mode === "running" ? "PracticeRoutine RUN" :
-              mode === "paused" ? "PracticeRoutine PAUSE" : "PracticeRoutine STOP"}
-          </span>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" aria-haspopup="dialog" aria-expanded={infoOpen}
+              onClick={() => setInfoOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded border border-sky-700 px-2.5 py-1.5 text-[11px] font-semibold text-sky-300 hover:bg-sky-950 focus-visible:outline-2 focus-visible:outline-sky-500">
+              <Info size={15} aria-hidden="true"/> Información de la escena
+            </button>
+            <span className={"inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px] " +
+              (mode === "running"
+                ? "border-emerald-700 bg-emerald-950 text-emerald-300"
+                : mode === "paused"
+                  ? "border-amber-700 bg-amber-950 text-amber-300"
+                  : "border-slate-600 bg-slate-800 text-slate-300")}>
+              <Activity size={12}/> {mode === "running" ? "PracticeRoutine RUN" :
+                mode === "paused" ? "PracticeRoutine PAUSE" : "PracticeRoutine STOP"}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -158,67 +168,6 @@ export function ConveyorScene({
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-700 bg-[#172634] p-3">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h3 className="text-xs font-semibold text-slate-100">
-                Mapa E/S · Tags vinculados a la simulación
-              </h3>
-              <p className="mt-1 text-[11px] text-slate-400">
-                Se registran automáticamente al entrar. Usa estos nombres exactos en PracticeRoutine.
-              </p>
-            </div>
-            <button type="button" onClick={onOpenTags}
-              className="rounded border border-sky-600 px-2.5 py-1.5 text-[11px] font-semibold text-sky-300 hover:bg-sky-950">
-              Abrir Controller Tags
-            </button>
-          </div>
-          <div className="overflow-x-auto rounded border border-slate-700">
-            <table className="w-full min-w-[560px] table-auto text-left text-[11px]">
-              <thead className="bg-[#203449] text-slate-300">
-                <tr>
-                  <th scope="col" className="px-2.5 py-2 font-semibold">Tag</th>
-                  <th scope="col" className="px-2.5 py-2 font-semibold">Tipo</th>
-                  <th scope="col" className="px-2.5 py-2 font-semibold">Función</th>
-                  <th scope="col" className="px-2.5 py-2 font-semibold">Descripción</th>
-                  <th scope="col" className="px-2.5 py-2 text-right font-semibold">Valor</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/70">
-                {CONVEYOR_TAGS.map((spec) => {
-                  const linked = project.tags.find((tag) => tag.name === spec.name);
-                  const valid = linked?.type === spec.type;
-                  const value = valid
-                    ? spec.type === "COUNTER" ? readConveyorCount(project)
-                      : readConveyorBool(project, spec.name) ? 1 : 0
-                    : null;
-                  return (
-                    <tr key={spec.name} className="hover:bg-slate-700/20">
-                      <th scope="row" className="px-2.5 py-2 font-mono font-semibold text-sky-200">
-                        {spec.name}
-                      </th>
-                      <td className="px-2.5 py-2 font-mono text-slate-300">{spec.type}</td>
-                      <td className="px-2.5 py-2 text-slate-300">{spec.direction}</td>
-                      <td className="px-2.5 py-2 text-slate-300">
-                        {valid && linked ? linked.description || spec.description : spec.description}
-                      </td>
-                      <td className={"px-2.5 py-2 text-right font-mono " +
-                        (valid ? "text-emerald-300" : "text-amber-300")}>
-                        {valid ? value : "Revisar"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <p className="mt-2 text-[11px] text-slate-400">
-            Entrada: señales generadas por botones/sensor · Salida: accionamiento
-            del motor por Ladder · Interna: contador CTU (valor ACC mostrado).
-            Registrar tags no inserta instrucciones ni activa salidas.
-          </p>
-        </div>
-
         {!wired && (
           <div className="rounded-md border border-amber-600/60 bg-amber-950/30 p-3 text-xs">
             <p className="flex items-center gap-2 font-semibold text-amber-300">
@@ -233,27 +182,14 @@ export function ConveyorScene({
             </button>
           </div>
         )}
-        <div className="rounded-md border border-slate-600/70 bg-[#172634] p-3 text-xs">
-          <p className="font-semibold text-slate-200">Ladder recomendado para practicar</p>
-          <p className="mt-1 font-mono text-[11px] text-slate-400">
-            Rung 0: Start_PB → OTL Motor_Run
-          </p>
-          <p className="font-mono text-[11px] text-slate-400">
-            Rung 1: Stop_PB → OTU Motor_Run
-          </p>
-          <p className="font-mono text-[11px] text-slate-400">
-            Rung 2: CV_BoxSensor → CTU CV_Count (PRE=5)
-          </p>
-          <button type="button" onClick={onLoadExample}
-            className="mt-2 rounded border border-sky-600 px-3 py-1.5 text-xs font-semibold text-sky-300 hover:bg-sky-950">
-            Cargar plantilla Ladder (reemplaza PracticeRoutine)
-          </button>
-          <p className="mt-2 text-[11px] text-slate-400">
-            Build y RUN se inician desde PracticeRoutine. Sin RUN, las cajas permanecen quietas.
-            Esta escena nunca controla hardware físico. Vaciar faja no reinicia el contador PLC.
-          </p>
-        </div>
+        <p className="text-[11px] text-slate-400">
+          Build y RUN se inician desde PracticeRoutine. La faja solo avanza con el
+          motor habilitado; vaciar la faja no reinicia el contador PLC.
+        </p>
       </div>
+      <ConveyorSceneInfoDialog open={infoOpen} project={project}
+        onClose={() => setInfoOpen(false)}
+        onOpenTags={onOpenTags} onLoadExample={onLoadExample}/>
     </section>
   );
 }

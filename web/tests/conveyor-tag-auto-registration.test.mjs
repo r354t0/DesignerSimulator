@@ -100,12 +100,58 @@ test("filling a generic description does not invalidate a running controller bui
   assert.equal(next.mode, "running", "display-only descriptions must not stop RUN");
 });
 
-test("scene is registered on activation and displays the complete I/O map", () => {
+test("scene is registered on activation; map E/S and objective live in an accessible modal", () => {
   const app = readFileSync(new URL("../src/App.tsx", import.meta.url), "utf8");
   const scene = readFileSync(new URL("../src/components/ide/ConveyorScene.tsx", import.meta.url), "utf8");
+  const info = readFileSync(new URL("../src/components/ide/ConveyorSceneInfoDialog.tsx", import.meta.url), "utf8");
   assert.match(app, /useEffect\(\(\) => \{\s*if \(simulationTab === "conveyor"\) prepareConveyor\(\);/);
   assert.match(app, /next === state\.project \? state : changePracticeScanProject\(state, next\)/);
-  assert.match(scene, /CONVEYOR_TAGS\.map\(/);
-  assert.match(scene, /Mapa E\/S · Tags vinculados a la simulación/);
-  assert.match(scene, /Abrir Controller Tags/);
+  assert.match(scene, /Información de la escena/);
+  assert.match(scene, /aria-haspopup="dialog"/);
+  assert.match(scene, /ConveyorSceneInfoDialog open=\{infoOpen\}/);
+  assert.doesNotMatch(scene, /CONVEYOR_TAGS\.map\(/,
+    "The I/O table must no longer occupy space in the main conveyor view");
+  assert.match(info, /aria-labelledby="conveyor-scene-info-title"/);
+  assert.match(info, /dialog\.showModal\(\)/);
+  assert.match(info, /dialog\.close\(\)/);
+  assert.match(info, /onClose=\{onClose\}/);
+  assert.match(info, /Objetivo del ejercicio/);
+  assert.match(info, /arranque|arranque y detenga|arranque y parada|arranque y detenga|arranque y detener|arranque/i);
+  assert.match(info, /CONVEYOR_TAGS\.map\(/);
+  assert.match(info, /Mapa E\/S · Tags vinculados a la simulación/);
+  assert.match(info, /Abrir Controller Tags/);
+});
+
+test("scene descriptions omit digital I/O clarifiers and update old generated copy", () => {
+  const old = new Map([
+    ["Start_PB", "Faja: pulsador START de marcha (entrada digital simulada)"],
+    ["Stop_PB", "Faja: pulsador STOP de parada (entrada digital simulada)"],
+    ["Motor_Run", "Faja: orden de marcha del motor transportador (salida digital)"],
+  ]);
+  for (const definition of CONVEYOR_TAGS) {
+    assert.doesNotMatch(definition.description, /\((?:entrada|salida) digital/i,
+      definition.name);
+  }
+  let project = prepareConveyorTags(initialPracticeProject());
+  const originalRungs = project.rungs;
+  const originalTags = project.tags;
+  for (const [name, description] of old) {
+    project = editTag(project, name, { description });
+  }
+  project = setTagValue(project, "Start_PB", true);
+  project = setTagValue(project, "Motor_Run", true);
+  const migrated = prepareConveyorTags(project);
+  assert.equal(migrated.rungs, originalRungs);
+  for (const [name] of old) {
+    const expected = CONVEYOR_TAGS.find(t => t.name === name).description;
+    assert.equal(migrated.tags.find(t => t.name === name).description, expected);
+  }
+  assert.equal(migrated.tags.find(t => t.name === "Motor_Run").value, true);
+  assert.equal(migrated.tags.find(t => t.name === "Start_PB").value, true);
+  assert.equal(prepareConveyorTags(migrated), migrated);
+  assert.ok(originalTags.length <= migrated.tags.length);
+
+  const personalized = editTag(migrated, "Start_PB", { description: "Pulsador físico principal del operador" });
+  assert.equal(prepareConveyorTags(personalized), personalized,
+    "Never replace a user-customized tag description");
 });
