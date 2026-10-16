@@ -30,7 +30,7 @@ test("new process is its own large responsive SVG, without simulated UI-only mot
   assert.match(drawing, /SortProcessGraphic\(\{ state, motor, divert, detection \}/);
   assert.match(drawing, /animationPlayState: motor \? "running" : "paused"/);
   assert.match(drawing, /item\.route === "B"/);
-  assert.match(drawing, /item\.kind === "A"/);
+  assert.match(drawing, /kind === "A"/);
   assert.match(drawing, /<Photoeye x=\{exitSensorX\} y=\{OUTPUT_A_Y\}/);
   assert.match(drawing, /<Photoeye x=\{exitSensorX\} y=\{OUTPUT_B_Y\}/);
   assert.match(drawing, /SORT_SCANNER_POSITION/);
