@@ -9,7 +9,7 @@ import {
 import { demoTagMetadata, type DemoInputs, type DemoValues, type InputTag } from "../../plc/demoModel";
 
 interface Props {
-  activeScene: "conveyor" | "motor";
+  activeScene: "conveyor" | "sorting" | "motor";
   project: PracticeProject;
   onChange: (next: PracticeProject) => void;
   practiceRunning: boolean;
@@ -96,9 +96,9 @@ export function ControllerTags({
   activeScene, project, onChange, practiceRunning, practicePaused, inputs, values, online, onTagChange, onResetCounters,
 }: Props) {
   const [tab, setTab] = useState<Tab>("monitor");
-  // Only tags wired to the active process are shown: MainRoutine for the
-  // conveyor and the independent read-only tag bank for Motor · DEMO.
-  const scope: Scope = activeScene === "conveyor" ? "practice" : "demo";
+  // MainRoutine uses the active SCADA scene's independent tag project.
+  // The separate Motor · DEMO keeps its own read-only tag bank.
+  const scope: Scope = activeScene === "motor" ? "demo" : "practice";
   const [show, setShow] = useState("all");
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<string[]>([]);
@@ -358,7 +358,9 @@ export function ControllerTags({
       <header className="flex shrink-0 flex-wrap items-center gap-3 border-b border-slate-300 bg-[#f0f2f5] px-3 py-2 text-xs">
         <strong className="text-[12px]">Controller Tags</strong>
         <span className="rounded border border-slate-300 bg-white px-2 py-1 text-[11px]">
-          {scope === "practice" ? "MainRoutine · Faja transportadora" : "Motor · DEMO"}
+          {scope === "demo" ? "Motor · DEMO"
+            : activeScene === "sorting" ? "MainRoutine · Clasificación de cajas"
+            : "MainRoutine · Faja transportadora"}
         </span>
         <label className="flex items-center gap-1">
           Show:

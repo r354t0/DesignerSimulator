@@ -8,7 +8,8 @@ const dialog = readFileSync(new URL("../src/components/ide/ConveyorSceneInfoDial
 
 test("the simulation navigation is a single compact selector, not large secondary tabs", () => {
   assert.match(app, /<select id="simulation-scene-selector" value=\{simulationTab\}/);
-  assert.match(app, /setSimulationTab\(event\.target\.value as "conveyor" \| "motor"\)/);
+  assert.match(app, /chooseSimulationTab\(event\.target\.value as SimulationTab\)/);
+  assert.match(app, /<option value="sorting">Clasificación de cajas<\/option>/);
   assert.match(app, /<option value="conveyor">Faja transportadora<\/option>/);
   assert.match(app, /<option value="motor">Motor · DEMO<\/option>/);
   assert.doesNotMatch(app, /aria-pressed=\{simulationTab === "conveyor"\}/);

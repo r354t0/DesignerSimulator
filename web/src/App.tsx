@@ -18,6 +18,11 @@ import { evaluateDemo, initialDemoInputs, type DemoInputs, type InputTag } from 
 import { initialDemoBlocks, resetDemoCounters, stepDemoBlocks, type DemoBlockRuntime } from "./plc/timerCounterDemo";
 import { SimulationScene } from "./components/ide/SimulationScene";
 import { ConveyorScene } from "./components/ide/ConveyorScene";
+import { SortScene } from "./components/ide/SortScene";
+import {
+  addSortBox, createSortExampleProject, initialSortProject, initialSortState,
+  prepareSortTags, readSortBool, stepSortState, type SortBoxType, type SortState,
+} from "./plc/sortSceneModel";
 import {
   CONVEYOR_SENSOR_TAG, addConveyorItem, createConveyorExampleProject,
   initialConveyorProject, initialConveyorState, prepareConveyorTags, readConveyorBool, stepConveyor,
@@ -59,6 +64,9 @@ const layoutConfig: IJsonModel = {
   },
 };
 
+type SimulationTab = "conveyor" | "sorting" | "motor";
+type ProgrammingScene = "conveyor" | "sorting";
+
 interface DemoMachineState {
   inputs: DemoInputs;
   motorLatched: boolean;
@@ -84,6 +92,11 @@ export default function App() {
   const [scanState, setScanState] = useState<PracticeScanState>(() =>
     initialPracticeScanState(initialConveyorProject()));
   const scanRef = useRef(scanState);
+  // Separate Ladder programs per SCADA scene; no accidental tag mixing.
+  const sceneSessions = useRef<Record<ProgrammingScene, PracticeScanState>>({
+    conveyor: scanState, sorting: initialPracticeScanState(initialSortProject()),
+  });
+  const activeControllerScene = useRef<ProgrammingScene>("conveyor");
   const practice = scanState.project;
   const practiceMode = scanState.mode;
   // Serialize timer ticks and input/UI edits against the same synchronous
@@ -110,7 +123,39 @@ export default function App() {
     blocks: initialDemoBlocks(),
   }));
   const { inputs, motorLatched, blocks } = demo;
-  const [simulationTab, setSimulationTab] = useState<"conveyor" | "motor">("conveyor");
+  const [simulationTab, setSimulationTab] = useState<SimulationTab>("conveyor");
+  const [sortSetupError, setSortSetupError] = useState<string | null>(null);
+  const [sortState, setSortState] = useState<SortState>(initialSortState);
+  const sortRef = useRef(sortState);
+  const changeSort = useCallback((operation: (state: SortState) => SortState) => {
+    const next = operation(sortRef.current);
+    if (next !== sortRef.current) {
+      sortRef.current = next;
+      setSortState(next);
+    }
+  }, []);
+
+  const chooseSimulationTab = useCallback((next: SimulationTab) => {
+    if (next === simulationTab) return;
+    if (next === "motor") {
+      // The standalone demo is not connected to MainRoutine. Pause this
+      // programming scene safely so it cannot run unseen in the background.
+      changeScan(stopPracticeScans);
+      setSimulationTab(next);
+      return;
+    }
+    if (next !== activeControllerScene.current) {
+      changeScan((current) => {
+        const previous = activeControllerScene.current;
+        // Switching stops the previous controller, but saves its Ladder,
+        // counters, and customized tags for when the user returns.
+        sceneSessions.current[previous] = stopPracticeScans(current);
+        activeControllerScene.current = next;
+        return stopPracticeScans(sceneSessions.current[next]);
+      });
+    }
+    setSimulationTab(next);
+  }, [simulationTab, changeScan]);
   const [conveyorTagSetupError, setConveyorTagSetupError] = useState<string | null>(null);
   const [conveyor, setConveyor] = useState<ConveyorState>(initialConveyorState);
   const conveyorRef = useRef(conveyor);
@@ -126,10 +171,10 @@ export default function App() {
   // evaluated immediately in RUN (zero elapsed time), so short gaps never
   // disappear between cyclic scans and CTU can count the next box.
   useEffect(() => {
-    if (practiceMode !== "running") return;
+    if (practiceMode !== "running" || activeControllerScene.current !== "conveyor") return;
     const id = window.setInterval(() => {
       const plc = scanRef.current;
-      if (plc.mode !== "running") return;
+      if (plc.mode !== "running" || activeControllerScene.current !== "conveyor") return;
       const motorOn = readConveyorBool(plc.project, "Motor_Run");
       const next = stepConveyor(conveyorRef.current, motorOn, 50);
       if (next !== conveyorRef.current) changeConveyor(() => next);
@@ -140,7 +185,33 @@ export default function App() {
       }
     }, 50);
     return () => window.clearInterval(id);
-  }, [practiceMode, changeConveyor, changeScan]);
+  }, [practiceMode, simulationTab, changeConveyor, changeScan]);
+
+  // Separate 50ms browser physics. Each optical edge is passed through the
+  // serialized zero-elapsed MainRoutine scan to protect CTU counting.
+  useEffect(() => {
+    if (practiceMode !== "running" || activeControllerScene.current !== "sorting") return;
+    const id = window.setInterval(() => {
+      const current = scanRef.current;
+      if (current.mode !== "running" || activeControllerScene.current !== "sorting") return;
+      const next = stepSortState(sortRef.current,
+        readSortBool(current.project, "Sort_Motor"),
+        readSortBool(current.project, "Sort_Divert"), 50);
+      if (next !== sortRef.current) changeSort(() => next);
+      const sensors: readonly [string, boolean][] = [
+        ["Sort_TypeB", next.sensorTypeB],
+        ["Sort_AExit", next.sensorExitA],
+        ["Sort_BExit", next.sensorExitB],
+      ];
+      for (const [name, value] of sensors) {
+        const tag = scanRef.current.project.tags.find((item) => item.name === name);
+        if (tag?.type === "BOOL" && tag.value !== value) {
+          changeScan((state) => applySceneSensorBoolInput(state, name, value));
+        }
+      }
+    }, 50);
+    return () => window.clearInterval(id);
+  }, [practiceMode, simulationTab, changeSort, changeScan]);
 
   // Advance the five fixed demo rungs with elapsed milliseconds, independent of
   // React render frequency. This is NOT a controller-quality real-time scan.
@@ -177,6 +248,34 @@ export default function App() {
   const handlePracticeChange = useCallback((next: PracticeProject) =>
     changeScan((state) => changePracticeScanProject(state, next)), [changeScan]);
 
+  const setSortInput = useCallback((tag: "Sort_StartPB" | "Sort_StopPB", value: boolean) => {
+    changeScan((state) => applyMomentaryBoolInput(state, tag, value));
+  }, [changeScan]);
+  const resetSort = useCallback(() => {
+    changeSort(() => initialSortState());
+    changeScan((current) => {
+      let next = current;
+      for (const name of ["Sort_TypeB", "Sort_AExit", "Sort_BExit"]) {
+        if (next.project.tags.some((tag) =>
+          tag.name === name && tag.type === "BOOL" && tag.value === true)) {
+          next = applySceneSensorBoolInput(next, name, false);
+        }
+      }
+      return next;
+    });
+  }, [changeSort, changeScan]);
+  const prepareSort = useCallback(() => {
+    try {
+      changeScan((state) => {
+        const prepared = prepareSortTags(state.project);
+        return prepared === state.project ? state : changePracticeScanProject(state, prepared);
+      });
+      setSortSetupError(null);
+    } catch (error) {
+      setSortSetupError(error instanceof Error ? error.message : "No se pudieron preparar los tags.");
+    }
+  }, [changeScan]);
+
   const setConveyorInput = useCallback((tag: "Start_PB" | "Stop_PB", value: boolean) => {
     // A quick momentary press must reach the PLC even between timer ticks.
     // Only the rising press samples a zero-elapsed scan in RUN mode.
@@ -210,7 +309,8 @@ export default function App() {
   // existing Ladder logic, tag values, or personalized descriptions.
   useEffect(() => {
     if (simulationTab === "conveyor") prepareConveyor();
-  }, [simulationTab, prepareConveyor]);
+    else if (simulationTab === "sorting") prepareSort();
+  }, [simulationTab, prepareConveyor, prepareSort]);
 
   const startPractice = useCallback(() =>
     changeScan(startPracticeScans), [changeScan]);
@@ -246,6 +346,18 @@ export default function App() {
     }
     setEditorView(view);
   }, [model]);
+
+  const loadSortExample = useCallback(() => {
+    if (!window.confirm(
+      "Se reemplazará el MainRoutine y los Controller Tags del CLASIFICADOR por su plantilla Ladder. ¿Continuar?",
+    )) return;
+    changeScan((state) => ({
+      ...initialPracticeScanState(createSortExampleProject()),
+      scanPeriodMs: state.scanPeriodMs,
+    }));
+    changeSort(() => initialSortState());
+    openEditorView("practice");
+  }, [changeScan, changeSort, openEditorView]);
 
   const loadConveyorExample = useCallback(() => {
     if (!window.confirm("Se reemplazará MainRoutine y sus Controller Tags por el ejemplo de faja. ¿Continuar?")) {
@@ -312,9 +424,10 @@ export default function App() {
                   Seleccionar escena de simulación
                 </label>
                 <select id="simulation-scene-selector" value={simulationTab}
-                  onChange={(event) => setSimulationTab(event.target.value as "conveyor" | "motor")}
+                  onChange={(event) => chooseSimulationTab(event.target.value as SimulationTab)}
                   className="max-w-full cursor-pointer rounded border border-slate-600 bg-[#1c2e3e] px-2 py-1 text-[11px] font-medium text-slate-200 outline-none hover:border-slate-400 focus-visible:border-sky-500">
                   <option value="conveyor">Faja transportadora</option>
+                  <option value="sorting">Clasificación de cajas</option>
                   <option value="motor">Motor · DEMO</option>
                 </select>
               </div>
@@ -328,8 +441,17 @@ export default function App() {
                       setupError={conveyorTagSetupError}
                       onOpenTags={() => openEditorView("tags")}
                       onLoadExample={loadConveyorExample}/>
-                  : <SimulationScene online={online} inputs={inputs} values={values}
-                      onTagChange={handleTagChange}/>}
+                  : simulationTab === "sorting"
+                    ? <SortScene project={practice} mode={practiceMode} state={sortState}
+                        onInputChange={setSortInput}
+                        onAddBox={(kind: SortBoxType) => changeSort((state) => addSortBox(state, kind))}
+                        onReset={resetSort}
+                        onPrepareTags={prepareSort}
+                        setupError={sortSetupError}
+                        onOpenTags={() => openEditorView("tags")}
+                        onLoadExample={loadSortExample}/>
+                    : <SimulationScene online={online} inputs={inputs} values={values}
+                        onTagChange={handleTagChange}/>}
               </div>
             </div>
           );
@@ -342,7 +464,9 @@ export default function App() {
       pausePractice, resumePractice, stepPractice, changeScanPeriod, handleTagChange,
       handleResetCounters, openEditorView, onToolbarDragStart, simulationTab, conveyor,
       setConveyorInput, changeConveyor, resetConveyor, prepareConveyor,
-      conveyorTagSetupError, loadConveyorExample],
+      conveyorTagSetupError, loadConveyorExample, sortState, setSortInput,
+      changeSort, resetSort, prepareSort, sortSetupError, loadSortExample,
+      chooseSimulationTab],
   );
 
   const syncTabSelection = useCallback((updatedModel: Model) => {
