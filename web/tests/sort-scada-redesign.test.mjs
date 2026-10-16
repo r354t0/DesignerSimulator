@@ -62,9 +62,9 @@ test("SCADA process follows the header directly, without redundant KPI cards", (
 });
 
 test("momentary START, STOP, RESET and both add-box inputs are preserved", () => {
-  assert.match(view, /<MomentaryPushButton name="START" tone="start" pressed=\{start\}/);
-  assert.match(view, /<MomentaryPushButton name="STOP" tone="stop" pressed=\{stop\}/);
-  assert.match(view, /<MomentaryPushButton name="RESET LOTE" tone="drain" pressed=\{reset\}/);
+  assert.match(view, /<MomentaryPushButton compact name="START" tone="start" pressed=\{start\}/);
+  assert.match(view, /<MomentaryPushButton compact name="STOP" tone="stop" pressed=\{stop\}/);
+  assert.match(view, /<MomentaryPushButton compact name="RESET LOTE" tone="drain" pressed=\{reset\}/);
   assert.match(view, /onChange=\{\(v\) => onInputChange\("Sort_StartPB", v\)\}/);
   assert.match(view, /onChange=\{\(v\) => onInputChange\("Sort_StopPB", v\)\}/);
   assert.match(view, /onChange=\{\(v\) => onInputChange\("Sort_ResetPB", v\)\}/);
