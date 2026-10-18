@@ -118,13 +118,13 @@ export function TrafficScene({project,mode,state,onInputChange,onAddVehicle,onRe
             <span className={"rounded bg-[#102534] px-2 py-1 font-mono text-[10px] "+
               (fault?"text-red-300":"text-sky-300")}>{fault?"ALARMA":phaseLabel}</span>
           </div>
-          <div className="scada-process-canvas overflow-x-auto rounded border border-[#7d8992] bg-[#c0c0c0]"
+          <div className="scada-process-canvas overflow-x-auto rounded border border-[#7d8992] bg-[#ffffff]"
             role="img" aria-label={"Intersección: NS "+(nsG?"verde":nsY?"amarillo":"rojo")+
               ", EW "+(ewG?"verde":ewY?"amarillo":"rojo")+
               ", peatones "+(walk?"cruzando":"esperando")}>
             <svg viewBox="0 0 760 440" className="block h-auto w-full min-w-[390px]"
               xmlns="http://www.w3.org/2000/svg">
-              <rect width="760" height="440" fill="#c0c0c0"/>
+              <rect width="760" height="440" fill="#ffffff"/>
               <rect x="308" y="0" width="144" height="440" fill="#485560"/>
               <rect x="0" y="149" width="760" height="142" fill="#485560"/>
               <rect x="308" y="149" width="144" height="142" fill="#3c4853"/>
