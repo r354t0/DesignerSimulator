@@ -110,7 +110,8 @@ export function TankScene({
           </div>
         </header>
 
-        <section className="sort-panel rounded-lg border border-[#344c5e] p-3"
+        <div className="scada-scene-workspace">
+        <section className="sort-panel scada-process-panel rounded-lg border border-[#344c5e] p-3"
           aria-labelledby="tank-process-title">
           <div className="mb-3 flex items-center gap-2">
             <ScanLine size={16} className="text-sky-300" aria-hidden="true"/>
@@ -275,7 +276,8 @@ export function TankScene({
           </div>
         </section>
 
-        <div className="scada-dashboard-grid grid gap-3">
+        <aside className="scada-scene-sidebar" aria-label="Controles e indicadores del SCADA">
+          <div className="scada-dashboard-grid grid gap-3">
           <section className="sort-panel rounded-lg border border-[#344c5e] p-2.5"
             aria-label="Tablero de mando">
             <h3 className="mb-2 text-[11px] font-semibold">Tablero de mando</h3>
@@ -326,9 +328,9 @@ export function TankScene({
                 </div></div>
             </div>
           </section>
-        </div>
+          </div>
 
-        <div className="sort-panel rounded-lg border border-[#344c5e] p-3">
+          <div className="sort-panel rounded-lg border border-[#344c5e] p-3">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 text-xs font-semibold">
             <span className="flex items-center gap-2"><Clock3 size={15} className="text-sky-300"/> Temporizadores TON</span>
             {alarm && <span className="flex items-center gap-1 text-red-400"><AlertTriangle size={13}/> Tiempo excedido</span>}
@@ -356,6 +358,8 @@ export function TankScene({
           <div className="mt-3 flex items-center gap-2 text-[10px] text-slate-400">
             <Cog size={13}/> Motor, agitador y válvulas siguen únicamente las salidas Ladder.
           </div>
+          </div>
+        </aside>
         </div>
 
         {!wired && (
