@@ -31,6 +31,8 @@ const started=(exercise,adjust=project=>project)=>{
   assert.equal(build.success,true,"Exercise "+exercise+": "+JSON.stringify(build.diagnostics));
   let plc=startPracticeScans(setScanPeriod(initialPracticeScanState(project),500));
   plc=press(plc,"PB_Start");
+  // After the first inflow pulse, the physically empty-level switch drops.
+  plc=applySceneSensorBoolInput(plc,"DI_LowLevel",false);
   return plc;
 };
 const setBOOL=(plc,name,value)=>applySceneSensorBoolInput(plc,name,value);
@@ -91,6 +93,7 @@ test("lab 01 exercise 2: RTO mixes for eight seconds, CTD drains to zero",()=>{
   for(let i=0;i<90;i++)plc=pulse(plc,"DI_Flowmeter3");
   assert.equal(count(plc,"CNT_Volume"),0);
   assert.equal(output(plc,"DO_Pump3"),false);
+  plc=setBOOL(plc,"DI_LowLevel",true);
   plc=press(plc,"PB_Start");
   assert.equal(output(plc,"DO_Pump1"),true);
 });
