@@ -46,7 +46,7 @@ export const SORT_TEMPLATE_TAGS: readonly (typeof SORT_TAGS)[number][] = [
     description: "Parada STOP/lote" },
   { name: "CNT_BatchBoxes", type: "COUNTER", direction: "Interna",
     description: "Cajas del lote" },
-  { name: "CNT_Batches", type: "COUNTER", direction: "Interna",
+  { name: "CNT_Lotes", type: "COUNTER", direction: "Interna",
     description: "Lotes terminados" },
 ];
 
@@ -159,7 +159,7 @@ export function createSortExampleProject(): PracticeProject {
   p = setTagValue(p, "CNT_ExitA", SORT_BATCH_SIZE, "PRE");
   p = setTagValue(p, "CNT_ExitB", SORT_BATCH_SIZE, "PRE");
   p = setTagValue(p, "CNT_BatchBoxes", SORT_BATCH_SIZE, "PRE");
-  p = setTagValue(p, "CNT_Batches", 10, "PRE");
+  p = setTagValue(p, "CNT_Lotes", 10, "PRE");
 
   const append = (rung: string, specs: {
     id: string; kind: "XIC" | "XIO" | "OTE" | "CTU" | "RES"; tag: string;
@@ -233,7 +233,7 @@ export function createSortExampleProject(): PracticeProject {
   append("sort-batches",[
     { id:"sort-batch-full",kind:"XIC",tag:"CNT_BatchBoxes.DN" },
     { id:"sort-batch-clear",kind:"XIC",tag:"DI_LineClear" },
-    { id:"sort-batch-ctu",kind:"CTU",tag:"CNT_Batches" },
+    { id:"sort-batch-ctu",kind:"CTU",tag:"CNT_Lotes" },
   ]);
 
   // R7–R9: no reset mid-transport; total and A/B are reset together.
