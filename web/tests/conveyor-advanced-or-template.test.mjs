@@ -136,7 +136,7 @@ test("advanced SCADA controls, map E/S and help match optional template logic",(
   assert.match(scene,/MomentaryPushButton compact name="RESET LOTE"/);
   assert.match(scene,/onInputChange\("PB_Reset", pressed\)/);
   assert.match(scene,/PilotLed label="LOTE COMPLETO"/);
-  assert.match(info,/CONVEYOR_TEMPLATE_TAGS\.filter/);
+  assert.match(info,/RecommendedSolutionPanel/);
   assert.match(info,/CNT_Boxes\.DN/);
   assert.match(info,/RES CNT_Boxes/);
   assert.match(app,/applyConveyorMomentaryInput\(state, tag, value\)/);
