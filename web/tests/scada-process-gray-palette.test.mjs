@@ -7,11 +7,11 @@ const source = path => readFileSync(new URL(path, import.meta.url), "utf8");
 test("the four process simulation canvases use neutral gray #C0C0C0", () => {
   for (const scene of ["Conveyor", "Sort", "Tank", "Traffic"]) {
     const view = source("../src/components/ide/"+scene+"Scene.tsx");
-    assert.match(view, /scada-process-canvas/, scene);
-    if (scene !== "Sort") assert.match(view, /bg-\[#c0c0c0\]/, scene);
-    // The sorter draws its complete simulation in a dedicated SVG component.
-    else assert.match(source("../src/components/ide/SortProcessGraphic.tsx"),
-      /bg-\[#c0c0c0\]/);
+    // The sorter draws its simulation in a dedicated SVG component.
+    const canvas = scene === "Sort"
+      ? source("../src/components/ide/SortProcessGraphic.tsx") : view;
+    assert.match(canvas, /scada-process-canvas/, scene);
+    assert.match(canvas, /bg-\[#c0c0c0\]/, scene);
     assert.match(view, /scada-process-panel/, scene);
     assert.match(view, /scada-scene-workspace/, scene);
   }
