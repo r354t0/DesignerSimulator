@@ -19,7 +19,7 @@ test("scene defines a complete and self-documenting E/S contract", () => {
     ["PB_Stop", "BOOL", "Entrada"],
     ["DI_BoxSensor", "BOOL", "Entrada"],
     ["DO_Motor", "BOOL", "Salida"],
-    ["CNT_Boxes", "COUNTER", "Interna"],
+    ["PB_Reset", "BOOL", "Entrada"],
   ]);
   for (const definition of CONVEYOR_TAGS) {
     assert.ok(definition.description.length <= 19, definition.name);
@@ -74,6 +74,7 @@ test("registering a scene with a conflicting tag type is atomic and non-destruct
 
 test("revisiting repairs missing tags but does not change an established PLC state", () => {
   let project = prepareConveyorTags(initialPracticeProject());
+  project = createTag(project, CONVEYOR_COUNT_TAG, "Conteo de prueba", "COUNTER");
   project = setTagValue(project, CONVEYOR_COUNT_TAG, 7, "ACC");
   project = setTagValue(project, "PB_Start", true);
   project = editTag(project, "DO_Motor", { description: "Motor personalizado" });
@@ -117,7 +118,7 @@ test("scene is registered on activation; map E/S and objective live in an access
   assert.match(info, /onClose=\{onClose\}/);
   assert.match(info, /Objetivo del ejercicio/);
   assert.match(info, /arranque|arranque y detenga|arranque y parada|arranque y detenga|arranque y detener|arranque/i);
-  assert.match(info, /\.\.\.CONVEYOR_TAGS, \.\.\.CONVEYOR_TEMPLATE_TAGS\.filter/);
+  assert.match(info, /SceneTagTable specs=\{CONVEYOR_TAGS\}/);
   assert.match(info, /Mapa E\/S · Tags vinculados a la simulación/);
   assert.match(info, /Abrir Controller Tags/);
 });
