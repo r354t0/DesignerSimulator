@@ -19,7 +19,7 @@ interface Props {
   state: SortState;
   setupError: string | null;
   onInputChange: (
-    name: "Sort_StartPB" | "Sort_StopPB" | "Sort_ResetPB", pressed: boolean,
+    name: "PB_Start" | "PB_Stop" | "PB_Reset", pressed: boolean,
   ) => void;
   onAddBox: (kind: SortBoxType) => void;
   onReset: () => void;
@@ -57,21 +57,21 @@ export function SortScene({
 }: Props) {
   const [infoOpen, setInfoOpen] = useState(false);
   const running = mode === "running";
-  const motor = running && readSortBool(project, "Sort_Motor");
-  const divert = running && readSortBool(project, "Sort_Divert");
-  const start = readSortBool(project, "Sort_StartPB");
-  const stop = readSortBool(project, "Sort_StopPB");
-  const detection = readSortBool(project, "Sort_TypeB");
+  const motor = running && readSortBool(project, "DO_Motor");
+  const divert = running && readSortBool(project, "DO_Diverter");
+  const start = readSortBool(project, "PB_Start");
+  const stop = readSortBool(project, "PB_Stop");
+  const detection = readSortBool(project, "DI_TypeB");
   const resetAvailable = project.tags.some(
-    tag => tag.name === "Sort_ResetPB" && tag.type === "BOOL");
-  const reset = resetAvailable && readSortBool(project, "Sort_ResetPB");
+    tag => tag.name === "PB_Reset" && tag.type === "BOOL");
+  const reset = resetAvailable && readSortBool(project, "PB_Reset");
   const lotComplete = resetAvailable && project.tags.some(tag =>
-    tag.name === "Sort_CountTotal" && tag.type === "COUNTER" &&
+    tag.name === "CNT_BatchBoxes" && tag.type === "COUNTER" &&
     typeof tag.value === "object" && tag.value.DN === true);
   const validTags = hasSortTags(project);
 
-  const countTotal = resetAvailable ? readSortCount(project, "Sort_CountTotal") : null;
-  const configuredPreset = project.tags.find(tag => tag.name === "Sort_CountTotal");
+  const countTotal = resetAvailable ? readSortCount(project, "CNT_BatchBoxes") : null;
+  const configuredPreset = project.tags.find(tag => tag.name === "CNT_BatchBoxes");
   const batchTarget = configuredPreset?.type === "COUNTER" &&
     typeof configuredPreset.value === "object" &&
     typeof configuredPreset.value.PRE === "number" &&
@@ -170,14 +170,14 @@ export function SortScene({
             </h3>
             <div className="scada-command-buttons grid max-w-[210px] grid-cols-2 gap-2">
               <MomentaryPushButton compact name="START" tone="start" pressed={start}
-                onChange={(v) => onInputChange("Sort_StartPB", v)}
+                onChange={(v) => onInputChange("PB_Start", v)}
                 icon={<Play size={15} aria-hidden="true"/>}>START</MomentaryPushButton>
               <MomentaryPushButton compact name="STOP" tone="stop" pressed={stop}
-                onChange={(v) => onInputChange("Sort_StopPB", v)}
+                onChange={(v) => onInputChange("PB_Stop", v)}
                 icon={<Pause size={15} aria-hidden="true"/>}>STOP</MomentaryPushButton>
               {resetAvailable && (
                 <MomentaryPushButton compact name="RESET LOTE" tone="drain" pressed={reset}
-                  onChange={(v) => onInputChange("Sort_ResetPB", v)}
+                  onChange={(v) => onInputChange("PB_Reset", v)}
                   icon={<RotateCcw size={15} aria-hidden="true"/>}>RESET</MomentaryPushButton>
               )}
             </div>
@@ -210,7 +210,7 @@ export function SortScene({
                     Progreso del lote
                   </span>
                   <span className="font-mono text-[11px] font-bold tabular-nums text-sky-300">
-                    {readSortCount(project, "Sort_CountTotal") ?? "—"} / {batchTarget}
+                    {readSortCount(project, "CNT_BatchBoxes") ?? "—"} / {batchTarget}
                   </span>
                 </div>
                 <div role="progressbar" aria-label="Cajas del lote" aria-valuemin={0}
@@ -221,7 +221,7 @@ export function SortScene({
                 </div>
                 <div className="mt-2 text-[10px] text-slate-400">
                   Lotes terminados: <span className="font-mono font-semibold text-emerald-300">
-                    {readSortCount(project, "Sort_Batches") ?? "—"}
+                    {readSortCount(project, "CNT_Batches") ?? "—"}
                   </span>
                 </div>
               </div>
