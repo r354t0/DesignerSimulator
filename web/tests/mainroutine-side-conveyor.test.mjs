@@ -22,7 +22,7 @@ test("initial controller has only the 5 conveyor-scene tags and one empty MainRo
  const p=initialConveyorProject();
  assert.deepEqual(p.tags.map(tag=>tag.name),CONVEYOR_TAGS.map(tag=>tag.name));
  assert.equal(p.tags.length,5);
- assert.ok(!p.tags.some(t=>["Auto_Mode","Lamp_Run"].includes(t.name)));
+ assert.ok(!p.tags.some(t=>["ST_AutoMode","DO_RunLamp"].includes(t.name)));
  assert.equal(p.rungs.length,1);
  assert.equal(p.rungs[0].instructions.length,0);
  assert.equal(prepareConveyorTags(p),p,"no duplicate initial scene registration");
@@ -75,17 +75,17 @@ test("motorized side profile visually includes 2D drive, pulleys, boxes and phot
 test("scene motor power is still calculated from Ladder, not animation timers",()=>{
  let p=createConveyorExampleProject();
  assert.equal(buildPracticeProject(p).success,true);
- p=setTagValue(p,"Start_PB",true);
+ p=setTagValue(p,"PB_Start",true);
  p=evaluateSeriesScan(p).project;
- assert.equal(p.tags.find(t=>t.name==="Motor_Run").value,true);
+ assert.equal(p.tags.find(t=>t.name==="DO_Motor").value,true);
  let state=addConveyorItem(initialConveyorState());
  const moving=stepConveyor(state,true,50);
  assert.ok(moving.items[0].position>state.items[0].position);
  assert.equal(stepConveyor(moving,false,50),moving);
- p=setTagValue(p,"Stop_PB",true);
+ p=setTagValue(p,"PB_Stop",true);
  p=evaluateSeriesScan(p).project;
  p=evaluateSeriesScan(p).project; // R0 observes R1's stop request on next scan.
- assert.equal(p.tags.find(t=>t.name==="Motor_Run").value,false);
+ assert.equal(p.tags.find(t=>t.name==="DO_Motor").value,false);
 });
 
 test("conveyor template adds only its two advanced tags; no legacy demo variables",()=>{
@@ -97,5 +97,5 @@ test("conveyor template adds only its two advanced tags; no legacy demo variable
   ["OR_JUNCTION","XIC","XIO","OTE"],["OR_JUNCTION","XIC","OTE"],
   ["XIC","CTU"],["XIO","XIC","RES"]
  ]);
- assert.equal(p.tags.find(t=>t.name==="CV_Count").value.PRE,5);
+ assert.equal(p.tags.find(t=>t.name==="CNT_Boxes").value.PRE,5);
 });
