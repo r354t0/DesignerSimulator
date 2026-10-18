@@ -147,7 +147,7 @@ test("SCADA, physical inputs and tutorial mention advanced control and count wid
   assert.match(app,/applySortMomentaryInput\(state, tag, value\)/);
   assert.match(app,/\["DI_LineClear", next\.lineClear\]/);
   assert.match(info,/CNT_BatchBoxes\.DN/);
-  assert.match(info,/SORT_TEMPLATE_TAGS\.filter/);
+  assert.match(info,/RecommendedSolutionPanel/);
   assert.match(info,/R5: OR \(DI_ExitA \| DI_ExitB\)/);
 });
 
