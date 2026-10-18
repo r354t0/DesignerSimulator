@@ -26,7 +26,8 @@ test("prepare tags preserves the full current Ladder and does not duplicate tags
   assert.equal(hasConveyorTags(project), false);
   assert.equal(hasConveyorTags(next), true);
   assert.equal(next.tags.find(t => t.name === CONVEYOR_SENSOR_TAG).type, "BOOL");
-  assert.equal(next.tags.find(t => t.name === "CNT_Boxes").type, "COUNTER");
+  assert.equal(next.tags.some(t => t.name === "CNT_Boxes"), false,
+    "Counter is created only by the recommended solution");
   assert.equal(prepareConveyorTags(next), next);
 });
 
