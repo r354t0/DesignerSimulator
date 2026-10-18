@@ -36,9 +36,9 @@ test("PE-01 goes LOW for a visually open gap, not a generous detection halo", ()
 test("two consecutive boxes count twice at 500ms PLC scan without missing short sensor LOW", () => {
   let plc = startPracticeScans(setScanPeriod(
     initialPracticeScanState(createConveyorExampleProject()), 500));
-  plc = applyMomentaryBoolInput(plc, "Start_PB", true);
-  plc = applyMomentaryBoolInput(plc, "Start_PB", false);
-  assert.equal(readConveyorBool(plc.project, "Motor_Run"), true);
+  plc = applyMomentaryBoolInput(plc, "PB_Start", true);
+  plc = applyMomentaryBoolInput(plc, "PB_Start", false);
+  assert.equal(readConveyorBool(plc.project, "DO_Motor"), true);
   let belt = addConveyorItem(initialConveyorState());
   const edges = [];
   let clearedBetweenDischarges = false;
@@ -49,7 +49,7 @@ test("two consecutive boxes count twice at 500ms PLC scan without missing short 
       belt = addConveyorItem(belt);
       assert.equal(belt.items.length, 2);
     }
-    const next = stepConveyor(belt, readConveyorBool(plc.project, "Motor_Run"), 50);
+    const next = stepConveyor(belt, readConveyorBool(plc.project, "DO_Motor"), 50);
     if (next.sensorActive !== belt.sensorActive) {
       edges.push(next.sensorActive);
       if (!next.sensorActive && next.items.length === 1 && next.passed === 1) {
@@ -92,8 +92,8 @@ test("box entry enforces enough clearance for a physical sensor to read separati
 test("closely spaced boxes are still detected separately by PE-01 and counted by CTU", () => {
   let plc = startPracticeScans(setScanPeriod(
     initialPracticeScanState(createConveyorExampleProject()), 500));
-  plc = applyMomentaryBoolInput(plc, "Start_PB", true);
-  plc = applyMomentaryBoolInput(plc, "Start_PB", false);
+  plc = applyMomentaryBoolInput(plc, "PB_Start", true);
+  plc = applyMomentaryBoolInput(plc, "PB_Start", false);
   let belt = addConveyorItem(initialConveyorState());
   let gapAfterFirstExit = false;
   const sensorEdges = [];
@@ -107,7 +107,7 @@ test("closely spaced boxes are still detected separately by PE-01 and counted by
         CONVEYOR_BOX_WIDTH_PX / CONVEYOR_BELT_LENGTH_PX;
       assert.ok(gap >= MIN_BOX_GAP_UNITS && gap < 0.02);
     }
-    const next = stepConveyor(belt, readConveyorBool(plc.project, "Motor_Run"), 50);
+    const next = stepConveyor(belt, readConveyorBool(plc.project, "DO_Motor"), 50);
     if (next.sensorActive !== belt.sensorActive) {
       sensorEdges.push(next.sensorActive);
       if (!next.sensorActive && next.items.length === 1 && next.passed === 1) {
