@@ -51,18 +51,18 @@ test("zero-time button evaluations do not accelerate timer ACC/PRE", () => {
   project = createTag(project, "T_Start", "Tiempo de espera", "TIMER");
   project = setTagValue(project, "T_Start", 1000, "PRE");
   project = insertInstruction(project, "rung-1", 0,
-    { id: "sensor", kind: "XIC", tag: "PB_Start" });
+    { id: "sensor", kind: "XIC", tag: "Start_PB" });
   project = insertInstruction(project, "rung-1", 1,
     { id: "delay", kind: "TON", tag: "T_Start" });
   let state = startPracticeScans(initialPracticeScanState(project));
   const acc = (s) => s.project.tags.find(t => t.name === "T_Start").value.ACC;
-  state = input(state, "PB_Start", true);
+  state = input(state, "Start_PB", true);
   assert.equal(acc(state), 0, "pressed input does not advance virtual time");
   state = tickPracticeScan(state);
   assert.equal(acc(state), 100);
-  state = input(state, "PB_Start", false);
+  state = input(state, "Start_PB", false);
   assert.equal(acc(state), 100, "release updates input only");
-  state = input(state, "PB_Start", true);
+  state = input(state, "Start_PB", true);
   assert.equal(acc(state), 100, "another press may evaluate but not add elapsed ms");
   state = tickPracticeScan(state);
   assert.equal(acc(state), 200);
