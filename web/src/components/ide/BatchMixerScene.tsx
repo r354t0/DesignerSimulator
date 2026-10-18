@@ -195,6 +195,10 @@ export function BatchMixerScene({project,mode,state,selectedExercise,setupError,
       INT_RatioP1:Number(draft.INT_RatioP1),
       INT_BatchTarget:Number(draft.INT_BatchTarget),
     });
+    // Keep the original Enter pushbutton as a real SCADA digital input.
+    // The editable HMI values themselves are ordinary INT tags, not BCD.
+    onInputChange("PB_Enter",true);
+    onInputChange("PB_Enter",false);
     setError("");
   };
   const bool=(name:string)=>running&&batchBool(project,name);
