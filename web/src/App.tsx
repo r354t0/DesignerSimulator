@@ -89,7 +89,7 @@ interface DemoMachineState {
 }
 
 function scanDemo(previous: DemoMachineState, elapsedMs: number): DemoMachineState {
-  const motorLatched = !previous.inputs.Stop_PB && (previous.inputs.Start_PB || previous.motorLatched);
+  const motorLatched = !previous.inputs.PB_Stop && (previous.inputs.PB_Start || previous.motorLatched);
   const values = evaluateDemo(previous.inputs, motorLatched);
   return {
     ...previous,
@@ -213,7 +213,7 @@ export default function App() {
     const id = window.setInterval(() => {
       const plc = scanRef.current;
       if (plc.mode !== "running" || activeControllerScene.current !== "conveyor") return;
-      const motorOn = readConveyorBool(plc.project, "Motor_Run");
+      const motorOn = readConveyorBool(plc.project, "DO_Motor");
       const next = stepConveyor(conveyorRef.current, motorOn, 50);
       if (next !== conveyorRef.current) changeConveyor(() => next);
       const sensorTag = plc.project.tags.find((tag) => tag.name === CONVEYOR_SENSOR_TAG);
@@ -233,14 +233,14 @@ export default function App() {
       const current = scanRef.current;
       if (current.mode !== "running" || activeControllerScene.current !== "sorting") return;
       const next = stepSortState(sortRef.current,
-        readSortBool(current.project, "Sort_Motor"),
-        readSortBool(current.project, "Sort_Divert"), 50);
+        readSortBool(current.project, "DO_Motor"),
+        readSortBool(current.project, "DO_Diverter"), 50);
       if (next !== sortRef.current) changeSort(() => next);
       const sensors: readonly [string, boolean][] = [
-        ["Sort_TypeB", next.sensorTypeB],
-        ["Sort_AExit", next.sensorExitA],
-        ["Sort_BExit", next.sensorExitB],
-        ["Sort_LineClear", next.lineClear],
+        ["DI_TypeB", next.sensorTypeB],
+        ["DI_ExitA", next.sensorExitA],
+        ["DI_ExitB", next.sensorExitB],
+        ["DI_LineClear", next.lineClear],
       ];
       for (const [name, value] of sensors) {
         const tag = scanRef.current.project.tags.find((item) => item.name === name);
@@ -262,17 +262,17 @@ export default function App() {
       if (current.mode !== "running" || activeControllerScene.current !== "traffic") return;
       const previous = trafficRef.current;
       const next = stepTrafficState(previous,
-        readTrafficBool(current.project, "Tr_NS_Green"),
-        readTrafficBool(current.project, "Tr_EW_Green"),
-        readTrafficBool(current.project, "Tr_Walk"), 50);
+        readTrafficBool(current.project, "DO_NS_GreenLight"),
+        readTrafficBool(current.project, "DO_EW_GreenLight"),
+        readTrafficBool(current.project, "DO_PedestrianWalk"), 50);
       if (next !== trafficRef.current) changeTraffic(() => next);
       // Sensor pulses are generated on a *new* vehicle exit. They always
       // fall before the next event, preserving CTU rising-edge semantics.
       changeScan(state => {
         let updated=state;
         for (const [tag,prev,now] of [
-          ["Tr_NSExit", previous.exitedNS, next.exitedNS],
-          ["Tr_EWExit", previous.exitedEW, next.exitedEW],
+          ["DI_NSExit", previous.exitedNS, next.exitedNS],
+          ["DI_EWExit", previous.exitedEW, next.exitedEW],
         ] as const) {
           const input=updated.project.tags.find(t=>t.name===tag);
           if (input?.type==="BOOL" && now>prev) {
@@ -283,8 +283,8 @@ export default function App() {
           }
         }
         for(const [tag,wants] of [
-          ["Tr_NSWaiting",trafficWaiting(next,"NS")],
-          ["Tr_EWWaiting",trafficWaiting(next,"EW")],
+          ["DI_NSWaiting",trafficWaiting(next,"NS")],
+          ["DI_EWWaiting",trafficWaiting(next,"EW")],
         ] as const) {
           const input=updated.project.tags.find(t=>t.name===tag);
           if(input?.type==="BOOL" && input.value!==wants)
@@ -304,20 +304,20 @@ export default function App() {
       const current = scanRef.current;
       if (current.mode !== "running" || activeControllerScene.current !== "tank") return;
       const next = stepTankState(tankRef.current,
-        readTankBool(current.project, "Tank_Pump"),
-        readTankBool(current.project, "Tank_InletValve"),
-        readTankBool(current.project, "Tank_DrainValve"), 50);
+        readTankBool(current.project, "DO_Pump"),
+        readTankBool(current.project, "DO_InletValve"),
+        readTankBool(current.project, "DO_DrainValve"), 50);
       if (next !== tankRef.current) changeTank(() => next);
       const sensorValues = tankSensorInputs(next.levelPercent);
       changeScan((state) => {
         let result = state;
         // Publish the REAL level first, then scan on BOOL level switches.
-        const valueTag = result.project.tags.find(t => t.name === "Tank_LevelPct");
-        if (valueTag?.type === "REAL" && valueTag.value !== sensorValues.Tank_LevelPct) {
+        const valueTag = result.project.tags.find(t => t.name === "AI_LevelPct");
+        if (valueTag?.type === "REAL" && valueTag.value !== sensorValues.AI_LevelPct) {
           result = changePracticeScanProject(result,
-            setTagValue(result.project, "Tank_LevelPct", sensorValues.Tank_LevelPct));
+            setTagValue(result.project, "AI_LevelPct", sensorValues.AI_LevelPct));
         }
-        for (const name of ["Tank_LowLS", "Tank_HighLS"] as const) {
+        for (const name of ["DI_LowLevel", "DI_HighLevel"] as const) {
           const value = sensorValues[name];
           const tag = result.project.tags.find(t => t.name === name);
           if (tag?.type === "BOOL" && tag.value !== value) {
@@ -366,17 +366,17 @@ export default function App() {
     changeScan((state) => changePracticeScanProject(state, next)), [changeScan]);
 
   const setTrafficInput = useCallback((tag:
-    "Tr_StartPB" | "Tr_StopPB" | "Tr_ResetPB" | "Tr_PedPB", pressed:boolean) => {
+    "PB_Start" | "PB_Stop" | "PB_Reset" | "PB_Pedestrian", pressed:boolean) => {
     if (activeControllerScene.current !== "traffic") return;
     changeScan(state => applyMomentaryBoolInput(state,tag,pressed,
-      tag==="Tr_PedPB" || tag==="Tr_ResetPB"));
+      tag==="PB_Pedestrian" || tag==="PB_Reset"));
   }, [changeScan]);
   const resetTraffic = useCallback(() => {
     if(scanRef.current.mode==="running")return;
     changeTraffic(() => initialTrafficState());
     changeScan(state=>{
       let updated=state;
-      for(const tag of ["Tr_NSWaiting","Tr_EWWaiting","Tr_NSExit","Tr_EWExit"]) {
+      for(const tag of ["DI_NSWaiting","DI_EWWaiting","DI_NSExit","DI_EWExit"]) {
         const input=updated.project.tags.find(t=>t.name===tag);
         if(input?.type==="BOOL" && input.value)
           updated=changePracticeScanProject(updated,
@@ -400,13 +400,13 @@ export default function App() {
   },[changeScan]);
 
   const setTankInput = useCallback((
-    tag: "Tank_StartPB" | "Tank_StopPB" | "Tank_DrainPB" | "Tank_ResetPB", pressed: boolean,
+    tag: "PB_Start" | "PB_Stop" | "PB_Drain" | "PB_Reset", pressed: boolean,
   ) => {
     // React may unmount a held momentary input when the scene changes.
     // Never dispatch that release event into a different MainRoutine project.
     if (activeControllerScene.current !== "tank") return;
     changeScan(state => applyMomentaryBoolInput(
-      state, tag, pressed, tag === "Tank_DrainPB" || tag === "Tank_ResetPB",
+      state, tag, pressed, tag === "PB_Drain" || tag === "PB_Reset",
     ));
   }, [changeScan]);
 
@@ -415,11 +415,11 @@ export default function App() {
     changeScan(current => {
       const initial = tankSensorInputs(initialTankState().levelPercent);
       let next = current;
-      if (next.project.tags.some(t => t.name === "Tank_LevelPct" && t.type === "REAL")) {
+      if (next.project.tags.some(t => t.name === "AI_LevelPct" && t.type === "REAL")) {
         next = changePracticeScanProject(next,
-          setTagValue(next.project, "Tank_LevelPct", initial.Tank_LevelPct));
+          setTagValue(next.project, "AI_LevelPct", initial.AI_LevelPct));
       }
-      for (const name of ["Tank_LowLS", "Tank_HighLS"] as const) {
+      for (const name of ["DI_LowLevel", "DI_HighLevel"] as const) {
         const tag = next.project.tags.find(t => t.name === name);
         if (tag?.type === "BOOL" && tag.value !== initial[name]) {
           next = applySceneSensorBoolInput(next, name, initial[name]);
@@ -443,7 +443,7 @@ export default function App() {
   }, [changeScan]);
 
   const setSortInput = useCallback((
-    tag: "Sort_StartPB" | "Sort_StopPB" | "Sort_ResetPB", value: boolean,
+    tag: "PB_Start" | "PB_Stop" | "PB_Reset", value: boolean,
   ) => {
     if (activeControllerScene.current !== "sorting") return;
     changeScan((state) => applySortMomentaryInput(state, tag, value));
@@ -452,16 +452,16 @@ export default function App() {
     changeSort(() => initialSortState());
     changeScan((current) => {
       let next = current;
-      for (const name of ["Sort_TypeB", "Sort_AExit", "Sort_BExit"]) {
+      for (const name of ["DI_TypeB", "DI_ExitA", "DI_ExitB"]) {
         if (next.project.tags.some((tag) =>
           tag.name === name && tag.type === "BOOL" && tag.value === true)) {
           next = applySortSensorInput(next, name, false);
         }
       }
       // A physically cleared scene has both lines empty.
-      const clear = next.project.tags.find(tag => tag.name === "Sort_LineClear");
+      const clear = next.project.tags.find(tag => tag.name === "DI_LineClear");
       if (clear?.type === "BOOL" && clear.value !== true) {
-        next = applySortSensorInput(next, "Sort_LineClear", true);
+        next = applySortSensorInput(next, "DI_LineClear", true);
       }
       return next;
     });
@@ -478,7 +478,7 @@ export default function App() {
     }
   }, [changeScan]);
 
-  const setConveyorInput = useCallback((tag: "Start_PB" | "Stop_PB" | "CV_ResetPB", value: boolean) => {
+  const setConveyorInput = useCallback((tag: "PB_Start" | "PB_Stop" | "PB_Reset", value: boolean) => {
     if (activeControllerScene.current !== "conveyor") return;
     changeScan(state => applyConveyorMomentaryInput(state, tag, value));
   }, [changeScan]);
