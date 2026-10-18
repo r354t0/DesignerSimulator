@@ -158,6 +158,10 @@ const M=(dst:string,source:string):Spec=>({
 /** Creates real, editable rungs using the same instruction set as the IDE. */
 export function createBatchSolution(exercise: BatchExercise): PracticeProject {
   let p=initialBatchProject();
+  if(exercise===5) {
+    p=setTagValue(p,"DI_ModeA",false);
+    p=setTagValue(p,"DI_ModeB",true);
+  }
   for (const tag of batchSolutionTags(exercise))
     p=createTag(p,tag.name,tag.description,tag.type);
   for(const tag of ["CNT_Volume","CNT_Product1","CNT_Lotes"]) {
@@ -270,6 +274,23 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
   rung("bm-display",[M("INT_DisplayValue",exercise===5?"CNT_Lotes.ACC":
     exercise>=4?"CNT_Product1.ACC":"CNT_Volume.ACC")]);
   return p;
+}
+
+/** Reset all physical status and auxiliary runtime memory without deleting
+ * any Ladder instruction, tag declaration or operator-entered INT setpoint. */
+export function resetBatchProgramState(project:PracticeProject):PracticeProject {
+  return {...project,tags:project.tags.map(tag=>{
+    if(tag.type==="BOOL"){
+      if(tag.name.startsWith("DI_Mode"))return tag;
+      return {...tag,value:tag.name==="DI_LowLevel"};
+    }
+    if(tag.type==="TIMER"&&typeof tag.value==="object")
+      return {...tag,value:{...tag.value,ACC:0,EN:false,TT:false,DN:false}};
+    if(tag.type==="COUNTER"&&typeof tag.value==="object")
+      return {...tag,value:{...tag.value,ACC:0,CU:false,CD:false,DN:false,OV:false,UN:false}};
+    if(tag.name==="INT_DisplayValue")return {...tag,value:0};
+    return tag;
+  })};
 }
 
 export interface BatchMixerState {
