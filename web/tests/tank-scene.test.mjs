@@ -23,9 +23,9 @@ test("tank MainRoutine starts empty, with documented process, timer and batch ta
   assert.equal(project.tags.length,24);
   assert.equal(project.rungs.length,1);
   assert.equal(project.rungs[0].instructions.length,0);
-  assert.equal(project.tags.find(t=>t.name==="Tank_LevelPct").value,TANK_INITIAL_PERCENT);
-  assert.equal(project.tags.find(t=>t.name==="Tank_LowLS").value,true);
-  assert.equal(project.tags.find(t=>t.name==="Tank_HighLS").value,false);
+  assert.equal(project.tags.find(t=>t.name==="AI_LevelPct").value,TANK_INITIAL_PERCENT);
+  assert.equal(project.tags.find(t=>t.name==="DI_LowLevel").value,true);
+  assert.equal(project.tags.find(t=>t.name==="DI_HighLevel").value,false);
   assert.equal(prepareTankTags(project),project);
   assert.equal(project.tags.some(t=>t.name==="Sort_Motor"||t.name==="Motor_Run"),false);
   for(const def of TANK_TAGS) assert.equal(project.tags.find(t=>t.name===def.name).description,def.description);
@@ -33,21 +33,21 @@ test("tank MainRoutine starts empty, with documented process, timer and batch ta
 
 test("tank automatic tag registration is idempotent, does not mutate user rungs or tags",()=>{
   let project=initialTankProject();
-  project=editTag(project,"Tank_Pump",{description:"Descripción personalizada"});
-  project=insertInstruction(project,"rung-1",0,{id:"custom",kind:"XIC",tag:"Tank_StartPB"});
+  project=editTag(project,"DO_Pump",{description:"Descripción personalizada"});
+  project=insertInstruction(project,"rung-1",0,{id:"custom",kind:"XIC",tag:"PB_Start"});
   const source=project.rungs;
   const update=prepareTankTags(project);
   assert.equal(update,project);
   assert.equal(update.rungs,source);
-  assert.equal(update.tags.find(t=>t.name==="Tank_Pump").description,"Descripción personalizada");
+  assert.equal(update.tags.find(t=>t.name==="DO_Pump").description,"Descripción personalizada");
   assert.equal(prepareTankTags(update),update);
 });
 
 test("tank tag registration rejects wrong type without partial mutation",()=>{
   let project=initialTankProject();
-  project=editTag(project,"Tank_LevelPct",{type:"BOOL"});
-  assert.throws(()=>prepareTankTags(project),/Tank_LevelPct.*REAL/);
-  assert.equal(project.tags.find(t=>t.name==="Tank_LevelPct").type,"BOOL");
+  project=editTag(project,"AI_LevelPct",{type:"BOOL"});
+  assert.throws(()=>prepareTankTags(project),/AI_LevelPct.*REAL/);
+  assert.equal(project.tags.find(t=>t.name==="AI_LevelPct").type,"BOOL");
 });
 
 test("tank reference Ladder builds with actual independent OR, TON and CTU",()=>{
@@ -60,13 +60,13 @@ test("tank reference Ladder builds with actual independent OR, TON and CTU",()=>
   assert.deepEqual(begin.instructions.map(i=>i.kind),
     ["OR_JUNCTION","XIC","XIO","XIO","XIO","OTL"]);
   assert.deepEqual(begin.instructions.slice(1,5).map(i=>i.tag),
-    ["Tank_RunCmd","Tank_FillStage","Tank_MixStage","Tank_DrainStage"]);
-  assert.equal(begin.instructions.at(-1).tag,"Tank_FillStage");
+    ["ST_RunEnable","ST_Filling","ST_Mixing","ST_Draining"]);
+  assert.equal(begin.instructions.at(-1).tag,"ST_Filling");
   assert.equal(begin.parallelBranches.length,1);
   assert.deepEqual(begin.parallelBranches[0].instructions.map(i=>i.tag),
-    ["Tank_ToFill"],"ToFill must bypass the entire upper contact chain");
+    ["ST_ToFill"],"ToFill must bypass the entire upper contact chain");
   assert.equal(begin.parallelBranches[0].endId,begin.instructions[4].id,
-    "ToFill branch must rejoin after Tank_DrainStage");
+    "ToFill branch must rejoin after ST_Draining");
   const joins=project.rungs.filter(r=>r.instructions.some(i=>i.kind==="OR_JUNCTION"));
   assert.ok(joins.length>=5,"the training template must use several real OR junctions");
   assert.ok(joins.every(r=>r.parallelBranches?.some(b=>b.instructions.length>0)));
@@ -75,12 +75,12 @@ test("tank reference Ladder builds with actual independent OR, TON and CTU",()=>
   for (const [name,pre] of Object.entries(TANK_TIMER_PRESETS)) {
     assert.equal(project.tags.find(t=>t.name===name).value.PRE,pre);
   }
-  assert.equal(project.tags.find(t=>t.name==="Tank_Batches").value.PRE,TANK_BATCH_TARGET);
+  assert.equal(project.tags.find(t=>t.name==="CNT_Batches").value.PRE,TANK_BATCH_TARGET);
   // Mix and drain activate in the same scan AFTER their source stage's OTU.
   // Drain-to-fill loops back to R1, therefore its OTL runs NEXT scan.
   for (const [transition, ending, start, oldStage, newStage] of [
-    ["tank-to-mix","tank-fill-end","tank-mix-begin","Tank_FillStage","Tank_MixStage"],
-    ["tank-to-drain","tank-mix-end","tank-drain-begin","Tank_MixStage","Tank_DrainStage"],
+    ["tank-to-mix","tank-fill-end","tank-mix-begin","ST_Filling","ST_Mixing"],
+    ["tank-to-drain","tank-mix-end","tank-drain-begin","ST_Mixing","ST_Draining"],
   ]) {
     const index = (id) => project.rungs.findIndex(r=>r.id===id);
     assert.ok(index(transition)<index(ending) && index(ending)<index(start),
@@ -88,8 +88,8 @@ test("tank reference Ladder builds with actual independent OR, TON and CTU",()=>
     const lookup = (id,kind,tag) => project.rungs[index(id)].instructions
       .some(i=>i.kind===kind && i.tag===tag);
     const signal = {
-      "tank-to-mix":"Tank_ToMix","tank-to-drain":"Tank_ToDrain",
-      "tank-to-fill":"Tank_ToFill",
+      "tank-to-mix":"ST_ToMix","tank-to-drain":"ST_ToDrain",
+      "tank-to-fill":"ST_ToFill",
     }[transition];
     assert.equal(lookup(transition,"OTE",signal),true);
     assert.equal(lookup(ending,"OTU",oldStage),true);
@@ -105,7 +105,7 @@ test("tank reference Ladder builds with actual independent OR, TON and CTU",()=>
     project.rungs.findIndex(r=>r.id==="tank-to-fill"),
     "batch CTU must be evaluated before deciding on another batch");
   assert.ok(project.rungs.find(r=>r.id==="tank-to-fill").instructions
-    .some(i=>i.kind==="XIO"&&i.tag==="Tank_Batches.DN"),
+    .some(i=>i.kind==="XIO"&&i.tag==="CNT_Batches.DN"),
     "the last batch cannot cause a fourth fill");
 });
 
@@ -118,10 +118,10 @@ test("tank physics is output-driven, capped and freezes in PLC STOP/PAUSE",()=>{
   assert.ok(fill.levelPercent>initial.levelPercent);
   const drain=stepTankState(fill,false,false,true,50);
   assert.ok(drain.levelPercent<fill.levelPercent);
-  assert.equal(tankSensorInputs(15).Tank_LowLS,true);
-  assert.equal(tankSensorInputs(15.01).Tank_LowLS,false);
-  assert.equal(tankSensorInputs(90).Tank_HighLS,true);
-  assert.equal(tankSensorInputs(89.99).Tank_HighLS,false);
+  assert.equal(tankSensorInputs(15).DI_LowLevel,true);
+  assert.equal(tankSensorInputs(15.01).DI_LowLevel,false);
+  assert.equal(tankSensorInputs(90).DI_HighLevel,true);
+  assert.equal(tankSensorInputs(89.99).DI_HighLevel,false);
   let state={...initial,levelPercent:99.9};
   state=stepTankState(state,true,true,false,150);
   assert.equal(state.levelPercent,100);
@@ -130,7 +130,7 @@ test("tank physics is output-driven, capped and freezes in PLC STOP/PAUSE",()=>{
 });
 
 function assertExclusiveStages(plc, context="scan") {
-  const active=["Tank_FillStage","Tank_MixStage","Tank_DrainStage"]
+  const active=["ST_Filling","ST_Mixing","ST_Draining"]
     .filter(tag=>readTankBool(plc.project,tag));
   assert.ok(active.length<=1,
     context+": more than one stage active: "+active.join(", "));
@@ -138,54 +138,54 @@ function assertExclusiveStages(plc, context="scan") {
 
 test("transition flags preserve OTU→OTL semantics in one scan",()=>{
   let plc=startPracticeScans(setScanPeriod(initialPracticeScanState(createTankExampleProject()),500));
-  plc=applyMomentaryBoolInput(plc,"Tank_StartPB",true);
-  plc=applyMomentaryBoolInput(plc,"Tank_StartPB",false);
+  plc=applyMomentaryBoolInput(plc,"PB_Start",true);
+  plc=applyMomentaryBoolInput(plc,"PB_Start",false);
   assertExclusiveStages(plc,"initial fill");
-  assert.equal(readTankBool(plc.project,"Tank_FillStage"),true);
+  assert.equal(readTankBool(plc.project,"ST_Filling"),true);
   // Simulate the physically consistent tank sensors at the end of filling.
-  plc=applySceneSensorBoolInput(plc,"Tank_LowLS",false);
-  plc=applySceneSensorBoolInput(plc,"Tank_HighLS",true);
+  plc=applySceneSensorBoolInput(plc,"DI_LowLevel",false);
+  plc=applySceneSensorBoolInput(plc,"DI_HighLevel",true);
   assertExclusiveStages(plc,"fill to mix");
-  assert.equal(readTankBool(plc.project,"Tank_ToMix"),true);
-  assert.equal(readTankBool(plc.project,"Tank_FillStage"),false);
-  assert.equal(readTankBool(plc.project,"Tank_MixStage"),true);
+  assert.equal(readTankBool(plc.project,"ST_ToMix"),true);
+  assert.equal(readTankBool(plc.project,"ST_Filling"),false);
+  assert.equal(readTankBool(plc.project,"ST_Mixing"),true);
   for(let i=0;i<8;i++) {
     plc=tickPracticeScan(plc);
     assertExclusiveStages(plc,"mixing countdown "+i);
   }
-  assert.equal(readTankBool(plc.project,"Tank_ToDrain"),true);
-  assert.equal(readTankBool(plc.project,"Tank_MixStage"),false);
-  assert.equal(readTankBool(plc.project,"Tank_DrainStage"),true);
-  plc=applySceneSensorBoolInput(plc,"Tank_HighLS",false);
-  plc=applySceneSensorBoolInput(plc,"Tank_LowLS",true);
+  assert.equal(readTankBool(plc.project,"ST_ToDrain"),true);
+  assert.equal(readTankBool(plc.project,"ST_Mixing"),false);
+  assert.equal(readTankBool(plc.project,"ST_Draining"),true);
+  plc=applySceneSensorBoolInput(plc,"DI_HighLevel",false);
+  plc=applySceneSensorBoolInput(plc,"DI_LowLevel",true);
   assertExclusiveStages(plc,"drain to next fill");
-  assert.equal(readTankBool(plc.project,"Tank_ToFill"),true);
-  assert.equal(readTankBool(plc.project,"Tank_DrainStage"),false);
-  assert.equal(readTankBool(plc.project,"Tank_FillStage"),false,
+  assert.equal(readTankBool(plc.project,"ST_ToFill"),true);
+  assert.equal(readTankBool(plc.project,"ST_Draining"),false);
+  assert.equal(readTankBool(plc.project,"ST_Filling"),false,
     "R1 is above the transition rung and must not latch FillStage in this scan");
-  assert.equal(plc.project.tags.find(t=>t.name==="Tank_Batches").value.ACC,1);
+  assert.equal(plc.project.tags.find(t=>t.name==="CNT_Batches").value.ACC,1);
   // The following scan loops back through R1, latches FillStage, then ToFill
   // resets as a non-retentive OTE without creating a separate rung 22.
   plc=tickPracticeScan(plc);
   assertExclusiveStages(plc,"return to fill through OR in rung 1");
-  assert.equal(readTankBool(plc.project,"Tank_FillStage"),true);
-  assert.equal(readTankBool(plc.project,"Tank_ToMix"),false);
-  assert.equal(readTankBool(plc.project,"Tank_ToDrain"),false);
-  assert.equal(readTankBool(plc.project,"Tank_ToFill"),false);
+  assert.equal(readTankBool(plc.project,"ST_Filling"),true);
+  assert.equal(readTankBool(plc.project,"ST_ToMix"),false);
+  assert.equal(readTankBool(plc.project,"ST_ToDrain"),false);
+  assert.equal(readTankBool(plc.project,"ST_ToFill"),false);
 });
 
 function stepPhysicalTank(plc,physics) {
   const next=stepTankState(physics,
-    readTankBool(plc.project,"Tank_Pump"),
-    readTankBool(plc.project,"Tank_InletValve"),
-    readTankBool(plc.project,"Tank_DrainValve"),50);
+    readTankBool(plc.project,"DO_Pump"),
+    readTankBool(plc.project,"DO_InletValve"),
+    readTankBool(plc.project,"DO_DrainValve"),50);
   const sensors=tankSensorInputs(next.levelPercent);
   let program=plc;
-  const l=program.project.tags.find(t=>t.name==="Tank_LevelPct");
-  if(l.value!==sensors.Tank_LevelPct){
-    program=changePracticeScanProject(program,setTagValue(program.project,"Tank_LevelPct",sensors.Tank_LevelPct));
+  const l=program.project.tags.find(t=>t.name==="AI_LevelPct");
+  if(l.value!==sensors.AI_LevelPct){
+    program=changePracticeScanProject(program,setTagValue(program.project,"AI_LevelPct",sensors.AI_LevelPct));
   }
-  for(const name of ["Tank_LowLS","Tank_HighLS"]){
+  for(const name of ["DI_LowLevel","DI_HighLevel"]){
     if(readTankBool(program.project,name)!==sensors[name]){
       program=applySceneSensorBoolInput(program,name,sensors[name]);
     }
@@ -195,96 +195,96 @@ function stepPhysicalTank(plc,physics) {
 
 test("tank preopens inlet, delays pump, mixes, drains and stops after three batches",()=>{
   let plc=startPracticeScans(setScanPeriod(initialPracticeScanState(createTankExampleProject()),500));
-  plc=applyMomentaryBoolInput(plc,"Tank_StartPB",true);
-  plc=applyMomentaryBoolInput(plc,"Tank_StartPB",false);
-  assert.equal(readTankBool(plc.project,"Tank_RunCmd"),true);
-  assert.equal(readTankBool(plc.project,"Tank_InletValve"),true);
-  assert.equal(readTankBool(plc.project,"Tank_Pump"),false);
+  plc=applyMomentaryBoolInput(plc,"PB_Start",true);
+  plc=applyMomentaryBoolInput(plc,"PB_Start",false);
+  assert.equal(readTankBool(plc.project,"ST_RunEnable"),true);
+  assert.equal(readTankBool(plc.project,"DO_InletValve"),true);
+  assert.equal(readTankBool(plc.project,"DO_Pump"),false);
   for (let i=0;i<2;i++) {
     plc=tickPracticeScan(plc);
-    assert.equal(readTankBool(plc.project,"Tank_Pump"),false);
+    assert.equal(readTankBool(plc.project,"DO_Pump"),false);
   }
   plc=tickPracticeScan(plc);
-  assert.equal(plc.project.tags.find(t=>t.name==="Tank_TStart").value.DN,true);
-  assert.equal(readTankBool(plc.project,"Tank_Pump"),true);
+  assert.equal(plc.project.tags.find(t=>t.name==="TMR_StartDelay").value.DN,true);
+  assert.equal(readTankBool(plc.project,"DO_Pump"),true);
 
   let physics=initialTankState();
   let mixed=false,drained=false,alarm=false,lowCleared=false,highSeen=false;
   for (let i=0;i<1450;i++) {
     ({plc,physics}=stepPhysicalTank(plc,physics));
     assertExclusiveStages(plc,"tank physical step "+i);
-    mixed ||= readTankBool(plc.project,"Tank_Mixer");
-    drained ||= readTankBool(plc.project,"Tank_DrainValve");
-    alarm ||= readTankBool(plc.project,"Tank_Alarm");
-    lowCleared ||= !readTankBool(plc.project,"Tank_LowLS");
-    highSeen ||= readTankBool(plc.project,"Tank_HighLS");
+    mixed ||= readTankBool(plc.project,"DO_Mixer");
+    drained ||= readTankBool(plc.project,"DO_DrainValve");
+    alarm ||= readTankBool(plc.project,"ALM_ProcessTimeout");
+    lowCleared ||= !readTankBool(plc.project,"DI_LowLevel");
+    highSeen ||= readTankBool(plc.project,"DI_HighLevel");
     if (i%10===9) plc=tickPracticeScan(plc);
     assertExclusiveStages(plc,"tank cyclic scan "+i);
-    const count=plc.project.tags.find(t=>t.name==="Tank_Batches").value.ACC;
-    if(count===TANK_BATCH_TARGET && !readTankBool(plc.project,"Tank_RunCmd"))break;
+    const count=plc.project.tags.find(t=>t.name==="CNT_Batches").value.ACC;
+    if(count===TANK_BATCH_TARGET && !readTankBool(plc.project,"ST_RunEnable"))break;
     if(i===1449) assert.fail("three-batch sequence did not complete");
   }
   assert.equal(alarm,false,"normal process must not trip either watchdog");
   assert.equal(mixed,true); assert.equal(drained,true);
   assert.equal(lowCleared,true);assert.equal(highSeen,true);
-  assert.equal(plc.project.tags.find(t=>t.name==="Tank_Batches").value.ACC,3);
-  for(const output of ["Tank_Pump","Tank_InletValve","Tank_Mixer","Tank_DrainValve"]){
+  assert.equal(plc.project.tags.find(t=>t.name==="CNT_Batches").value.ACC,3);
+  for(const output of ["DO_Pump","DO_InletValve","DO_Mixer","DO_DrainValve"]){
     assert.equal(readTankBool(plc.project,output),false,output);
   }
-  assert.equal(readTankBool(plc.project,"Tank_RunCmd"),false);
+  assert.equal(readTankBool(plc.project,"ST_RunEnable"),false);
   assert.ok(physics.levelPercent <= TANK_LOW_PERCENT);
 });
 
 test("fill watchdog faults with no level progress and keeps actuators safe",()=>{
   let plc=startPracticeScans(setScanPeriod(initialPracticeScanState(createTankExampleProject()),500));
-  plc=applyMomentaryBoolInput(plc,"Tank_StartPB",true);
-  plc=applyMomentaryBoolInput(plc,"Tank_StartPB",false);
+  plc=applyMomentaryBoolInput(plc,"PB_Start",true);
+  plc=applyMomentaryBoolInput(plc,"PB_Start",false);
   for(let i=0;i<45;i++)plc=tickPracticeScan(plc);
-  assert.equal(readTankBool(plc.project,"Tank_Alarm"),true);
-  assert.equal(readTankBool(plc.project,"Tank_RunCmd"),false);
-  for(const output of ["Tank_Pump","Tank_InletValve","Tank_Mixer","Tank_DrainValve"]){
+  assert.equal(readTankBool(plc.project,"ALM_ProcessTimeout"),true);
+  assert.equal(readTankBool(plc.project,"ST_RunEnable"),false);
+  for(const output of ["DO_Pump","DO_InletValve","DO_Mixer","DO_DrainValve"]){
     assert.equal(readTankBool(plc.project,output),false,output);
   }
   // RESET only while the automatic cycle is idle.
-  plc=applyMomentaryBoolInput(plc,"Tank_ResetPB",true,true);
-  assert.equal(readTankBool(plc.project,"Tank_Alarm"),false);
-  plc=applyMomentaryBoolInput(plc,"Tank_ResetPB",false,true);
+  plc=applyMomentaryBoolInput(plc,"PB_Reset",true,true);
+  assert.equal(readTankBool(plc.project,"ALM_ProcessTimeout"),false);
+  plc=applyMomentaryBoolInput(plc,"PB_Reset",false,true);
 });
 
 test("manual drain is blocked below LSL and during the automatic cycle",()=>{
   let p=createTankExampleProject();
   let plc=startPracticeScans(initialPracticeScanState(p));
-  plc=applyMomentaryBoolInput(plc,"Tank_DrainPB",true,true);
-  assert.equal(readTankBool(plc.project,"Tank_DrainValve"),false,"LSL is active");
-  plc=applyMomentaryBoolInput(plc,"Tank_DrainPB",false,true);
-  p=setTagValue(plc.project,"Tank_LowLS",false);
-  p=setTagValue(p,"Tank_LevelPct",30);
+  plc=applyMomentaryBoolInput(plc,"PB_Drain",true,true);
+  assert.equal(readTankBool(plc.project,"DO_DrainValve"),false,"LSL is active");
+  plc=applyMomentaryBoolInput(plc,"PB_Drain",false,true);
+  p=setTagValue(plc.project,"DI_LowLevel",false);
+  p=setTagValue(p,"AI_LevelPct",30);
   plc=changePracticeScanProject(plc,p);
-  plc=applyMomentaryBoolInput(plc,"Tank_DrainPB",true,true);
-  assert.equal(readTankBool(plc.project,"Tank_DrainValve"),true);
-  plc=applyMomentaryBoolInput(plc,"Tank_DrainPB",false,true);
-  assert.equal(readTankBool(plc.project,"Tank_DrainValve"),false);
-  plc=applyMomentaryBoolInput(plc,"Tank_StartPB",true);
-  plc=applyMomentaryBoolInput(plc,"Tank_StartPB",false);
-  plc=applyMomentaryBoolInput(plc,"Tank_DrainPB",true,true);
-  assert.equal(readTankBool(plc.project,"Tank_DrainValve"),false);
+  plc=applyMomentaryBoolInput(plc,"PB_Drain",true,true);
+  assert.equal(readTankBool(plc.project,"DO_DrainValve"),true);
+  plc=applyMomentaryBoolInput(plc,"PB_Drain",false,true);
+  assert.equal(readTankBool(plc.project,"DO_DrainValve"),false);
+  plc=applyMomentaryBoolInput(plc,"PB_Start",true);
+  plc=applyMomentaryBoolInput(plc,"PB_Start",false);
+  plc=applyMomentaryBoolInput(plc,"PB_Drain",true,true);
+  assert.equal(readTankBool(plc.project,"DO_DrainValve"),false);
 });
 
 test("STOP and PAUSE freeze the simulated process and timers",()=>{
   let plc=startPracticeScans(initialPracticeScanState(createTankExampleProject()));
-  plc=applyMomentaryBoolInput(plc,"Tank_StartPB",true);
-  plc=applyMomentaryBoolInput(plc,"Tank_StartPB",false);
-  assert.equal(readTankBool(plc.project,"Tank_InletValve"),true);
-  plc=applyMomentaryBoolInput(plc,"Tank_StopPB",true);
-  assert.equal(readTankBool(plc.project,"Tank_RunCmd"),false);
-  assert.equal(readTankBool(plc.project,"Tank_InletValve"),false);
-  plc=applyMomentaryBoolInput(plc,"Tank_StopPB",false);
+  plc=applyMomentaryBoolInput(plc,"PB_Start",true);
+  plc=applyMomentaryBoolInput(plc,"PB_Start",false);
+  assert.equal(readTankBool(plc.project,"DO_InletValve"),true);
+  plc=applyMomentaryBoolInput(plc,"PB_Stop",true);
+  assert.equal(readTankBool(plc.project,"ST_RunEnable"),false);
+  assert.equal(readTankBool(plc.project,"DO_InletValve"),false);
+  plc=applyMomentaryBoolInput(plc,"PB_Stop",false);
   plc=pausePracticeScans(plc);
   const scans=plc.scanCount;
-  const acc=plc.project.tags.find(t=>t.name==="Tank_TStart").value.ACC;
-  plc=applyMomentaryBoolInput(plc,"Tank_DrainPB",true,true);
+  const acc=plc.project.tags.find(t=>t.name==="TMR_StartDelay").value.ACC;
+  plc=applyMomentaryBoolInput(plc,"PB_Drain",true,true);
   assert.equal(plc.scanCount,scans);
-  assert.equal(plc.project.tags.find(t=>t.name==="Tank_TStart").value.ACC,acc);
+  assert.equal(plc.project.tags.find(t=>t.name==="TMR_StartDelay").value.ACC,acc);
   plc=stopPracticeScans(plc);
   assert.equal(plc.mode,"stopped");
 });
