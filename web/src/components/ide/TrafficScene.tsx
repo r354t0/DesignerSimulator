@@ -108,7 +108,8 @@ export function TrafficScene({project,mode,state,onInputChange,onAddVehicle,onRe
           </div>
         </header>
 
-        <section className="sort-panel rounded-lg border border-[#344c5e] p-3"
+        <div className="scada-scene-workspace">
+        <section className="sort-panel scada-process-panel rounded-lg border border-[#344c5e] p-3"
           aria-labelledby="traffic-process-title">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
             <h3 id="traffic-process-title" className="flex items-center gap-2 text-xs font-semibold">
@@ -194,7 +195,8 @@ export function TrafficScene({project,mode,state,onInputChange,onAddVehicle,onRe
           </div>
         </section>
 
-        <div className="scada-dashboard-grid grid gap-3">
+        <aside className="scada-scene-sidebar" aria-label="Controles e indicadores del SCADA">
+          <div className="scada-dashboard-grid grid gap-3">
           <section className="sort-panel rounded-lg border border-[#344c5e] p-2.5"
             aria-label="Tablero de mando">
             <h3 className="mb-2 flex items-center gap-2 text-[11px] font-semibold">
@@ -242,9 +244,9 @@ export function TrafficScene({project,mode,state,onInputChange,onAddVehicle,onRe
                 <div className="font-mono text-lg font-bold text-rose-300">{ewCount}</div></div>
             </div>
           </section>
-        </div>
+          </div>
 
-        <section className="sort-panel rounded-lg border border-[#344c5e] p-3">
+          <section className="sort-panel rounded-lg border border-[#344c5e] p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-xs font-semibold">Supervisión de ciclo</h3>
             <span className="text-[11px] text-sky-300">{phaseLabel}</span>
@@ -267,7 +269,9 @@ export function TrafficScene({project,mode,state,onInputChange,onAddVehicle,onRe
               </div>
             </div>
           </div>
-        </section>
+          </section>
+        </aside>
+        </div>
         {!valid&&<div role="alert" className="rounded border border-amber-700 bg-amber-950/30 p-3 text-xs">
           <p className="flex items-center gap-2 font-semibold text-amber-300">
             <CircleAlert size={15}/> Faltan tags de la escena
