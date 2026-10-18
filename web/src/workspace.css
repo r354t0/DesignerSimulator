@@ -84,49 +84,14 @@ button.ide-tree-row:hover {
 
 /* Scene 02: process-focused industrial SCADA panels. All operational state
    comes from the PLC model; these rules are presentation-only. */
-/* Neutral light HMI palette: #C0C0C0 work surface, off-white panels,
-   high-contrast text and saturated *only* operational LEDs/alarms. */
 .sort-scada-shell {
-  background: #c0c0c0;
-  color: #1a2732;
-  color-scheme: light;
+  background:
+    radial-gradient(ellipse at 28% -20%, rgba(34, 75, 101, .25), transparent 63%),
+    #0b1823;
 }
-.sort-scada-shell .sort-panel {
-  background: #f2f3f5;
-  border-color: #8d989f;
-  box-shadow: 0 1px 3px rgba(36, 48, 58, .12);
-}
-/* The scenes previously used charcoal cards for secondary readouts.
-   Neutralize only HTML containers, never the SVG machinery or signal LEDs. */
-.sort-scada-shell .sort-panel :is(div, section)[class*="bg-[#"] {
-  background-color: #e3e8ec !important;
-  border-color: #b1bcc4;
-}
-.sort-scada-shell .sort-panel button[class*="bg-[#"] {
-  background-color: #d9e7f0 !important;
-  border-color: #8ba7ba;
-  color: #154566 !important;
-}
-.sort-scada-shell :is(.text-slate-100, .text-slate-200, .text-slate-300) {
-  color: #1a2934 !important;
-}
-.sort-scada-shell :is(.text-slate-400, .text-slate-500) {
-  color: #4c5c68 !important;
-}
-.sort-scada-shell :is(.text-sky-200, .text-sky-300, .text-sky-400) {
-  color: #075985 !important;
-}
-.sort-scada-shell :is(.text-emerald-300, .text-emerald-400) {
-  color: #047857 !important;
-}
-.sort-scada-shell :is(.text-amber-300, .text-amber-400) {
-  color: #92400e !important;
-}
-.sort-scada-shell :is(.text-red-300, .text-red-400) {
-  color: #b91c1c !important;
-}
-.sort-scada-shell .sort-panel :is(.border-slate-700, .border-slate-600) {
-  border-color: #a4b0b9 !important;
+.sort-panel {
+  background: linear-gradient(145deg, #192c3b 0%, #12212e 100%);
+  box-shadow: inset 0 1px 0 rgba(193, 219, 233, .055);
 }
 .sort-process-canvas {
   box-shadow: inset 0 0 28px rgba(0, 0, 0, .18);
