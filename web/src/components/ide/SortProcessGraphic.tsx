@@ -65,7 +65,7 @@ function Photoeye({ x, y, name, active }: {
       <path d="M0 -22 V24" stroke={color} strokeWidth="1.7"
         strokeDasharray="4 4" opacity={active ? 1 : .48}/>
       <text x="14" y="-29" fontSize="10" fontWeight="600"
-        fill="#c9d9e7" fontFamily="Arial, sans-serif">{name}</text>
+        fill="#163c55" fontFamily="Arial, sans-serif" fontWeight="700">{name}</text>
     </g>
   );
 }
@@ -84,14 +84,14 @@ export function SortProcessGraphic({ state, motor, divert, detection }: Props) {
       " cajas en tránsito; motor " + (motor ? "encendido" : "detenido") +
       "; desviador hacia " + (divert ? "B" : "A") +
       "; salida A " + state.exitA + ", salida B " + state.exitB}
-      className="sort-process-canvas overflow-x-auto rounded-lg border border-[#31495b]">
+      className="sort-process-canvas scada-process-canvas overflow-x-auto rounded-lg border border-[#7d8992] bg-[#c0c0c0]">
       <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg"
         className="block h-auto w-full min-w-[600px]" aria-hidden="true">
         <defs>
           <pattern id="sort-floor-grid" width="24" height="24"
             patternUnits="userSpaceOnUse">
-            <path d="M24 0 H0 V24" stroke="#355064" strokeWidth=".7"
-              fill="none" opacity=".27"/>
+            <path d="M24 0 H0 V24" stroke="#65727a" strokeWidth=".7"
+              fill="none" opacity=".16"/>
           </pattern>
           <linearGradient id="sort-steel" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="#7790a2"/>
@@ -103,10 +103,10 @@ export function SortProcessGraphic({ state, motor, divert, detection }: Props) {
             <stop offset="100%" stopColor="#192c3c"/>
           </linearGradient>
         </defs>
-        <rect width="760" height="320" fill="#101f2c"/>
+        <rect width="760" height="320" fill="#c0c0c0"/>
         <rect width="760" height="320" fill="url(#sort-floor-grid)"/>
         <g fontFamily="Arial, sans-serif">
-          <text x="25" y="25" fill="#64859c" fontSize="10"
+          <text x="25" y="25" fill="#263b4b" fontSize="10"
             letterSpacing="1.8">TRANSPORTE Y DESVÍO · DV-01</text>
           <g fill="#152c3b" stroke="#476273" strokeWidth="1.3">
             <rect x="15" y="130" width="80" height="26" rx="4"/>
@@ -164,8 +164,8 @@ export function SortProcessGraphic({ state, motor, divert, detection }: Props) {
             fill="none" stroke="#8cbbca" strokeWidth="2.1"/>
         </g>
         <text x="102" y="295" textAnchor="middle" fontSize="10"
-          fontFamily="Arial, sans-serif"
-          fill={motor ? "#6ee7b7" : "#9db3c2"}>M-01</text>
+          fontFamily="Arial, sans-serif" fontWeight="700"
+          fill={motor ? "#047857" : "#334155"}>M-01</text>
 
         {/* Type detection station and actuator. */}
         <g transform={"translate(" + scanX + " " + GATE_Y + ")"}>
@@ -175,7 +175,7 @@ export function SortProcessGraphic({ state, motor, divert, detection }: Props) {
           <circle cx="0" cy="-32" r="3" fill={detection ? "#fbbf24" : "#38bdf8"}/>
           <path d="M0 -24 V24" stroke={detection ? "#fbbf24" : "#38bdf8"}
             strokeDasharray="4 4" strokeWidth="1.8" opacity=".85"/>
-          <text x="-15" y="-48" fontSize="10" fill="#bad2e1"
+          <text x="-15" y="-48" fontSize="10" fill="#183c51" fontWeight="700"
             fontFamily="Arial, sans-serif">ID-B</text>
         </g>
         <g transform={"translate(" + gateX + " " + GATE_Y + ")"}>
@@ -210,7 +210,7 @@ export function SortProcessGraphic({ state, motor, divert, detection }: Props) {
         })}
         <g fontFamily="Arial, sans-serif" fontSize="10" letterSpacing=".5">
           <circle cx="672" cy="304" r="4" fill={motor ? "#34d399" : "#64748b"}/>
-          <text x="683" y="308" fill="#b6cbd9">
+          <text x="683" y="308" fill="#334155" fontWeight="700">
             MOTOR {motor ? "RUN" : "OFF"}
           </text>
         </g>
