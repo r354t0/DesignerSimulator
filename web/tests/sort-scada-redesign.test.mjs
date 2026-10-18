@@ -53,7 +53,7 @@ test("SCADA process follows the header directly, without redundant KPI cards", (
   assert.match(view, /<SortProcessGraphic state=\{state\} motor=\{motor\}/);
   // Bottom pilot panel retains its compact batch progress, sourced from PLC tags.
   assert.match(view, /readSortCount\(project, "CNT_BatchBoxes"\)/);
-  assert.match(view, /readSortCount\(project, "CNT_Batches"\)/);
+  assert.match(view, /readSortCount\(project, "CNT_Lotes"\)/);
   assert.match(view, /typeof configuredPreset\.value\.PRE === "number"/);
   assert.match(view, /role="progressbar" aria-label="Cajas del lote"/);
   assert.match(view, /aria-valuemax=\{batchTarget\}/);
