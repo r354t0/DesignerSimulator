@@ -200,7 +200,7 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
   const init=[X("PB_Start"),X("DI_LowLevel"),N("ST_Filling"),
     ...(exercise>=2?[N("ST_Mixing"),N("ST_Draining")]:[])];
   if(advanced) init.push(X(exercise===4?"DI_ModeA":"DI_ModeB"));
-  if(exercise!==1) init.push(N("ST_BatchDone"));
+  if(exercise===2||exercise===4||exercise===5) init.push(N("ST_BatchDone"));
   rung("bm-start-fill",[...init,O("OTL","ST_Filling")]);
 
   // Product line 1 is always counted from FM1 pulses; advanced percentage
@@ -226,11 +226,8 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
     rung("bm-enter-mix",[X("ST_ToMix"),O("OTL","ST_Mixing")]);
     rung("bm-full-latch",[X("ST_ToMix"),O("OTL","ST_Full")]);
     rung("bm-full-lamp",[X("ST_Full"),O("OTE","DO_FullLamp")]);
-    rung("bm-mixer",[X("ST_RunEnable"),X("ST_Mixing"),O("OTE","DO_Mixer")]);
     if(advanced) {
       // The thermostat is BOOL; actual temperature is private scene physics.
-      rung("bm-heater",[X("ST_RunEnable"),X("ST_Mixing"),N("DI_Thermostat"),
-        O("OTE","DO_Heater")]);
       rung("bm-timer",[X("ST_RunEnable"),X("ST_Mixing"),X("DI_Thermostat"),
         O("RTO","TMR_PostTemp4s")]);
       rung("bm-to-drain",[X("ST_Mixing"),X("TMR_PostTemp4s.DN"),
@@ -245,7 +242,14 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
     rung("bm-clear-full",[X("ST_ToDrain"),O("OTU","ST_Full")]);
     rung("bm-reset-mix",[X("ST_ToDrain"),
       O("RES",advanced?"TMR_PostTemp4s":"TMR_Mix8s")]);
-    rung("bm-drain-pump",[X("ST_RunEnable"),X("ST_Draining"),O("OTE","DO_Pump3")]);
+    // Keep actuator coils AFTER the phase transition so they deenergize on
+    // the exact scan where the timer reaches DN.
+    rung("bm-mixer",[X("ST_RunEnable"),X("ST_Mixing"),O("OTE","DO_Mixer")]);
+    if(advanced) rung("bm-heater",[
+      X("ST_RunEnable"),X("ST_Mixing"),N("DI_Thermostat"),O("OTE","DO_Heater")]);
+    rung("bm-drain-pump",[X("ST_RunEnable"),X("ST_Draining"),
+      advanced?N("DI_LowLevel"):C("GRT","CNT_Volume.ACC",0),
+      O("OTE","DO_Pump3")]);
     if(!advanced)
       rung("bm-ctd-volume",[X("DI_Flowmeter3"),O("CTD","CNT_Volume")]);
     rung("bm-drained",[X("ST_Draining"),emptyCondition,O("OTE","ST_ToDone")]);
