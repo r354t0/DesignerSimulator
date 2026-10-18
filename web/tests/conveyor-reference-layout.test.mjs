@@ -25,19 +25,19 @@ test("scene 1 solution follows the image: motor, stop request, CTU and RES in th
     ["OR_JUNCTION","XIC","OTE"],
     ["XIC","CTU"],["XIO","XIC","RES"],
   ]);
-  assert.equal(motor.instructions[1].tag,"Start_PB");
-  assert.equal(motor.instructions[2].tag,"CV_StopRequest");
-  assert.equal(motor.instructions[3].tag,"Motor_Run");
-  assert.deepEqual(motor.parallelBranches[0].instructions.map(i=>i.tag),["Motor_Run"]);
+  assert.equal(motor.instructions[1].tag,"PB_Start");
+  assert.equal(motor.instructions[2].tag,"ST_StopRequest");
+  assert.equal(motor.instructions[3].tag,"DO_Motor");
+  assert.deepEqual(motor.parallelBranches[0].instructions.map(i=>i.tag),["DO_Motor"]);
   assert.equal(motor.parallelBranches[0].endId,motor.instructions[1].id,
     "STOP contact must be AFTER the OR reunion");
-  assert.equal(stop.instructions[1].tag,"Stop_PB");
-  assert.equal(stop.instructions[2].tag,"CV_StopRequest");
+  assert.equal(stop.instructions[1].tag,"PB_Stop");
+  assert.equal(stop.instructions[2].tag,"ST_StopRequest");
   assert.deepEqual(stop.parallelBranches[0].instructions.map(i=>i.tag),
-    ["CV_Count.DN","CV_BoxSensor"]);
-  assert.deepEqual(count.instructions.map(i=>i.tag),["CV_BoxSensor","CV_Count"]);
+    ["CNT_Boxes.DN","DI_BoxSensor"]);
+  assert.deepEqual(count.instructions.map(i=>i.tag),["DI_BoxSensor","CNT_Boxes"]);
   assert.deepEqual(reset.instructions.map(i=>i.tag),
-    ["CV_BoxSensor","CV_ResetPB","CV_Count"]);
+    ["DI_BoxSensor","PB_Reset","CNT_Boxes"]);
 });
 
 test("PE-01 stops the five-box batch only once the final box fully exits the belt", () => {
@@ -53,9 +53,9 @@ test("PE-01 stops the five-box batch only once the final box fully exits the bel
     "PE-01 must remain occupied until the fifth box is removed");
   let plc=startPracticeScans(setScanPeriod(
     initialPracticeScanState(createConveyorExampleProject()),500));
-  plc=applyConveyorMomentaryInput(plc,"Start_PB",true);
-  plc=applyConveyorMomentaryInput(plc,"Start_PB",false);
-  assert.equal(readConveyorBool(plc.project,"Motor_Run"),true);
+  plc=applyConveyorMomentaryInput(plc,"PB_Start",true);
+  plc=applyConveyorMomentaryInput(plc,"PB_Start",false);
+  assert.equal(readConveyorBool(plc.project,"DO_Motor"),true);
   let belt=addConveyorItem(initialConveyorState()),lastId=1;
   let stoppedAt=-1;
   for(let i=0;i<190;i++){
@@ -63,20 +63,20 @@ test("PE-01 stops the five-box batch only once the final box fully exits the bel
       belt=addConveyorItem(belt);
       lastId++;
     }
-    const next=stepConveyor(belt,readConveyorBool(plc.project,"Motor_Run"),50);
+    const next=stepConveyor(belt,readConveyorBool(plc.project,"DO_Motor"),50);
     if(next.sensorActive!==belt.sensorActive){
       plc=applyConveyorPhotoeyeInput(plc,next.sensorActive);
     }
     belt=next;
     if((i+1)%10===0)plc=tickPracticeScan(plc);
-    if(lastId===5 && !readConveyorBool(plc.project,"Motor_Run")){
+    if(lastId===5 && !readConveyorBool(plc.project,"DO_Motor")){
       stoppedAt=i;
       break;
     }
   }
   assert.equal(readConveyorCount(plc.project),5);
   assert.ok(stoppedAt>=0,"batch must stop at five");
-  assert.equal(readConveyorBool(plc.project,"CV_StopRequest"),true);
+  assert.equal(readConveyorBool(plc.project,"ST_StopRequest"),true);
   assert.equal(belt.passed,5,
     "all five physical boxes must have completed discharge before batch stop");
   assert.equal(belt.items.length,0,
@@ -84,7 +84,7 @@ test("PE-01 stops the five-box batch only once the final box fully exits the bel
   assert.equal(belt.sensorActive,false,
     "PE-01 is clear once the fifth box passes the outlet");
   for(let i=0;i<20;i++){
-    const next=stepConveyor(belt,readConveyorBool(plc.project,"Motor_Run"),50);
+    const next=stepConveyor(belt,readConveyorBool(plc.project,"DO_Motor"),50);
     assert.strictEqual(next,belt,"stationary motor must not move boxes");
   }
 });
@@ -111,37 +111,37 @@ test("photoeye stays HIGH until a box completely leaves the discharge mouth",()=
 test("quick STOP works with motor rung before stop-request rung, and release permits restart",()=>{
   let p=startPracticeScans(setScanPeriod(
     initialPracticeScanState(createConveyorExampleProject()),500));
-  p=applyConveyorMomentaryInput(p,"Start_PB",true);
-  p=applyConveyorMomentaryInput(p,"Start_PB",false);
-  assert.equal(readConveyorBool(p.project,"Motor_Run"),true);
-  p=applyConveyorMomentaryInput(p,"Stop_PB",true);
-  assert.equal(readConveyorBool(p.project,"Motor_Run"),false,
+  p=applyConveyorMomentaryInput(p,"PB_Start",true);
+  p=applyConveyorMomentaryInput(p,"PB_Start",false);
+  assert.equal(readConveyorBool(p.project,"DO_Motor"),true);
+  p=applyConveyorMomentaryInput(p,"PB_Stop",true);
+  assert.equal(readConveyorBool(p.project,"DO_Motor"),false,
     "STOP must propagate without waiting another 500ms cyclic scan");
-  p=applyConveyorMomentaryInput(p,"Stop_PB",false);
-  assert.equal(readConveyorBool(p.project,"CV_StopRequest"),false);
-  p=applyConveyorMomentaryInput(p,"Start_PB",true);
-  assert.equal(readConveyorBool(p.project,"Motor_Run"),true);
+  p=applyConveyorMomentaryInput(p,"PB_Stop",false);
+  assert.equal(readConveyorBool(p.project,"ST_StopRequest"),false);
+  p=applyConveyorMomentaryInput(p,"PB_Start",true);
+  assert.equal(readConveyorBool(p.project,"DO_Motor"),true);
 });
 
 test("compact auto descriptions replace only old default copy, not user edits",()=>{
   const defaults=[...CONVEYOR_TAGS,...CONVEYOR_TEMPLATE_TAGS];
   assert.ok(defaults.every(item=>item.description.length<=19));
   const oldCopy=new Map([
-    ["Start_PB","Faja: pulsador START de marcha"],
-    ["Stop_PB","Faja: pulsador STOP de parada"],
-    ["CV_BoxSensor","Faja: sensor fotoeléctrico de presencia de caja (PE-01)"],
-    ["Motor_Run","Faja: orden de marcha del motor transportador"],
-    ["CV_Count","Faja: contador CTU de cajas detectadas por PE-01"],
-    ["CV_ResetPB","Faja: pulsador momentáneo RESET LOTE"],
-    ["CV_StopRequest","Faja: solicitud de parada por STOP o lote completo"],
+    ["PB_Start","Faja: pulsador START de marcha"],
+    ["PB_Stop","Faja: pulsador STOP de parada"],
+    ["DI_BoxSensor","Faja: sensor fotoeléctrico de presencia de caja (PE-01)"],
+    ["DO_Motor","Faja: orden de marcha del motor transportador"],
+    ["CNT_Boxes","Faja: contador CTU de cajas detectadas por PE-01"],
+    ["PB_Reset","Faja: pulsador momentáneo RESET LOTE"],
+    ["ST_StopRequest","Faja: solicitud de parada por STOP o lote completo"],
   ]);
   let p=createConveyorExampleProject();
   for (const [name,description]of oldCopy)p=editTag(p,name,{description});
   p=prepareConveyorTags(p);
   for (const spec of defaults)assert.equal(
     p.tags.find(item=>item.name===spec.name).description,spec.description);
-  p=editTag(p,"CV_BoxSensor",{description:"Sensor modificado por operador"});
-  p=editTag(p,"CV_StopRequest",{description:"Parada personalizada"});
+  p=editTag(p,"DI_BoxSensor",{description:"Sensor modificado por operador"});
+  p=editTag(p,"ST_StopRequest",{description:"Parada personalizada"});
   assert.equal(prepareConveyorTags(p),p,"customized tags must remain unchanged");
   const basic=initialConveyorProject();
   assert.equal(basic.tags.length,5,"extra template tags stay opt-in");
@@ -154,8 +154,8 @@ test("numbered rung gutter no longer displays 6-point grip and stays draggable",
   assert.doesNotMatch(editor,/<GripVertical/);
   assert.match(editor,/aria-label=\{"Seleccionar o arrastrar rung " \+ rungIndex\}/);
   assert.match(editor,/onDragStart=\{\(event\) => beginRungMove\(event, rung.id\)\}/);
-  assert.match(info,/Rung 0: OR \(Start_PB \| Motor_Run\)/);
-  assert.match(info,/Rung 2: CV_BoxSensor → CTU CV_Count/);
+  assert.match(info,/Rung 0: OR \(PB_Start \| DO_Motor\)/);
+  assert.match(info,/Rung 2: DI_BoxSensor → CTU CNT_Boxes/);
   assert.match(app,/applyConveyorPhotoeyeInput\(current, next.sensorActive\)/);
   assert.match(app,/applyConveyorMomentaryInput\(state, tag, value\)/);
 });
