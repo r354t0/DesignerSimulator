@@ -4,6 +4,8 @@ import { Cpu, Menu, PanelLeftClose, PanelLeftOpen, CircleHelp, BookOpen } from "
 import { ControllerOrganizer, type EditorView } from "./components/ide/ControllerOrganizer";
 import { ControllerTags } from "./components/ide/ControllerTags";
 import { PracticeEditor } from "./components/ide/PracticeEditor";
+import { CrossReferencePanel } from "./components/ide/CrossReferencePanel";
+import type { TagReference } from "./plc/practiceCrossReference";
 import { setTagValue, type EditableKind, type PracticeProject } from "./plc/practiceDocument";
 import {
   initialPracticeScanState, changePracticeScanProject,
@@ -117,6 +119,11 @@ export default function App() {
   // Each scene keeps the learner's program immediately before inserting
   // its reference solution. Switching scenes must not discard that snapshot.
   const solutionSnapshots = useRef<Partial<Record<ProgrammingScene, PracticeProject>>>({});
+  const [crossReferenceTag, setCrossReferenceTag] = useState<string | null>(null);
+  const [referenceNavigation, setReferenceNavigation] = useState<{
+    instructionId: string; rungId: string; branchId?: string; token: number;
+  } | null>(null);
+  const referenceSerial = useRef(0);
   const practice = scanState.project;
   const practiceMode = scanState.mode;
   // Serialize timer ticks and input/UI edits against the same synchronous
@@ -553,6 +560,15 @@ export default function App() {
     setEditorView(view);
   }, [model]);
 
+  const navigateToReference = useCallback((ref: TagReference) => {
+    setCrossReferenceTag(null);
+    setReferenceNavigation({
+      instructionId: ref.instructionId, rungId: ref.rungId,
+      branchId: ref.branchId, token: ++referenceSerial.current,
+    });
+    openEditorView("practice");
+  }, [openEditorView]);
+
   const loadTrafficExample = useCallback(() => {
     if (!window.confirm(
       "Se reemplazarán MainRoutine y Controller Tags de la escena SEMÁFOROS. ¿Continuar?",
@@ -674,11 +690,13 @@ export default function App() {
               }}
               onPaletteDragStart={onToolbarDragStart}
               onPaletteDragEnd={() => setDraggingKind(null)}
+              onCrossReference={setCrossReferenceTag}
+              navigateToReference={referenceNavigation}
             />
           );
 
         case "tags":
-          return <ControllerTags activeScene={simulationTab} project={practice} onChange={handlePracticeChange} practiceRunning={practiceMode !== "stopped"} practicePaused={practiceMode === "paused"} online={online} inputs={inputs} values={values} onTagChange={handleTagChange} onResetCounters={handleResetCounters} />;
+          return <ControllerTags activeScene={simulationTab} project={practice} onChange={handlePracticeChange} practiceRunning={practiceMode !== "stopped"} practicePaused={practiceMode === "paused"} online={online} inputs={inputs} values={values} onTagChange={handleTagChange} onResetCounters={handleResetCounters} onCrossReference={setCrossReferenceTag} />;
         case "simulation":
           return (
             <div className="flex h-full min-h-0 flex-col bg-[#111c27]">
@@ -748,7 +766,8 @@ export default function App() {
       }
     },
     [online, inputs, values, blocks, practice, practiceMode, scanState, instruction,
-      draggingKind, nextPracticeId, handlePracticeChange, startPractice, stopPractice,
+      draggingKind, nextPracticeId, handlePracticeChange, referenceNavigation,
+      startPractice, stopPractice,
       pausePractice, resumePractice, stepPractice, changeScanPeriod, handleTagChange,
       handleResetCounters, openEditorView, onToolbarDragStart, simulationTab, conveyor,
       setConveyorInput, changeConveyor, resetConveyor, prepareConveyor,
@@ -832,6 +851,11 @@ export default function App() {
             : "Motor · DEMO"}
         </span>
       </footer>
+      {crossReferenceTag && (
+        <CrossReferencePanel tag={crossReferenceTag} project={practice}
+          onClose={() => setCrossReferenceTag(null)}
+          onNavigate={navigateToReference}/>
+      )}
     </div>
   );
 }
