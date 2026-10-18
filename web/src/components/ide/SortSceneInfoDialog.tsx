@@ -103,11 +103,11 @@ export function SortSceneInfoDialog({ open, project, onClose, onOpenTags, onLoad
               <p>R3: DI_ExitA → CTU CNT_ExitA</p>
               <p>R4: DI_ExitB → CTU CNT_ExitB</p>
               <p>R5: OR (DI_ExitA | DI_ExitB) → CTU CNT_BatchBoxes (PRE=6)</p>
-              <p>R6: CNT_BatchBoxes.DN + DI_LineClear → CTU CNT_Batches</p>
+              <p>R6: CNT_BatchBoxes.DN + DI_LineClear → CTU CNT_Lotes</p>
               <p>R7–R9: DI_LineClear + PB_Reset → RES CountA / CountB / CountTotal</p>
               <p className="pt-2 font-sans text-slate-400">
                 La parada automática espera la descarga de todas las cajas.
-                RESET LOTE funciona solo con ambas líneas vacías y no borra CNT_Batches.
+                RESET LOTE funciona solo con ambas líneas vacías y no borra CNT_Lotes.
               </p>
             </div>
           </details>
