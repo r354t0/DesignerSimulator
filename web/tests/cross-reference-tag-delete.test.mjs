@@ -74,10 +74,11 @@ test("context menus provide Cross Reference and Controller Tags supports Supr",(
   assert.match(cross,/onNavigate\(ref\)/);
 });
 
-test("SCADA uses neutral gray background and pale cards without hiding LED states",()=>{
+test("SCADA preserves original dark background and contrast in all four scenes",()=>{
   const css=view("../src/workspace.css");
-  assert.match(css,/\.sort-scada-shell \{\s*background: #c0c0c0;/);
-  assert.match(css,/\.sort-scada-shell \.sort-panel \{\s*background: #f2f3f5;/);
+  assert.match(css,/\.sort-scada-shell \{\s*background:[\s\S]*?#0b1823;/);
+  assert.match(css,/\.sort-panel \{\s*background: linear-gradient\(145deg, #192c3b 0%, #12212e 100%\)/);
+  assert.doesNotMatch(css,/Neutral light HMI palette|background: #c0c0c0/);
   for(const name of ["Conveyor","Sort","Tank","Traffic"]){
     const scene=view("../src/components/ide/"+name+"Scene.tsx");
     assert.match(scene,/sort-scada-shell scada-control-shell/);
