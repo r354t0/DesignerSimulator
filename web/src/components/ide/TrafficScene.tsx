@@ -20,6 +20,7 @@ interface Props {
   setupError:string|null;
   onOpenTags:()=>void;
   onLoadExample:()=>void;
+  onResetExample:()=>void;
 }
 
 function Led({label,lit,tone="green"}:{
@@ -51,7 +52,7 @@ function Lamp({x,y,green,yellow,red,title}:{
   </g>;
 }
 export function TrafficScene({project,mode,state,onInputChange,onAddVehicle,onReset,
-  onPrepareTags,setupError,onOpenTags,onLoadExample}:Props) {
+  onPrepareTags,setupError,onOpenTags,onLoadExample,onResetExample}:Props) {
   const [infoOpen,setInfoOpen]=useState(false);
   const running=mode==="running";
   const b=(name:string)=>running&&readTrafficBool(project,name);
@@ -280,7 +281,7 @@ export function TrafficScene({project,mode,state,onInputChange,onAddVehicle,onRe
       </div>
       <TrafficSceneInfoDialog open={infoOpen} project={project}
         onClose={()=>setInfoOpen(false)} onOpenTags={onOpenTags}
-        onLoadExample={onLoadExample}/>
+        onLoadExample={onLoadExample} onResetExample={onResetExample}/>
     </section>
   );
 }
