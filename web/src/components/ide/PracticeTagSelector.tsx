@@ -27,17 +27,31 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
   const [expandedTimers, setExpandedTimers] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const keyboardNavigation = useRef(false);
   const rows = useMemo(() =>
     getTagPickerRows(tags, selector.kind as EditableKind, query, expandedTimers),
     [tags, selector.kind, query, expandedTimers]);
   const suggestions = selector.mode === "suggestions";
-  const shown = suggestions ? rows.slice(0, 8) : rows;
+  // Show every compatible tag in both selector modes. The quick popup stays
+  // compact through a scrollable viewport rather than silently hiding rows.
+  const shown = rows;
   const selectable = shown.filter((row) => row.selectable);
   const toggleExpanded = (name: string) => {
     setExpandedTimers((previous) => previous.includes(name)
       ? previous.filter((item) => item !== name) : [...previous, name]);
     setActiveIndex(0);
   };
+
+  // Arrow navigation must also reach entries beyond the visible popup height.
+  // Do not reposition the list on ordinary mouse hover.
+  useEffect(() => {
+    if (!keyboardNavigation.current) return;
+    keyboardNavigation.current = false;
+    scrollRef.current?.querySelector<HTMLElement>(
+      '[data-tag-picker-active="true"]',
+    )?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, shown]);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -71,6 +85,7 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
     }
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       event.preventDefault();
+      keyboardNavigation.current = true;
       setActiveIndex((current) =>
         selectable.length === 0 ? 0 :
         event.key === "ArrowDown" ? (current + 1) % selectable.length : (current - 1 + selectable.length) % selectable.length);
@@ -97,7 +112,8 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
   );
 
   const tableRows = (
-    <div className={suggestions ? "max-h-[250px] overflow-y-auto" : "max-h-[340px] overflow-y-auto"}>
+    <div ref={scrollRef}
+      className={suggestions ? "max-h-[250px] overflow-y-auto" : "max-h-[340px] overflow-y-auto"}>
       {shown.length === 0 ? (
         <p className="px-4 py-5 text-center text-xs text-slate-500">No se encontraron variables compatibles.</p>
       ) : (
@@ -119,6 +135,7 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
                     <button type="button"
                       aria-label={(row.expandable ? (row.expanded ? "Contraer " : "Expandir ") : "Asignar tag ") + row.name}
                       aria-selected={isActive}
+                      data-tag-picker-active={isActive ? "true" : undefined}
                       aria-expanded={row.expandable ? row.expanded : undefined}
                       disabled={!row.selectable && !row.expandable}
                       onMouseEnter={() => { if (selectableIndex >= 0) setActiveIndex(selectableIndex); }}
@@ -175,7 +192,9 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
         </div>
         {searchField}
         <div className="mt-2 rounded border border-slate-200">{tableRows}</div>
-        <p className="pt-2 text-[10px] text-slate-500">Escribe para filtrar · ↑ ↓ seleccionar · Enter asignar · Esc cerrar</p>
+        <p className="pt-2 text-[10px] text-slate-500">
+          {selectable.length} variable(s) compatible(s) · Desplázate para ver todas · ↑ ↓ seleccionar · Enter asignar · Esc cerrar
+        </p>
       </div>,
       document.body,
     );
