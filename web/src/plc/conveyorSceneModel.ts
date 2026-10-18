@@ -57,18 +57,17 @@ export const CONVEYOR_TAGS: readonly ConveyorTagDefinition[] = [
       "Faja: orden de marcha del motor transportador (salida digital)",
     ],
   },
+  { name: "PB_Reset", type: "BOOL", direction: "Entrada",
+    description: "RESET lote" },
+];
+/** Extra tags installed only when the advanced Ladder solution is loaded. */
+export const CONVEYOR_TEMPLATE_TAGS: readonly ConveyorTagDefinition[] = [
   {
     name: CONVEYOR_COUNT_TAG, type: "COUNTER", direction: "Interna",
     description: "Conteo de cajas",
     legacyDescriptions: ["Faja: contador CTU de cajas detectadas por PE-01"],
     initialDescription: "Piezas que cruzaron el sensor",
   },
-];
-/** Extra tags installed only when the advanced Ladder solution is loaded. */
-export const CONVEYOR_TEMPLATE_TAGS: readonly ConveyorTagDefinition[] = [
-  { name: "PB_Reset", type: "BOOL", direction: "Entrada",
-    description: "RESET lote",
-    legacyDescriptions: ["Faja: pulsador momentáneo RESET LOTE"] },
   { name: "ST_StopRequest", type: "BOOL", direction: "Interna",
     description: "Parada STOP/lote",
     legacyDescriptions: ["Faja: solicitud de parada por STOP o lote completo"] },
