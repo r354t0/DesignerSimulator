@@ -52,8 +52,8 @@ test("SCADA process follows the header directly, without redundant KPI cards", (
   assert.doesNotMatch(styles, /\.sort-kpi/);
   assert.match(view, /<SortProcessGraphic state=\{state\} motor=\{motor\}/);
   // Bottom pilot panel retains its compact batch progress, sourced from PLC tags.
-  assert.match(view, /readSortCount\(project, "Sort_CountTotal"\)/);
-  assert.match(view, /readSortCount\(project, "Sort_Batches"\)/);
+  assert.match(view, /readSortCount\(project, "CNT_BatchBoxes"\)/);
+  assert.match(view, /readSortCount\(project, "CNT_Batches"\)/);
   assert.match(view, /typeof configuredPreset\.value\.PRE === "number"/);
   assert.match(view, /role="progressbar" aria-label="Cajas del lote"/);
   assert.match(view, /aria-valuemax=\{batchTarget\}/);
@@ -65,9 +65,9 @@ test("momentary START, STOP, RESET and both add-box inputs are preserved", () =>
   assert.match(view, /<MomentaryPushButton compact name="START" tone="start" pressed=\{start\}/);
   assert.match(view, /<MomentaryPushButton compact name="STOP" tone="stop" pressed=\{stop\}/);
   assert.match(view, /<MomentaryPushButton compact name="RESET LOTE" tone="drain" pressed=\{reset\}/);
-  assert.match(view, /onChange=\{\(v\) => onInputChange\("Sort_StartPB", v\)\}/);
-  assert.match(view, /onChange=\{\(v\) => onInputChange\("Sort_StopPB", v\)\}/);
-  assert.match(view, /onChange=\{\(v\) => onInputChange\("Sort_ResetPB", v\)\}/);
+  assert.match(view, /onChange=\{\(v\) => onInputChange\("PB_Start", v\)\}/);
+  assert.match(view, /onChange=\{\(v\) => onInputChange\("PB_Stop", v\)\}/);
+  assert.match(view, /onChange=\{\(v\) => onInputChange\("PB_Reset", v\)\}/);
   assert.match(view, /onClick=\{\(\) => onAddBox\("A"\)\} disabled=\{!canFeed\}/);
   assert.match(view, /onClick=\{\(\) => onAddBox\("B"\)\} disabled=\{!canFeed\}/);
   assert.match(view, /const canFeed = canAddSortBox\(state\)/);
@@ -92,8 +92,8 @@ test("render-only redesign keeps advanced PLC sort logic intact", () => {
   const p = createSortExampleProject();
   assert.equal(buildPracticeProject(p).success, true);
   assert.equal(p.rungs.length, 10);
-  assert.equal(readSortCount(p, "Sort_CountTotal"), 0);
-  assert.equal(readSortBool(p, "Sort_Motor"), false);
+  assert.equal(readSortCount(p, "CNT_BatchBoxes"), 0);
+  assert.equal(readSortBool(p, "DO_Motor"), false);
   let belt = addSortBox(initialSortState(), "A");
   belt = stepSortState(belt, false, true, 50);
   assert.equal(belt.items[0].position, 0.045,
