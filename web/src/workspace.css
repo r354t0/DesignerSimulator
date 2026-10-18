@@ -93,8 +93,14 @@ button.ide-tree-row:hover {
   background: linear-gradient(145deg, #192c3b 0%, #12212e 100%);
   box-shadow: inset 0 1px 0 rgba(193, 219, 233, .055);
 }
+/* Light-gray simulation surface only. Toolbars, LED boards and status
+   cards retain the original dark SCADA appearance. */
+.scada-process-canvas {
+  background: #c0c0c0;
+  border-color: #7d8992;
+}
 .sort-process-canvas {
-  box-shadow: inset 0 0 28px rgba(0, 0, 0, .18);
+  box-shadow: inset 0 0 14px rgba(15, 23, 42, .12);
 }
 .sort-progress-fill {
   transition: width 180ms ease-out;
