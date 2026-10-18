@@ -64,8 +64,8 @@ function Photoeye({ x, y, name, active }: {
       <circle cx="0" cy="-31" r="3" fill={color}/>
       <path d="M0 -22 V24" stroke={color} strokeWidth="1.7"
         strokeDasharray="4 4" opacity={active ? 1 : .48}/>
-      <text x="14" y="-29" fontSize="10" fontWeight="600"
-        fill="#163c55" fontFamily="Arial, sans-serif" fontWeight="700">{name}</text>
+      <text x="14" y="-29" fontSize="10" fontWeight="700"
+        fill="#163c55" fontFamily="Arial, sans-serif">{name}</text>
     </g>
   );
 }
