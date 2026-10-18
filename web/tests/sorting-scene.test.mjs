@@ -54,8 +54,8 @@ test("advanced sorting template builds three independent OR rungs and four CTUs"
     ["CNT_BatchBoxes.DN","DI_LineClear"]);
   assert.deepEqual(total.parallelBranches[0].instructions.map(i=>i.tag),
     ["DI_ExitB"]);
-  assert.equal(batch.instructions[2].tag,"CNT_Batches");
-  for(const tag of ["CNT_ExitA","CNT_ExitB","CNT_BatchBoxes","CNT_Batches"])
+  assert.equal(batch.instructions[2].tag,"CNT_Lotes");
+  for(const tag of ["CNT_ExitA","CNT_ExitB","CNT_BatchBoxes","CNT_Lotes"])
     assert.equal(readSortCount(project,tag),0);
   assert.equal(project.tags.find(t => t.name === "CNT_BatchBoxes").value.PRE,SORT_BATCH_SIZE);
   assert.equal(project.tags.find(t => t.name === "DI_LineClear").value,true);
