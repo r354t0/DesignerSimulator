@@ -15,11 +15,11 @@ import {
 
 test("scene defines a complete and self-documenting E/S contract", () => {
   assert.deepEqual(CONVEYOR_TAGS.map((tag) => [tag.name, tag.type, tag.direction]), [
-    ["Start_PB", "BOOL", "Entrada"],
-    ["Stop_PB", "BOOL", "Entrada"],
-    ["CV_BoxSensor", "BOOL", "Entrada"],
-    ["Motor_Run", "BOOL", "Salida"],
-    ["CV_Count", "COUNTER", "Interna"],
+    ["PB_Start", "BOOL", "Entrada"],
+    ["PB_Stop", "BOOL", "Entrada"],
+    ["DI_BoxSensor", "BOOL", "Entrada"],
+    ["DO_Motor", "BOOL", "Salida"],
+    ["CNT_Boxes", "COUNTER", "Interna"],
   ]);
   for (const definition of CONVEYOR_TAGS) {
     assert.ok(definition.description.length <= 19, definition.name);
@@ -45,16 +45,16 @@ test("first entrance to conveyor prepares ALL five linked tags and useful descri
 test("scene preserves custom descriptions, tag values, and existing Ladder logic", () => {
   let project = initialPracticeProject();
   project = insertInstruction(project, "rung-1", 0,
-    { id: "original-contact", kind: "XIC", tag: "Start_PB" });
-  project = editTag(project, "Start_PB", { description: "Descripción personalizada del usuario" });
-  project = setTagValue(project, "Start_PB", true);
-  project = setTagValue(project, "Motor_Run", true);
+    { id: "original-contact", kind: "XIC", tag: "PB_Start" });
+  project = editTag(project, "PB_Start", { description: "Descripción personalizada del usuario" });
+  project = setTagValue(project, "PB_Start", true);
+  project = setTagValue(project, "DO_Motor", true);
   const rungReference = project.rungs;
   const prepared = prepareConveyorTags(project);
   assert.equal(prepared.rungs, rungReference);
-  assert.equal(prepared.tags.find(t => t.name === "Start_PB").value, true);
-  assert.equal(prepared.tags.find(t => t.name === "Motor_Run").value, true);
-  assert.equal(prepared.tags.find(t => t.name === "Start_PB").description,
+  assert.equal(prepared.tags.find(t => t.name === "PB_Start").value, true);
+  assert.equal(prepared.tags.find(t => t.name === "DO_Motor").value, true);
+  assert.equal(prepared.tags.find(t => t.name === "PB_Start").description,
     "Descripción personalizada del usuario");
   assert.equal(prepareConveyorTags(prepared), prepared);
 });
@@ -63,37 +63,37 @@ test("registering a scene with a conflicting tag type is atomic and non-destruct
   let project = initialPracticeProject();
   project = createTag(project, CONVEYOR_SENSOR_TAG, "Otra funcionalidad", "DINT");
   const originalTags = project.tags;
-  assert.throws(() => prepareConveyorTags(project), /CV_BoxSensor.*BOOL.*DINT/);
+  assert.throws(() => prepareConveyorTags(project), /DI_BoxSensor.*BOOL.*DINT/);
   assert.equal(project.tags, originalTags);
   assert.equal(project.tags.some(t => t.name === CONVEYOR_COUNT_TAG), false,
     "never partially register scene tags before checking all conflicts");
 
-  project = editTag(initialPracticeProject(), "Motor_Run", { type: "STRING" });
-  assert.throws(() => prepareConveyorTags(project), /Motor_Run.*BOOL.*STRING/);
+  project = editTag(initialPracticeProject(), "DO_Motor", { type: "STRING" });
+  assert.throws(() => prepareConveyorTags(project), /DO_Motor.*BOOL.*STRING/);
 });
 
 test("revisiting repairs missing tags but does not change an established PLC state", () => {
   let project = prepareConveyorTags(initialPracticeProject());
   project = setTagValue(project, CONVEYOR_COUNT_TAG, 7, "ACC");
-  project = setTagValue(project, "Start_PB", true);
-  project = editTag(project, "Motor_Run", { description: "Motor personalizado" });
+  project = setTagValue(project, "PB_Start", true);
+  project = editTag(project, "DO_Motor", { description: "Motor personalizado" });
   const original = project.tags.find(t => t.name === CONVEYOR_COUNT_TAG).value;
   const prepared = prepareConveyorTags(project);
   assert.equal(prepared, project);
   assert.equal(prepared.tags.find(t => t.name === CONVEYOR_COUNT_TAG).value, original);
-  assert.equal(prepared.tags.find(t => t.name === "Motor_Run").description,
+  assert.equal(prepared.tags.find(t => t.name === "DO_Motor").description,
     "Motor personalizado");
 });
 
 test("filling a generic description does not invalidate a running controller build", () => {
   let project = prepareConveyorTags(initialPracticeProject());
-  project = editTag(project, "Stop_PB", { description: "Pulsador de parada" });
+  project = editTag(project, "PB_Stop", { description: "Pulsador de parada" });
   const signature = getPracticeBuildSignature(project);
   const result = prepareConveyorTags(project);
   assert.equal(getPracticeBuildSignature(result), signature);
   assert.notEqual(result, project);
-  assert.equal(result.tags.find(t => t.name === "Stop_PB").description,
-    CONVEYOR_TAGS.find(t => t.name === "Stop_PB").description);
+  assert.equal(result.tags.find(t => t.name === "PB_Stop").description,
+    CONVEYOR_TAGS.find(t => t.name === "PB_Stop").description);
 
   const run = startPracticeScans(initialPracticeScanState(project));
   const next = changePracticeScanProject(run, result);
@@ -124,9 +124,9 @@ test("scene is registered on activation; map E/S and objective live in an access
 
 test("scene descriptions omit digital I/O clarifiers and update old generated copy", () => {
   const old = new Map([
-    ["Start_PB", "Faja: pulsador START de marcha (entrada digital simulada)"],
-    ["Stop_PB", "Faja: pulsador STOP de parada (entrada digital simulada)"],
-    ["Motor_Run", "Faja: orden de marcha del motor transportador (salida digital)"],
+    ["PB_Start", "Faja: pulsador START de marcha (entrada digital simulada)"],
+    ["PB_Stop", "Faja: pulsador STOP de parada (entrada digital simulada)"],
+    ["DO_Motor", "Faja: orden de marcha del motor transportador (salida digital)"],
   ]);
   for (const definition of CONVEYOR_TAGS) {
     assert.doesNotMatch(definition.description, /\((?:entrada|salida) digital/i,
@@ -138,20 +138,20 @@ test("scene descriptions omit digital I/O clarifiers and update old generated co
   for (const [name, description] of old) {
     project = editTag(project, name, { description });
   }
-  project = setTagValue(project, "Start_PB", true);
-  project = setTagValue(project, "Motor_Run", true);
+  project = setTagValue(project, "PB_Start", true);
+  project = setTagValue(project, "DO_Motor", true);
   const migrated = prepareConveyorTags(project);
   assert.equal(migrated.rungs, originalRungs);
   for (const [name] of old) {
     const expected = CONVEYOR_TAGS.find(t => t.name === name).description;
     assert.equal(migrated.tags.find(t => t.name === name).description, expected);
   }
-  assert.equal(migrated.tags.find(t => t.name === "Motor_Run").value, true);
-  assert.equal(migrated.tags.find(t => t.name === "Start_PB").value, true);
+  assert.equal(migrated.tags.find(t => t.name === "DO_Motor").value, true);
+  assert.equal(migrated.tags.find(t => t.name === "PB_Start").value, true);
   assert.equal(prepareConveyorTags(migrated), migrated);
   assert.ok(originalTags.length <= migrated.tags.length);
 
-  const personalized = editTag(migrated, "Start_PB", { description: "Pulsador físico principal del operador" });
+  const personalized = editTag(migrated, "PB_Start", { description: "Pulsador físico principal del operador" });
   assert.equal(prepareConveyorTags(personalized), personalized,
     "Never replace a user-customized tag description");
 });
