@@ -12,41 +12,41 @@ import {
 export const SORT_TAGS: readonly {
   name: string; type: TagType; direction: "Entrada" | "Salida" | "Interna"; description: string;
 }[] = [
-  { name: "Sort_StartPB", type: "BOOL", direction: "Entrada", description: "Pulsador START" },
-  { name: "Sort_StopPB", type: "BOOL", direction: "Entrada", description: "Pulsador STOP" },
-  { name: "Sort_TypeB", type: "BOOL", direction: "Entrada", description: "Sensor tipo B" },
-  { name: "Sort_AExit", type: "BOOL", direction: "Entrada", description: "Sensor salida A" },
-  { name: "Sort_BExit", type: "BOOL", direction: "Entrada", description: "Sensor salida B" },
-  { name: "Sort_Motor", type: "BOOL", direction: "Salida", description: "Motor principal" },
-  { name: "Sort_Divert", type: "BOOL", direction: "Salida", description: "Desviador línea B" },
-  { name: "Sort_CountA", type: "COUNTER", direction: "Interna", description: "Conteo salida A" },
-  { name: "Sort_CountB", type: "COUNTER", direction: "Interna", description: "Conteo salida B" },
+  { name: "PB_Start", type: "BOOL", direction: "Entrada", description: "Pulsador START" },
+  { name: "PB_Stop", type: "BOOL", direction: "Entrada", description: "Pulsador STOP" },
+  { name: "DI_TypeB", type: "BOOL", direction: "Entrada", description: "Sensor tipo B" },
+  { name: "DI_ExitA", type: "BOOL", direction: "Entrada", description: "Sensor salida A" },
+  { name: "DI_ExitB", type: "BOOL", direction: "Entrada", description: "Sensor salida B" },
+  { name: "DO_Motor", type: "BOOL", direction: "Salida", description: "Motor principal" },
+  { name: "DO_Diverter", type: "BOOL", direction: "Salida", description: "Desviador línea B" },
+  { name: "CNT_ExitA", type: "COUNTER", direction: "Interna", description: "Conteo salida A" },
+  { name: "CNT_ExitB", type: "COUNTER", direction: "Interna", description: "Conteo salida B" },
 ];
 
 /** Keep user-edited descriptions; migrate only previously generated defaults. */
 const SORT_LEGACY_DESCRIPTIONS: Readonly<Record<string, string>> = {
-  Sort_StartPB: "Clasificador: pulsador START",
-  Sort_StopPB: "Clasificador: pulsador STOP",
-  Sort_TypeB: "Clasificador: sensor de caja tipo B",
-  Sort_AExit: "Clasificador: sensor de salida A",
-  Sort_BExit: "Clasificador: sensor de salida B",
-  Sort_Motor: "Clasificador: motor de transporte principal",
-  Sort_Divert: "Clasificador: accionamiento del desviador hacia línea B",
-  Sort_CountA: "Clasificador: cajas que cruzaron la salida A",
-  Sort_CountB: "Clasificador: cajas que cruzaron la salida B",
+  PB_Start: "Clasificador: pulsador START",
+  PB_Stop: "Clasificador: pulsador STOP",
+  DI_TypeB: "Clasificador: sensor de caja tipo B",
+  DI_ExitA: "Clasificador: sensor de salida A",
+  DI_ExitB: "Clasificador: sensor de salida B",
+  DO_Motor: "Clasificador: motor de transporte principal",
+  DO_Diverter: "Clasificador: accionamiento del desviador hacia línea B",
+  CNT_ExitA: "Clasificador: cajas que cruzaron la salida A",
+  CNT_ExitB: "Clasificador: cajas que cruzaron la salida B",
 };
 
 /** Installed only when the user accepts the advanced Ladder solution. */
 export const SORT_TEMPLATE_TAGS: readonly (typeof SORT_TAGS)[number][] = [
-  { name: "Sort_ResetPB", type: "BOOL", direction: "Entrada",
+  { name: "PB_Reset", type: "BOOL", direction: "Entrada",
     description: "RESET lote" },
-  { name: "Sort_LineClear", type: "BOOL", direction: "Entrada",
+  { name: "DI_LineClear", type: "BOOL", direction: "Entrada",
     description: "Líneas vacías" },
-  { name: "Sort_StopRequest", type: "BOOL", direction: "Interna",
+  { name: "ST_StopRequest", type: "BOOL", direction: "Interna",
     description: "Parada STOP/lote" },
-  { name: "Sort_CountTotal", type: "COUNTER", direction: "Interna",
+  { name: "CNT_BatchBoxes", type: "COUNTER", direction: "Interna",
     description: "Cajas del lote" },
-  { name: "Sort_Batches", type: "COUNTER", direction: "Interna",
+  { name: "CNT_Batches", type: "COUNTER", direction: "Interna",
     description: "Lotes terminados" },
 ];
 
@@ -155,11 +155,11 @@ export function createSortExampleProject(): PracticeProject {
   for (const tag of SORT_TEMPLATE_TAGS) {
     p = createTag(p, tag.name, tag.description, tag.type);
   }
-  p = setTagValue(p, "Sort_LineClear", true);
-  p = setTagValue(p, "Sort_CountA", SORT_BATCH_SIZE, "PRE");
-  p = setTagValue(p, "Sort_CountB", SORT_BATCH_SIZE, "PRE");
-  p = setTagValue(p, "Sort_CountTotal", SORT_BATCH_SIZE, "PRE");
-  p = setTagValue(p, "Sort_Batches", 10, "PRE");
+  p = setTagValue(p, "DI_LineClear", true);
+  p = setTagValue(p, "CNT_ExitA", SORT_BATCH_SIZE, "PRE");
+  p = setTagValue(p, "CNT_ExitB", SORT_BATCH_SIZE, "PRE");
+  p = setTagValue(p, "CNT_BatchBoxes", SORT_BATCH_SIZE, "PRE");
+  p = setTagValue(p, "CNT_Batches", 10, "PRE");
 
   const append = (rung: string, specs: {
     id: string; kind: "XIC" | "XIO" | "OTE" | "CTU" | "RES"; tag: string;
@@ -171,80 +171,80 @@ export function createSortExampleProject(): PracticeProject {
   const addRung = (id: string) => { p = createRung(p, id); };
 
   // R0. OR joins BEFORE normally-closed stop request (electrical seal-in).
-  append("rung-1", [{ id:"sort-motor-out",kind:"OTE",tag:"Sort_Motor" }]);
+  append("rung-1", [{ id:"sort-motor-out",kind:"OTE",tag:"DO_Motor" }]);
   p = createIndependentParallelBranch(p, "rung-1");
   const motorOr = p.rungs[0].instructions.find(i => i.kind === "OR_JUNCTION")!.id;
   p = insertIntoIndependentOrUpper(p,"rung-1",motorOr,
-    { id:"sort-start",kind:"XIC",tag:"Sort_StartPB" });
+    { id:"sort-start",kind:"XIC",tag:"PB_Start" });
   p = addParallelContact(p,"rung-1",motorOr,
-    { id:"sort-seal",kind:"XIC",tag:"Sort_Motor" });
+    { id:"sort-seal",kind:"XIC",tag:"DO_Motor" });
   p = insertInstruction(p,"rung-1",2,
-    { id:"sort-stop-interlock",kind:"XIO",tag:"Sort_StopRequest" });
+    { id:"sort-stop-interlock",kind:"XIO",tag:"ST_StopRequest" });
 
   // R1. STOP or full batch with BOTH lines empty.
   addRung("sort-stop-request");
-  append("sort-stop-request",[{ id:"sort-stop-coil",kind:"OTE",tag:"Sort_StopRequest" }]);
+  append("sort-stop-request",[{ id:"sort-stop-coil",kind:"OTE",tag:"ST_StopRequest" }]);
   p = createIndependentParallelBranch(p,"sort-stop-request");
   const stopOr = p.rungs.find(r=>r.id==="sort-stop-request")!.instructions
     .find(i=>i.kind==="OR_JUNCTION")!.id;
   p = insertIntoIndependentOrUpper(p,"sort-stop-request",stopOr,
-    { id:"sort-stop",kind:"XIC",tag:"Sort_StopPB" });
+    { id:"sort-stop",kind:"XIC",tag:"PB_Stop" });
   p = addParallelContact(p,"sort-stop-request",stopOr,
-    { id:"sort-full",kind:"XIC",tag:"Sort_CountTotal.DN" });
+    { id:"sort-full",kind:"XIC",tag:"CNT_BatchBoxes.DN" });
   p = addParallelContact(p,"sort-stop-request",stopOr,
-    { id:"sort-lines-empty",kind:"XIC",tag:"Sort_LineClear" });
+    { id:"sort-lines-empty",kind:"XIC",tag:"DI_LineClear" });
 
   // R2. Divert only when the motor is running and the B sensor is active.
   addRung("sort-diverter");
   append("sort-diverter",[
-    { id:"sort-motor-ok",kind:"XIC",tag:"Sort_Motor" },
-    { id:"sort-type-b",kind:"XIC",tag:"Sort_TypeB" },
-    { id:"sort-divert",kind:"OTE",tag:"Sort_Divert" },
+    { id:"sort-motor-ok",kind:"XIC",tag:"DO_Motor" },
+    { id:"sort-type-b",kind:"XIC",tag:"DI_TypeB" },
+    { id:"sort-divert",kind:"OTE",tag:"DO_Diverter" },
   ]);
 
   // R3 + R4. Independent counters on physical discharge lines.
   addRung("sort-count-a");
   append("sort-count-a",[
-    { id:"sort-a-sensor",kind:"XIC",tag:"Sort_AExit" },
-    { id:"sort-ctu-a",kind:"CTU",tag:"Sort_CountA" },
+    { id:"sort-a-sensor",kind:"XIC",tag:"DI_ExitA" },
+    { id:"sort-ctu-a",kind:"CTU",tag:"CNT_ExitA" },
   ]);
   addRung("sort-count-b");
   append("sort-count-b",[
-    { id:"sort-b-sensor",kind:"XIC",tag:"Sort_BExit" },
-    { id:"sort-ctu-b",kind:"CTU",tag:"Sort_CountB" },
+    { id:"sort-b-sensor",kind:"XIC",tag:"DI_ExitB" },
+    { id:"sort-ctu-b",kind:"CTU",tag:"CNT_ExitB" },
   ]);
 
   // R5. Third OR: any one of the non-overlapping exit sensors increments
   // the total batch counter. Scene entry spacing keeps their pulses distinct.
   addRung("sort-count-total");
   append("sort-count-total",[
-    { id:"sort-total",kind:"CTU",tag:"Sort_CountTotal" },
+    { id:"sort-total",kind:"CTU",tag:"CNT_BatchBoxes" },
   ]);
   p = createIndependentParallelBranch(p,"sort-count-total");
   const countOr = p.rungs.find(r=>r.id==="sort-count-total")!.instructions
     .find(i=>i.kind==="OR_JUNCTION")!.id;
   p = insertIntoIndependentOrUpper(p,"sort-count-total",countOr,
-    { id:"sort-total-a",kind:"XIC",tag:"Sort_AExit" });
+    { id:"sort-total-a",kind:"XIC",tag:"DI_ExitA" });
   p = addParallelContact(p,"sort-count-total",countOr,
-    { id:"sort-total-b",kind:"XIC",tag:"Sort_BExit" });
+    { id:"sort-total-b",kind:"XIC",tag:"DI_ExitB" });
 
   // R6. Count the batch once, but only AFTER its last physical discharge.
   addRung("sort-batches");
   append("sort-batches",[
-    { id:"sort-batch-full",kind:"XIC",tag:"Sort_CountTotal.DN" },
-    { id:"sort-batch-clear",kind:"XIC",tag:"Sort_LineClear" },
-    { id:"sort-batch-ctu",kind:"CTU",tag:"Sort_Batches" },
+    { id:"sort-batch-full",kind:"XIC",tag:"CNT_BatchBoxes.DN" },
+    { id:"sort-batch-clear",kind:"XIC",tag:"DI_LineClear" },
+    { id:"sort-batch-ctu",kind:"CTU",tag:"CNT_Batches" },
   ]);
 
   // R7–R9: no reset mid-transport; total and A/B are reset together.
   for (const [rung, counter] of [
-    ["sort-reset-a","Sort_CountA"],["sort-reset-b","Sort_CountB"],
-    ["sort-reset-total","Sort_CountTotal"],
+    ["sort-reset-a","CNT_ExitA"],["sort-reset-b","CNT_ExitB"],
+    ["sort-reset-total","CNT_BatchBoxes"],
   ]) {
     addRung(rung);
     append(rung,[
-      { id:rung+"-clear",kind:"XIC",tag:"Sort_LineClear" },
-      { id:rung+"-button",kind:"XIC",tag:"Sort_ResetPB" },
+      { id:rung+"-clear",kind:"XIC",tag:"DI_LineClear" },
+      { id:rung+"-button",kind:"XIC",tag:"PB_Reset" },
       { id:rung+"-out",kind:"RES",tag:counter },
     ]);
   }
@@ -254,13 +254,13 @@ export function createSortExampleProject(): PracticeProject {
 /** Operator momentary keys: immediate STOP and RESET sampling, including
  * a zero-time second pass to propagate a later STOP rung into Motor OTE. */
 export function applySortMomentaryInput(
-  state: PracticeScanState, tag: "Sort_StartPB" | "Sort_StopPB" | "Sort_ResetPB",
+  state: PracticeScanState, tag: "PB_Start" | "PB_Stop" | "PB_Reset",
   pressed: boolean,
 ): PracticeScanState {
   let next = applyMomentaryBoolInput(
-    state, tag, pressed, tag === "Sort_StopPB" || tag === "Sort_ResetPB",
+    state, tag, pressed, tag === "PB_Stop" || tag === "PB_Reset",
   );
-  if (pressed && (tag === "Sort_StopPB" || tag === "Sort_ResetPB")) {
+  if (pressed && (tag === "PB_Stop" || tag === "PB_Reset")) {
     next = rescanPracticeWithoutTime(next);
   }
   return next;
@@ -274,9 +274,9 @@ export function applySortSensorInput(
   const tag = state.project.tags.find(t=>t.name===name);
   if (!tag || tag.type !== "BOOL" || tag.value===value) return state;
   let next = applySceneSensorBoolInput(state,name,value);
-  if (name==="Sort_LineClear" && value && next.mode==="running" &&
-    readSortBool(next.project,"Sort_StopRequest") &&
-    readSortBool(next.project,"Sort_Motor")) {
+  if (name==="DI_LineClear" && value && next.mode==="running" &&
+    readSortBool(next.project,"ST_StopRequest") &&
+    readSortBool(next.project,"DO_Motor")) {
     next = rescanPracticeWithoutTime(next);
   }
   return next;
