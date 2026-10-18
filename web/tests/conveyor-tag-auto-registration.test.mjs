@@ -31,7 +31,7 @@ test("first entrance to conveyor prepares ALL five linked tags and useful descri
   const prepared = prepareConveyorTags(project);
   assert.equal(hasConveyorTags(project), false);
   assert.equal(hasConveyorTags(prepared), true);
-  assert.equal(prepared.tags.length, project.tags.length + 2);
+  assert.equal(prepared.tags.length, project.tags.length + CONVEYOR_TAGS.length);
   assert.deepEqual(prepared.rungs, project.rungs);
   for (const definition of CONVEYOR_TAGS) {
     const tag = prepared.tags.find((entry) => entry.name === definition.name);
@@ -43,7 +43,7 @@ test("first entrance to conveyor prepares ALL five linked tags and useful descri
 });
 
 test("scene preserves custom descriptions, tag values, and existing Ladder logic", () => {
-  let project = initialPracticeProject();
+  let project = prepareConveyorTags(initialPracticeProject());
   project = insertInstruction(project, "rung-1", 0,
     { id: "original-contact", kind: "XIC", tag: "PB_Start" });
   project = editTag(project, "PB_Start", { description: "Descripción personalizada del usuario" });
@@ -68,7 +68,7 @@ test("registering a scene with a conflicting tag type is atomic and non-destruct
   assert.equal(project.tags.some(t => t.name === CONVEYOR_COUNT_TAG), false,
     "never partially register scene tags before checking all conflicts");
 
-  project = editTag(initialPracticeProject(), "DO_Motor", { type: "STRING" });
+  project = editTag(prepareConveyorTags(initialPracticeProject()), "DO_Motor", { type: "STRING" });
   assert.throws(() => prepareConveyorTags(project), /DO_Motor.*BOOL.*STRING/);
 });
 
