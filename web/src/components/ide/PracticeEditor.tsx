@@ -74,6 +74,8 @@ interface Props {
   onSelectDemoTool: (kind: Instruction) => void;
   onPaletteDragStart: (event: DragEvent<HTMLButtonElement>, kind: EditableKind) => void;
   onPaletteDragEnd: () => void;
+  onCrossReference: (tag: string) => void;
+  navigateToReference: { instructionId: string; rungId: string; branchId?: string; token: number } | null;
 }
 interface InternalDrag { id: string; kind: EditableKind }
 
@@ -81,6 +83,7 @@ export function PracticeEditor({
   project, selectedTool, draggingKind, onChange, running, scanMode, scanState,
   onStart, onStop, onPause, onResume, onStep, onScanPeriodChange, nextId,
   onSelectPaletteTool, onSelectDemoTool, onPaletteDragStart, onPaletteDragEnd,
+  onCrossReference, navigateToReference,
 }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedRungId, setSelectedRungId] = useState<string | null>(null);
@@ -253,6 +256,22 @@ export function PracticeEditor({
     row?.scrollIntoView({ block: "nearest", inline: "nearest" });
     editorRef.current?.focus({ preventScroll: true });
   };
+
+  useEffect(() => {
+    if (!navigateToReference) return;
+    if (!project.rungs.some(rung => rung.id === navigateToReference.rungId)) return;
+    setSelected(navigateToReference.instructionId);
+    setSelectedOrBranch(navigateToReference.branchId
+      ? { rungId: navigateToReference.rungId, branchId: navigateToReference.branchId } : null);
+    setSelectedRungId(null);
+    const frame = window.requestAnimationFrame(() => {
+      const row = Array.from(viewportRef.current?.querySelectorAll<HTMLElement>("[data-rung-id]") ?? [])
+        .find(element => element.dataset.rungId === navigateToReference.rungId);
+      row?.scrollIntoView({ block: "center", inline: "nearest" });
+      editorRef.current?.focus({ preventScroll: true });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [navigateToReference, project.rungs]);
 
   const insertAt = (rungId: string, position: number, kind: EditableKind,
     anchorId?: string, branchId?: string) => {
@@ -1511,6 +1530,14 @@ export function PracticeEditor({
             onClick={toggleContextBit}
             className="w-full rounded px-2 py-1.5 text-left text-xs hover:bg-sky-50 disabled:cursor-not-allowed disabled:text-slate-400">
             Invertir valor del bit ({Number(currentBitMenuTarget.value)} → {Number(!currentBitMenuTarget.value)})
+          </button>
+          <button type="button" role="menuitem"
+            onClick={() => {
+              onCrossReference(currentBitMenuTarget.tagName);
+              setBitMenu(null);
+            }}
+            className="w-full rounded border-t border-slate-200 px-2 py-2 text-left text-xs font-medium hover:bg-sky-50">
+            Cross Reference
           </button>
           {currentBitMenuTarget.reason && (
             <p className="border-t border-slate-200 px-2 py-2 text-[11px] text-amber-800">
