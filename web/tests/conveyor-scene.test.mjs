@@ -19,14 +19,14 @@ import {
 test("prepare tags preserves the full current Ladder and does not duplicate tags", () => {
   let project = initialPracticeProject();
   project = insertInstruction(project, "rung-1", 0,
-    { id: "existing", kind: "XIC", tag: "Auto_Mode" });
+    { id: "existing", kind: "XIC", tag: "ST_AutoMode" });
   const original = project.rungs;
   const next = prepareConveyorTags(project);
   assert.deepEqual(next.rungs, original);
   assert.equal(hasConveyorTags(project), false);
   assert.equal(hasConveyorTags(next), true);
   assert.equal(next.tags.find(t => t.name === CONVEYOR_SENSOR_TAG).type, "BOOL");
-  assert.equal(next.tags.find(t => t.name === "CV_Count").type, "COUNTER");
+  assert.equal(next.tags.find(t => t.name === "CNT_Boxes").type, "COUNTER");
   assert.equal(prepareConveyorTags(next), next);
 });
 
@@ -37,21 +37,21 @@ test("Advanced Ladder builds two OR networks and four control rungs", () => {
     ["OR_JUNCTION", "XIC", "XIO", "OTE"], ["OR_JUNCTION", "XIC", "OTE"],
     ["XIC", "CTU"], ["XIO", "XIC", "RES"],
   ]);
-  assert.equal(project.tags.find(t => t.name === "CV_Count").value.PRE, 5);
+  assert.equal(project.tags.find(t => t.name === "CNT_Boxes").value.PRE, 5);
   assert.equal(hasConveyorTags(project), true);
 });
 
 test("start/stop inputs actuate conveyor through actual PracticeRoutine scans", () => {
   let state = startPracticeScans(initialPracticeScanState(createConveyorExampleProject()));
-  assert.equal(readConveyorBool(state.project, "Motor_Run"), false);
-  state = changePracticeScanProject(state, setTagValue(state.project, "Start_PB", true));
+  assert.equal(readConveyorBool(state.project, "DO_Motor"), false);
+  state = changePracticeScanProject(state, setTagValue(state.project, "PB_Start", true));
   state = tickPracticeScan(state);
-  assert.equal(readConveyorBool(state.project, "Motor_Run"), true);
-  state = changePracticeScanProject(state, setTagValue(state.project, "Start_PB", false));
+  assert.equal(readConveyorBool(state.project, "DO_Motor"), true);
+  state = changePracticeScanProject(state, setTagValue(state.project, "PB_Start", false));
   state = tickPracticeScan(state);
-  assert.equal(readConveyorBool(state.project, "Motor_Run"), true, "OR seal-in retains motor");
-  state = applyConveyorMomentaryInput(state, "Stop_PB", true);
-  assert.equal(readConveyorBool(state.project, "Motor_Run"), false, "STOP interlock has priority");
+  assert.equal(readConveyorBool(state.project, "DO_Motor"), true, "OR seal-in retains motor");
+  state = applyConveyorMomentaryInput(state, "PB_Stop", true);
+  assert.equal(readConveyorBool(state.project, "DO_Motor"), false, "STOP interlock has priority");
   state = stopPracticeScans(state);
   assert.equal(state.mode, "stopped");
 });
