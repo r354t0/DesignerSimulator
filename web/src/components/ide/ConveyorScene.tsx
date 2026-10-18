@@ -103,7 +103,8 @@ export function ConveyorScene({
           </div>
         </header>
 
-        <section className="sort-panel rounded-lg border border-[#344c5e] p-3"
+        <div className="scada-scene-workspace">
+        <section className="sort-panel scada-process-panel rounded-lg border border-[#344c5e] p-3"
           aria-labelledby="conveyor-process-title">
           <div className="mb-3 flex items-center gap-2">
             <ScanLine size={16} className="text-sky-300" aria-hidden="true"/>
@@ -232,7 +233,8 @@ export function ConveyorScene({
           </div>
         </section>
 
-        <div className="scada-dashboard-grid grid gap-3">
+        <aside className="scada-scene-sidebar" aria-label="Controles e indicadores del SCADA">
+          <div className="scada-dashboard-grid grid gap-3">
           <section className="sort-panel rounded-lg border border-[#344c5e] p-2.5"
             aria-label="Tablero de mando">
             <div className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-slate-200">
@@ -271,6 +273,8 @@ export function ConveyorScene({
               </output>
             </div>
           </section>
+          </div>
+        </aside>
         </div>
 
         {!wired && (
