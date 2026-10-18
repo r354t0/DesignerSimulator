@@ -1,3 +1,5 @@
+import { SceneTagTable } from "./SceneTagTable";
+import { RecommendedSolutionPanel } from "./RecommendedSolutionPanel";
 import { useEffect, useRef } from "react";
 import { BookOpen, Info, X } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
@@ -9,8 +11,9 @@ interface Props {
   onClose: () => void;
   onOpenTags: () => void;
   onLoadExample: () => void;
+  onResetExample: () => void;
 }
-export function TankSceneInfoDialog({ open, project, onClose, onOpenTags, onLoadExample }: Props) {
+export function TankSceneInfoDialog({ open, project, onClose, onOpenTags, onLoadExample, onResetExample }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const dialog = dialogRef.current;
@@ -72,87 +75,24 @@ export function TankSceneInfoDialog({ open, project, onClose, onOpenTags, onLoad
               Abrir Controller Tags
             </button>
           </div>
-          <div className="overflow-x-auto rounded border border-slate-700">
-            <table className="w-full min-w-[620px] text-left text-[11px]">
-              <thead className="bg-[#203449] text-slate-300">
-                <tr>
-                  {["Tag", "Tipo", "Función", "Descripción", "Valor"].map((name) =>
-                    <th key={name} scope="col" className="px-2.5 py-2 font-semibold">{name}</th>)}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/70">
-                {TANK_TAGS.map((spec) => {
-                  const tag = project.tags.find(item => item.name === spec.name);
-                  const valid = tag?.type === spec.type;
-                  const value = !valid ? "Revisar" : spec.type === "REAL"
-                    ? (readTankLevel(project)?.toFixed(1) ?? "—") + " %"
-                    : (spec.type === "TIMER" || spec.type === "COUNTER") &&
-                        tag && typeof tag.value === "object"
-                      ? String(tag.value.ACC ?? 0) + " / " + String(tag.value.PRE ?? 0)
-                      : readTankBool(project, spec.name) ? "1" : "0";
-                  return (
-                    <tr key={spec.name} className="hover:bg-slate-700/20">
-                      <th scope="row" className="px-2.5 py-2 font-mono font-semibold text-sky-200">
-                        {spec.name}
-                      </th>
-                      <td className="px-2.5 py-2 font-mono">{spec.type}</td>
-                      <td className="px-2.5 py-2">{spec.direction}</td>
-                      <td className="px-2.5 py-2">{tag?.description || spec.description}</td>
-                      <td className="px-2.5 py-2 text-right font-mono text-emerald-300">{value}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <SceneTagTable specs={TANK_IO_TAGS} project={project}/>
           <p className="mt-2 text-[11px] text-slate-400">
-            Los temporizadores muestran ACC / PRE en milisegundos y el contador
-            muestra lotes ACC / PRE. Sensores y nivel son entradas simuladas;
-            bomba, agitador y válvulas siguen las salidas calculadas por MainRoutine.
+            Entradas de sensores y pulsadores y salidas de actuadores.
+            Los temporizadores, contadores y estados internos pertenecen a la solución.
           </p>
         </section>
 
-        <section className="rounded border border-slate-700 bg-[#1a2b3b] p-3">
-          <details>
-            <summary className="cursor-pointer text-xs font-semibold text-sky-300">
-              Orientación Ladder (opcional)
-            </summary>
-            <div className="mt-2 space-y-1 font-mono text-[11px] text-slate-300">
-              <p>R0: OR (StartPB | RunCmd) y XIO StopPB/Alarm/Batches.DN → OTE RunCmd</p>
-              <p>R1: OR (RunCmd + XIO FillStage/MixStage/DrainStage | ToFill) → OTL FillStage</p>
-              <p>R2–R4: TON TStart, TON TFillMax y TON TDrainMax</p>
-              <p>R5: OR (TFillMax.DN | TDrainMax.DN) → OTL Alarm</p>
-              <p>R6–R7: ResetPB y XIO RunCmd → OTU Alarm; RES Batches</p>
-              <p>R8–R9: OTE InletValve y OTE Pump con enclavamientos</p>
-              <p>R10: FillStage + HighLS → OTE ToMix (capturar transición)</p>
-              <p>R11: OR (ToMix | XIO RunCmd) → OTU FillStage</p>
-              <p>R12: ToMix → OTL MixStage</p>
-              <p>R13–R14: TON TMix y OTE Mixer</p>
-              <p>R15: MixStage + TMix.DN → OTE ToDrain</p>
-              <p>R16: OR (ToDrain | XIO RunCmd) → OTU MixStage</p>
-              <p>R17: ToDrain → OTL DrainStage</p>
-              <p>R18: OR (DrainStage | DrainPB) → OTE DrainValve, con interbloqueos</p>
-              <p>R19: DrainStage + LowLS → CTU Batches</p>
-              <p>R20: DrainStage + LowLS + XIO Batches.DN → OTE ToFill</p>
-              <p>R21: OR (LowLS | XIO RunCmd) → OTU DrainStage</p>
-              <p className="pt-2 font-sans text-slate-400">
-                Al finalizar el drenaje se captura ToFill (OTE) y se hace
-                OTU de DrainStage; en el scan siguiente el rung 1 vuelve a
-                activar FillStage por su rama OR. Para llenar y mezclar se
-                mantiene el orden OTE de transición, OTU saliente y OTL entrante.
-                De esta manera solo una etapa permanece activa.
-              </p>
-            </div>
-          </details>
-          <button type="button" onClick={() => { onClose(); onLoadExample(); }}
-            className="mt-3 rounded border border-sky-600 px-3 py-1.5 text-[11px] font-semibold text-sky-300 hover:bg-sky-950">
-            Cargar plantilla Ladder (reemplaza MainRoutine de esta escena)
-          </button>
-          <p className="mt-2 text-[11px] text-slate-400">
-            La plantilla requiere confirmación. Cargar una escena nunca
-            sustituye automáticamente tu programa.
-          </p>
-        </section>
+        <RecommendedSolutionPanel
+          project={project} specs={TANK_SOLUTION_TAGS}
+          onImplement={() => { onClose(); onLoadExample(); }}
+          onReset={() => { onClose(); onResetExample(); }}>
+          <div className="space-y-1 font-mono text-[11px] text-slate-300">
+  <p>Enclavamiento de ST_RunEnable mediante OR; temporizadores TON y contador CNT_Lotes.</p>
+  <p>Llenado → mezclado → vaciado. Cada transición registra OTE, ejecuta OTU de la etapa anterior y OTL de la siguiente.</p>
+  <p>TMR_FillTimeout y TMR_DrainTimeout generan ALM_ProcessTimeout.</p>
+  <p>Al terminar el drenaje, ST_ToFill permite activar ST_Filling desde el rung 1 durante el scan siguiente.</p>
+</div>
+        </RecommendedSolutionPanel>
       </div>
       <div className="sticky bottom-0 flex justify-end border-t border-slate-600 bg-[#1b2d3d] px-4 py-2.5">
         <button type="button" onClick={onClose}
