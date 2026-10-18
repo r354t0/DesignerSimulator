@@ -102,6 +102,6 @@ test("timer RES still clears ACC, EN, TT and DN only with true rung",()=>{
 test("conveyor advanced template reset is same symbol and retains program behavior",()=>{
   const project=createConveyorExampleProject();
   const reset=project.rungs.find(r=>r.id==="cv-rung-reset").instructions.find(i=>i.kind==="RES");
-  assert.equal(reset.tag,"CV_Count");
+  assert.equal(reset.tag,"CNT_Boxes");
   assert.equal(buildPracticeProject(project).success,true);
 });
