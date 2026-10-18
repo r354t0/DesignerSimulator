@@ -26,7 +26,7 @@ import { TrafficScene } from "./components/ide/TrafficScene";
 import { BatchMixerScene } from "./components/ide/BatchMixerScene";
 import {
   initialBatchProject, createBatchSolution, prepareBatchTags,
-  initialBatchState, stepBatchPhysics, batchDigitalSensors,
+  initialBatchState, stepBatchPhysics, batchDigitalSensors, resetBatchProgramState,
   batchBool, batchInt,
   type BatchMixerState, type BatchExercise, type BatchMode,
 } from "./plc/batchMixerSceneModel";
@@ -463,20 +463,10 @@ export default function App() {
   const resetBatch = useCallback(()=>{
     if(activeControllerScene.current!=="batch"||scanRef.current.mode!=="stopped")return;
     changeBatch(()=>initialBatchState());
-    changeScan(state=>{
-      let project=state.project;
-      for(const [name,value] of Object.entries(batchDigitalSensors(initialBatchState(),
-        batchInt(state.project,"INT_TempSP")))){
-        const tag=project.tags.find(t=>t.name===name);
-        if(tag?.type==="BOOL"&&tag.value!==value)
-          project=setTagValue(project,name,value);
-      }
-      for(const name of ["DI_Flowmeter1","DI_Flowmeter2","DI_Flowmeter3"]){
-        const tag=project.tags.find(t=>t.name===name);
-        if(tag?.type==="BOOL"&&tag.value)project=setTagValue(project,name,false);
-      }
-      return project===state.project?state:changePracticeScanProject(state,project);
-    });
+    changeScan(state=>({
+      ...initialPracticeScanState(resetBatchProgramState(state.project)),
+      scanPeriodMs:state.scanPeriodMs,
+    }));
   },[changeBatch,changeScan]);
   const prepareBatch = useCallback(()=>{
     try{
@@ -691,10 +681,17 @@ export default function App() {
       " de Batch Mixer? Se reemplazarán MainRoutine y los Controller Tags de esta escena."))return;
     if(!solutionSnapshots.current.batch)
       solutionSnapshots.current.batch=scanRef.current.project;
-    changeScan(state=>({
-      ...initialPracticeScanState(createBatchSolution(exercise)),
-      scanPeriodMs:state.scanPeriodMs,
-    }));
+    changeScan(state=>{
+      // Operator HMI values survive loading a different Ladder exercise.
+      let example=createBatchSolution(exercise);
+      for(const name of ["INT_TempSP","INT_RatioP1","INT_BatchTarget"]){
+        const tag=state.project.tags.find(t=>t.name===name);
+        if(tag?.type==="INT"&&typeof tag.value==="number")
+          example=setTagValue(example,name,tag.value);
+      }
+      return {...initialPracticeScanState(example),
+        scanPeriodMs:state.scanPeriodMs};
+    });
     changeBatch(()=>initialBatchState());
     setBatchExercise(exercise);
     openEditorView("practice");
