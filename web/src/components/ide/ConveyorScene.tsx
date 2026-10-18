@@ -22,6 +22,7 @@ interface Props {
   onOpenTags: () => void;
   setupError: string | null;
   onLoadExample: () => void;
+  onResetExample: () => void;
 }
 
 function PilotLed({ label, lit, tone }: {
@@ -46,7 +47,7 @@ function PilotLed({ label, lit, tone }: {
 /** Inputs come from operator controls; MainRoutine alone evaluates outputs. */
 export function ConveyorScene({
   project, mode, scene, onInputChange, onAddItem, onResetScene,
-  onPrepareTags, onOpenTags, setupError, onLoadExample,
+  onPrepareTags, onOpenTags, setupError, onLoadExample, onResetExample,
 }: Props) {
   const running = mode === "running";
   const motorOn = running && readConveyorBool(project, "DO_Motor");
@@ -289,7 +290,7 @@ export function ConveyorScene({
       </div>
       <ConveyorSceneInfoDialog open={infoOpen} project={project}
         onClose={() => setInfoOpen(false)}
-        onOpenTags={onOpenTags} onLoadExample={onLoadExample}/>
+        onOpenTags={onOpenTags} onLoadExample={onLoadExample} onResetExample={onResetExample}/>
     </section>
   );
 }
