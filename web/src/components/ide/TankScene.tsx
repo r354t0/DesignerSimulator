@@ -56,7 +56,7 @@ export function TankScene({
   const filling = auto && readTankBool(project, "ST_Filling");
   const mixing = auto && readTankBool(project, "ST_Mixing");
   const draining = auto && readTankBool(project, "ST_Draining");
-  const batch = project.tags.find(t => t.name === "CNT_Batches");
+  const batch = project.tags.find(t => t.name === "CNT_Lotes");
   const batches = batch?.type === "COUNTER" && typeof batch.value === "object" &&
     typeof batch.value.ACC === "number" ? batch.value.ACC : 0;
   const complete = batches >= TANK_BATCH_TARGET;
