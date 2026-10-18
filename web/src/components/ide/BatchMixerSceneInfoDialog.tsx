@@ -107,8 +107,7 @@ export function BatchMixerSceneInfoDialog({open,project,selectedExercise,onClose
         <SceneTagTable specs={batchSolutionTags(exercise)} project={project} preview/>
         <p className="mt-2 text-[11px] text-slate-400">
           {exercise<4?"Los caudalímetros generan pulsos y el volumen lo representa CNT_Volume.":
-            "El termostato es una DI. INT_RatioP1 se compara con CNT_Product1.ACC;
-             la temperatura real pertenece a la física simulada."}
+            "El termostato es una DI. INT_RatioP1 se compara con CNT_Product1.ACC; la temperatura real pertenece a la física simulada."}
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" onClick={()=>{onClose();onLoadSolution(exercise);}}
