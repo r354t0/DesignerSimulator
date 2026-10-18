@@ -48,17 +48,17 @@ test("advanced sorting template builds three independent OR rungs and four CTUs"
   ]);
   const [motor,stop,,,,total,batch] = project.rungs;
   assert.deepEqual(motor.parallelBranches[0].instructions.map(i=>i.tag),
-    ["Sort_Motor"]);
+    ["DO_Motor"]);
   assert.equal(motor.parallelBranches[0].endId,motor.instructions[1].id);
   assert.deepEqual(stop.parallelBranches[0].instructions.map(i=>i.tag),
-    ["Sort_CountTotal.DN","Sort_LineClear"]);
+    ["CNT_BatchBoxes.DN","DI_LineClear"]);
   assert.deepEqual(total.parallelBranches[0].instructions.map(i=>i.tag),
-    ["Sort_BExit"]);
-  assert.equal(batch.instructions[2].tag,"Sort_Batches");
-  for(const tag of ["Sort_CountA","Sort_CountB","Sort_CountTotal","Sort_Batches"])
+    ["DI_ExitB"]);
+  assert.equal(batch.instructions[2].tag,"CNT_Batches");
+  for(const tag of ["CNT_ExitA","CNT_ExitB","CNT_BatchBoxes","CNT_Batches"])
     assert.equal(readSortCount(project,tag),0);
-  assert.equal(project.tags.find(t => t.name === "Sort_CountTotal").value.PRE,SORT_BATCH_SIZE);
-  assert.equal(project.tags.find(t => t.name === "Sort_LineClear").value,true);
+  assert.equal(project.tags.find(t => t.name === "CNT_BatchBoxes").value.PRE,SORT_BATCH_SIZE);
+  assert.equal(project.tags.find(t => t.name === "DI_LineClear").value,true);
   assert.equal(prepareSortTags(project),project);
 });
 
@@ -73,9 +73,9 @@ test("sorter physics keeps boxes stationary unless MainRoutine motor is on", () 
 function runSortWithExample() {
   let plc = startPracticeScans(setScanPeriod(
     initialPracticeScanState(createSortExampleProject()), 500));
-  plc = applyMomentaryBoolInput(plc,"Sort_StartPB",true);
-  plc = applyMomentaryBoolInput(plc,"Sort_StartPB",false);
-  assert.equal(readSortBool(plc.project,"Sort_Motor"),true);
+  plc = applyMomentaryBoolInput(plc,"PB_Start",true);
+  plc = applyMomentaryBoolInput(plc,"PB_Start",false);
+  assert.equal(readSortBool(plc.project,"DO_Motor"),true);
   let state = initialSortState();
   state = addSortBox(state,"A");
   let sawB = false;
@@ -86,19 +86,19 @@ function runSortWithExample() {
       state = addSortBox(state,"B");
     }
     const next = stepSortState(state,
-      readSortBool(plc.project,"Sort_Motor"),
-      readSortBool(plc.project,"Sort_Divert"),50);
+      readSortBool(plc.project,"DO_Motor"),
+      readSortBool(plc.project,"DO_Diverter"),50);
     state = next;
     for(const [tag,value] of [
-      ["Sort_TypeB",state.sensorTypeB],
-      ["Sort_AExit",state.sensorExitA],
-      ["Sort_BExit",state.sensorExitB],
+      ["DI_TypeB",state.sensorTypeB],
+      ["DI_ExitA",state.sensorExitA],
+      ["DI_ExitB",state.sensorExitB],
     ]){
       const prior=readSortBool(plc.project,tag);
       if(prior !== value) plc=applySceneSensorBoolInput(plc,tag,value);
     }
     if(state.sensorTypeB) sawB=true;
-    if(readSortBool(plc.project,"Sort_Divert")) sawDivert=true;
+    if(readSortBool(plc.project,"DO_Diverter")) sawDivert=true;
     if((i+1)%10===0)plc=tickPracticeScan(plc);
   }
   return {plc,state,sawB,sawDivert};
@@ -111,14 +111,14 @@ test("500ms PLC scan sorts A→A and B→B; both exit CTUs count exactly once", 
   assert.equal(state.exitA,1);
   assert.equal(state.exitB,1);
   assert.equal(state.errors,0,"correct example must not misroute boxes");
-  assert.equal(readSortCount(plc.project,"Sort_CountA"),1);
-  assert.equal(readSortCount(plc.project,"Sort_CountB"),1);
+  assert.equal(readSortCount(plc.project,"CNT_ExitA"),1);
+  assert.equal(readSortCount(plc.project,"CNT_ExitB"),1);
   assert.equal(state.sensorTypeB,false);
   assert.equal(state.sensorExitA,false);
   assert.equal(state.sensorExitB,false);
 });
 
-test("without Sort_Divert, B is routed to exit A and mismatch is displayed",()=>{
+test("without DO_Diverter, B is routed to exit A and mismatch is displayed",()=>{
   let state=addSortBox(initialSortState(),"B");
   for(let i=0;i<120;i++) state=stepSortState(state,true,false,50);
   assert.equal(state.exitA,1);
