@@ -48,8 +48,8 @@ test("the information dialog remains accessible from the unified SCADA header", 
 });
 
 test("SCADA operator controls still update the PLC tags and physical scene", () => {
-  assert.match(conveyor, /onChange=\{\(pressed\) => onInputChange\("Start_PB", pressed\)\}/);
-  assert.match(conveyor, /onChange=\{\(pressed\) => onInputChange\("Stop_PB", pressed\)\}/);
+  assert.match(conveyor, /onChange=\{\(pressed\) => onInputChange\("PB_Start", pressed\)\}/);
+  assert.match(conveyor, /onChange=\{\(pressed\) => onInputChange\("PB_Stop", pressed\)\}/);
   assert.match(conveyor, /onClick=\{onAddItem\}/);
   assert.match(conveyor, /onClick=\{onResetScene\}/);
   assert.match(conveyor, /CONVEYOR_SENSOR_TAG/);
