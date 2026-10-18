@@ -31,7 +31,7 @@ export const TANK_TAGS: readonly {
   { name: "TMR_Mixing", type: "TIMER", direction: "Interna", description: "Tiempo mezclado" },
   { name: "TMR_FillTimeout", type: "TIMER", direction: "Interna", description: "Máximo llenado" },
   { name: "TMR_DrainTimeout", type: "TIMER", direction: "Interna", description: "Máximo vaciado" },
-  { name: "CNT_Batches", type: "COUNTER", direction: "Interna", description: "Lotes terminados" },
+  { name: "CNT_Lotes", type: "COUNTER", direction: "Interna", description: "Lotes terminados" },
 ];
 
 export const TANK_BATCH_TARGET = 3;
@@ -125,7 +125,7 @@ export function createTankExampleProject(): PracticeProject {
   for (const [name, pre] of Object.entries(TANK_TIMER_PRESETS)) {
     p = setTagValue(p, name, pre, "PRE");
   }
-  p = setTagValue(p, "CNT_Batches", TANK_BATCH_TARGET, "PRE");
+  p = setTagValue(p, "CNT_Lotes", TANK_BATCH_TARGET, "PRE");
   type Spec = { kind: EditableKind; tag: string };
   const contact = (kind: "XIC" | "XIO", tag: string): Spec => ({ kind, tag });
   const x = (tag: string) => contact("XIC", tag);
@@ -167,7 +167,7 @@ export function createTankExampleProject(): PracticeProject {
 
   // R0. START or self-hold; STOP, watchdog alarm and batch DN break the latch.
   or("rung-1", [x("PB_Start")], [x("ST_RunEnable")],
-    [nx("PB_Stop"), nx("ALM_ProcessTimeout"), nx("CNT_Batches.DN")],
+    [nx("PB_Stop"), nx("ALM_ProcessTimeout"), nx("CNT_Lotes.DN")],
     output("OTE", "ST_RunEnable"));
   // R1. Either start when the cycle has no active stages, OR accept the
   // completed drain-to-fill transition from the previous PLC scan.
@@ -188,7 +188,7 @@ export function createTankExampleProject(): PracticeProject {
   make("tank-reset-alarm", [x("PB_Reset"), nx("ST_RunEnable"),
     output("OTU", "ALM_ProcessTimeout")]);
   make("tank-reset-count", [x("PB_Reset"), nx("ST_RunEnable"),
-    output("RES", "CNT_Batches")]);
+    output("RES", "CNT_Lotes")]);
   // XV-01 opens before the pump; both deenergize on high level or alarm.
   make("tank-inlet", [x("ST_Filling"), x("ST_RunEnable"),
     nx("DI_HighLevel"), nx("ALM_ProcessTimeout"), nx("ST_Draining"),
@@ -222,12 +222,12 @@ export function createTankExampleProject(): PracticeProject {
       nx("DO_InletValve")], output("OTE", "DO_DrainValve"));
   // Count the just-completed lot BEFORE deciding whether another is needed.
   make("tank-batch-counter", [x("ST_Draining"), x("DI_LowLevel"),
-    x("ST_RunEnable"), output("CTU", "CNT_Batches")]);
+    x("ST_RunEnable"), output("CTU", "CNT_Lotes")]);
   // Drain → Fill: for lots 1 and 2. Capture ToFill here, then OTU Drain.
   // R1 reads ToFill and latches FillStage on the NEXT scan; at batch 3
   // Batches.DN prevents the transition and RunCmd drops out.
   make("tank-to-fill", [x("ST_Draining"), x("DI_LowLevel"),
-    x("ST_RunEnable"), nx("CNT_Batches.DN"), nx("ALM_ProcessTimeout"),
+    x("ST_RunEnable"), nx("CNT_Lotes.DN"), nx("ALM_ProcessTimeout"),
     output("OTE", "ST_ToFill")]);
   or("tank-drain-end", [x("DI_LowLevel")], [nx("ST_RunEnable")],
     [], output("OTU", "ST_Draining"));
