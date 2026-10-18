@@ -154,8 +154,8 @@ test("numbered rung gutter no longer displays 6-point grip and stays draggable",
   assert.doesNotMatch(editor,/<GripVertical/);
   assert.match(editor,/aria-label=\{"Seleccionar o arrastrar rung " \+ rungIndex\}/);
   assert.match(editor,/onDragStart=\{\(event\) => beginRungMove\(event, rung.id\)\}/);
-  assert.match(info,/Rung 0: OR \(PB_Start \| DO_Motor\)/);
-  assert.match(info,/Rung 2: DI_BoxSensor → CTU CNT_Boxes/);
+  assert.match(info,/R0: OR \(PB_Start \| DO_Motor\)/);
+  assert.match(info,/R2: DI_BoxSensor → CTU CNT_Boxes/);
   assert.match(app,/applyConveyorPhotoeyeInput\(current, next.sensorActive\)/);
   assert.match(app,/applyConveyorMomentaryInput\(state, tag, value\)/);
 });
