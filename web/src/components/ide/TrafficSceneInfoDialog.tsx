@@ -3,7 +3,7 @@ import { RecommendedSolutionPanel } from "./RecommendedSolutionPanel";
 import { useEffect, useRef } from "react";
 import { BookOpen, Info, X } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
-import { TRAFFIC_IO_TAGS, TRAFFIC_SOLUTION_TAGS, TRAFFIC_TIMERS } from "../../plc/trafficSceneModel";
+import { TRAFFIC_IO_TAGS, TRAFFIC_SOLUTION_TAGS } from "../../plc/trafficSceneModel";
 
 interface Props {
   open:boolean;
