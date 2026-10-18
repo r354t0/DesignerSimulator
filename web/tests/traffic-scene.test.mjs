@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
-  TRAFFIC_PHASES, TRAFFIC_TIMERS, TRAFFIC_TAGS,
+  TRAFFIC_PHASES, TRAFFIC_TIMERS, TRAFFIC_TAGS, TRAFFIC_IO_TAGS, TRAFFIC_SOLUTION_TAGS,
   initialTrafficProject,createTrafficExampleProject,initialTrafficState,
   prepareTrafficTags,readTrafficBool,readTrafficCount,addTrafficVehicle,
   trafficWaiting,stepTrafficState,
@@ -33,7 +33,7 @@ const press=(plc,tag)=>{
 
 test("traffic scene gets its own empty MainRoutine and idempotent tag registration",()=>{
   const project=initialTrafficProject();
-  assert.deepEqual(project.tags.map(t=>t.name),TRAFFIC_TAGS.map(t=>t.name));
+  assert.deepEqual(project.tags.map(t=>t.name),TRAFFIC_IO_TAGS.map(t=>t.name));
   assert.equal(project.rungs.length,1);
   assert.equal(project.rungs[0].instructions.length,0);
   assert.strictEqual(prepareTrafficTags(project),project);
@@ -160,5 +160,5 @@ test("scene 4 connects selector, separate project, SCADA and help dialog",()=>{
   assert.match(view,/Tablero de mando/);
   assert.match(view,/Pilotos LED y tráfico/);
   assert.match(view,/MomentaryPushButton compact name="PEATÓN"/);
-  assert.match(help,/Cargar plantilla Ladder/);
+  assert.match(help,/RecommendedSolutionPanel/);
 });
