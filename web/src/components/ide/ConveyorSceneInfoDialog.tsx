@@ -1,8 +1,10 @@
+import { SceneTagTable } from "./SceneTagTable";
+import { RecommendedSolutionPanel } from "./RecommendedSolutionPanel";
 import { useEffect, useRef } from "react";
 import { BookOpen, Info, X } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import {
-  CONVEYOR_TAGS, CONVEYOR_TEMPLATE_TAGS, readConveyorBool, readConveyorCount,
+  CONVEYOR_TAGS, CONVEYOR_TEMPLATE_TAGS,
 } from "../../plc/conveyorSceneModel";
 
 interface Props {
@@ -11,11 +13,12 @@ interface Props {
   onClose: () => void;
   onOpenTags: () => void;
   onLoadExample: () => void;
+  onResetExample: () => void;
 }
 
 /** Native modal dialog stays outside the scene's document flow and scroll area. */
 export function ConveyorSceneInfoDialog({
-  open, project, onClose, onOpenTags, onLoadExample,
+  open, project, onClose, onOpenTags, onLoadExample, onResetExample,
 }: Props) {
   const dialogRef = useRef<HTMLDialogElement>(null);
 
@@ -86,80 +89,24 @@ export function ConveyorSceneInfoDialog({
               Abrir Controller Tags
             </button>
           </div>
-          <div className="overflow-x-auto rounded-md border border-slate-700">
-            <table className="w-full min-w-[570px] table-auto text-left text-[11px]">
-              <thead className="bg-[#203449] text-slate-300">
-                <tr>
-                  <th scope="col" className="px-2.5 py-2 font-semibold">Tag</th>
-                  <th scope="col" className="px-2.5 py-2 font-semibold">Tipo</th>
-                  <th scope="col" className="px-2.5 py-2 font-semibold">Función</th>
-                  <th scope="col" className="px-2.5 py-2 font-semibold">Descripción</th>
-                  <th scope="col" className="px-2.5 py-2 text-right font-semibold">Valor</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/70">
-                {[...CONVEYOR_TAGS, ...CONVEYOR_TEMPLATE_TAGS.filter(spec =>
-                  project.tags.some(tag => tag.name === spec.name))].map((spec) => {
-                  const linked = project.tags.find((tag) => tag.name === spec.name);
-                  const valid = linked?.type === spec.type;
-                  const value = valid
-                    ? spec.type === "COUNTER" ? readConveyorCount(project)
-                      : readConveyorBool(project, spec.name) ? 1 : 0
-                    : null;
-                  return (
-                    <tr key={spec.name} className="hover:bg-slate-700/20">
-                      <th scope="row" className="px-2.5 py-2 font-mono font-semibold text-sky-200">
-                        {spec.name}
-                      </th>
-                      <td className="px-2.5 py-2 font-mono text-slate-300">{spec.type}</td>
-                      <td className="px-2.5 py-2 text-slate-300">{spec.direction}</td>
-                      <td className="px-2.5 py-2 text-slate-300">
-                        {valid && linked ? linked.description || spec.description : spec.description}
-                      </td>
-                      <td className={"px-2.5 py-2 text-right font-mono " +
-                        (valid ? "text-emerald-300" : "text-amber-300")}>
-                        {valid ? value : "Revisar"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+          <SceneTagTable specs={CONVEYOR_TAGS} project={project}/>
           <p className="mt-2 text-[11px] text-slate-400">
-            Entradas: botones y sensor de presencia · Salida: orden de marcha del motor ·
-            Interna: contador CTU; se muestra el valor ACC.
+            Solo se registran entradas y salidas vinculadas al SCADA.
+            El contador y la lógica interna se muestran en la solución recomendada.
           </p>
         </section>
 
-        <section className="rounded-md border border-slate-700 bg-[#1a2b3b] p-3 text-xs">
-          <details className="group">
-            <summary className="cursor-pointer font-semibold text-sky-300">
-              Ver orientación para desarrollar el Ladder (opcional)
-            </summary>
-            <div className="mt-2 space-y-1 font-mono text-[11px] text-slate-300">
-              <p>Rung 0: OR (PB_Start | DO_Motor) + XIO ST_StopRequest → OTE DO_Motor</p>
-              <p>Rung 1: OR (PB_Stop | CNT_Boxes.DN + XIO DI_BoxSensor) → OTE ST_StopRequest</p>
-              <p>Rung 2: DI_BoxSensor → CTU CNT_Boxes (PRE=5)</p>
-              <p>Rung 3: XIO DI_BoxSensor + PB_Reset → RES CNT_Boxes</p>
-              <p className="pt-2 font-sans text-slate-400">
-                PE-01 está en la boca de descarga. Tras cinco detecciones,
-                la faja se detiene cuando la última caja sale por completo
-                y deja libre el sensor.
-                RESET LOTE solo opera con el sensor libre; después pulsa START
-                para comenzar otro lote. STOP detiene sin perder el conteo.
-              </p>
-            </div>
-          </details>
-          <button type="button" onClick={() => { onClose(); onLoadExample(); }}
-            className="mt-3 rounded border border-sky-600 px-3 py-1.5 text-[11px] font-semibold text-sky-300 hover:bg-sky-950">
-            Cargar plantilla Ladder (reemplaza MainRoutine)
-          </button>
-          <p className="mt-2 text-[11px] text-slate-400">
-            La plantilla avanzada requiere confirmación y añade PB_Reset y
-            ST_StopRequest. Registrar los cinco tags básicos no agrega rungs ni activa salidas.
-          </p>
-        </section>
+        <RecommendedSolutionPanel
+          project={project} specs={CONVEYOR_TEMPLATE_TAGS}
+          onImplement={() => { onClose(); onLoadExample(); }}
+          onReset={() => { onClose(); onResetExample(); }}>
+          <div className="space-y-1 font-mono text-[11px] text-slate-300">
+  <p>R0: OR (PB_Start | DO_Motor), XIO ST_StopRequest → OTE DO_Motor</p>
+  <p>R1: OR (PB_Stop | CNT_Boxes.DN + XIO DI_BoxSensor) → OTE ST_StopRequest</p>
+  <p>R2: DI_BoxSensor → CTU CNT_Boxes (PRE=5)</p>
+  <p>R3: XIO DI_BoxSensor + PB_Reset → RES CNT_Boxes</p>
+</div>
+        </RecommendedSolutionPanel>
       </div>
 
       <div className="sticky bottom-0 flex justify-end border-t border-slate-600 bg-[#1b2d3d] px-4 py-2.5">
