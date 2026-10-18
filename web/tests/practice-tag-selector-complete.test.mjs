@@ -24,7 +24,8 @@ test("large scene-4 tag list can be browsed without typing any search text", () 
     const rows = getTagPickerRows(project.tags, kind, "");
     const relevant = project.tags.filter(t => t.type === "BOOL");
     assert.ok(rows.length > 8, kind + " should have many options");
-    assert.equal(rows.length, relevant.length, kind + " must expose ALL BOOL tags");
+    assert.equal(rows.filter(row => row.selectable).length, relevant.length,
+      kind + " must expose ALL BOOL tags without losing additional structured parents");
     assert.ok(rows.some(row => row.name === "Tr_EWWaiting" && row.selectable));
     assert.ok(rows.some(row => row.name === "Tr_Walk" && row.selectable));
   }
