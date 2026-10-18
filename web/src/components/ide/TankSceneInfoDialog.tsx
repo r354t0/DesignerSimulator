@@ -51,7 +51,7 @@ export function TankSceneInfoDialog({ open, project, onClose, onOpenTags, onLoad
             abre XV-01; tras {TANK_TIMER_PRESETS.TMR_StartDelay / 1000} s arranca
             P-01. Al alcanzar el 90 % se cierra la entrada y M-02 mezcla durante
             {TANK_TIMER_PRESETS.TMR_Mixing / 1000} s. Después XV-02 drena hasta
-            el nivel bajo de 15 %, se incrementa CNT_Batches y comienza el
+            el nivel bajo de 15 %, se incrementa CNT_Lotes y comienza el
             siguiente lote. Tras {TANK_BATCH_TARGET} lotes se detiene el ciclo.
             Los watchdogs TON de llenado ({TANK_TIMER_PRESETS.TMR_FillTimeout / 1000} s)
             y vaciado ({TANK_TIMER_PRESETS.TMR_DrainTimeout / 1000} s) disparan
