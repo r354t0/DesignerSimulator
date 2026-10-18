@@ -58,7 +58,8 @@ export const CONVEYOR_TAGS: readonly ConveyorTagDefinition[] = [
     ],
   },
   { name: "PB_Reset", type: "BOOL", direction: "Entrada",
-    description: "RESET lote" },
+    description: "RESET lote",
+    legacyDescriptions: ["Faja: pulsador momentáneo RESET LOTE"] },
 ];
 /** Extra tags installed only when the advanced Ladder solution is loaded. */
 export const CONVEYOR_TEMPLATE_TAGS: readonly ConveyorTagDefinition[] = [
