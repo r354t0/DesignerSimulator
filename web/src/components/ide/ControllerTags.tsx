@@ -19,6 +19,7 @@ interface Props {
   online: boolean;
   onTagChange: (tag: InputTag, value: boolean) => void;
   onResetCounters: () => void;
+  onCrossReference: (tag: string) => void;
 }
 
 type Tab = "monitor" | "edit";
@@ -93,7 +94,7 @@ const cellWidths = {
 };
 
 export function ControllerTags({
-  activeScene, project, onChange, practiceRunning, practicePaused, inputs, values, online, onTagChange, onResetCounters,
+  activeScene, project, onChange, practiceRunning, practicePaused, inputs, values, online, onTagChange, onResetCounters, onCrossReference,
 }: Props) {
   const [tab, setTab] = useState<Tab>("monitor");
   // MainRoutine uses the active SCADA scene's independent tag project.
@@ -110,6 +111,24 @@ export function ControllerTags({
   const [newAccess, setNewAccess] = useState<TagExternalAccess>("Read/Write");
   const [newConstant, setNewConstant] = useState(false);
   const [newStyle, setNewStyle] = useState<TagStyle>("Decimal");
+  const [selectedTag, setSelectedTag] = useState<string | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ tag: string; x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    if (!contextMenu) return;
+    const close = () => setContextMenu(null);
+    const escape = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", escape);
+    window.addEventListener("resize", close);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", escape);
+      window.removeEventListener("resize", close);
+    };
+  }, [contextMenu]);
 
   const update = (operation: () => PracticeProject, message?: string): boolean => {
     try {
@@ -136,6 +155,38 @@ export function ControllerTags({
     .filter((tag) => show === "all" || tag.type === show)
     .filter((tag) => (tag.name + " " + tag.description).toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()))
     .sort((a, b) => a.name.localeCompare(b.name)), [allRows, show, query]);
+
+  const deleteSelectedTag = (name: string | null) => {
+    if (scope !== "practice" || !name || !project.tags.some(tag => tag.name === name)) return;
+    if (!window.confirm("¿Eliminar el tag " + name +
+      "? No se puede deshacer. Si está referenciado en Ladder, primero debes quitar sus referencias.")) return;
+    if (update(() => deleteTag(project, name), "Tag " + name + " eliminado.")) {
+      setSelectedTag(null);
+      setContextMenu(null);
+    }
+  };
+
+  const handleTagTableKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Delete" && event.key !== "Del") return;
+    const element = event.target as HTMLElement;
+    if (element.closest("input,textarea,select,[contenteditable='true']")) return;
+    if (scope !== "practice" || !selectedTag) return;
+    event.preventDefault();
+    event.stopPropagation();
+    deleteSelectedTag(selectedTag);
+  };
+
+  const openTagContext = (event: React.MouseEvent<HTMLTableRowElement>,
+    name: string, rootName = name) => {
+    if (scope !== "practice") return;
+    event.preventDefault();
+    event.stopPropagation();
+    setSelectedTag(rootName);
+    setContextMenu({
+      tag: name, x: Math.min(event.clientX, window.innerWidth - 225),
+      y: Math.min(event.clientY, window.innerHeight - 100),
+    });
+  };
 
   const applyValue = (name: string, value: TagMemberValue, member?: string): boolean =>
     update(() => setTagValue(project, name, value, member));
@@ -238,7 +289,13 @@ export function ControllerTags({
     const isStructured = typeof tag.value === "object";
     const display = tab === "monitor" ? (
       <>
-        <tr key={tag.name} className="bg-white hover:bg-[#edf4ff]">
+        <tr key={tag.name} tabIndex={0} aria-selected={selectedTag === tag.name}
+          onClick={() => setSelectedTag(tag.name)}
+          onFocus={() => setSelectedTag(tag.name)}
+          onContextMenu={event => openTagContext(event, tag.name)}
+          className={selectedTag === tag.name
+            ? "bg-sky-100 outline outline-1 outline-sky-400"
+            : "bg-white hover:bg-[#edf4ff]"}>
           <td className={cellClass + " font-mono"}>
             <div className="flex items-center gap-1">
               {isStructured && <button type="button" aria-label={(expanded.includes(tag.name) ? "Contraer " : "Expandir ") + tag.name}
@@ -267,7 +324,10 @@ export function ControllerTags({
           </td>
         </tr>
         {expanded.includes(tag.name) && isStructured && Object.entries(tag.value as Record<string,TagMemberValue>).map(([member, value]) => (
-          <tr key={tag.name + "." + member} className="bg-[#f7f9fb]">
+          <tr key={tag.name + "." + member} tabIndex={0}
+            onClick={() => setSelectedTag(tag.name)}
+            onContextMenu={event => openTagContext(event, tag.name + "." + member, tag.name)}
+            className={selectedTag === tag.name ? "bg-sky-50" : "bg-[#f7f9fb]"}>
             <td className={cellClass + " pl-8 font-mono text-slate-600"}>{tag.name}.{member}</td>
             <td className={cellClass + " text-right"}>{scope === "practice" ? valueCell(tag, member) : String(Number(value))}</td>
             <td className={cellClass + " text-center text-slate-400"}>—</td>
@@ -279,7 +339,13 @@ export function ControllerTags({
         ))}
       </>
     ) : (
-      <tr key={tag.name} className="bg-white hover:bg-[#edf4ff]">
+      <tr key={tag.name} tabIndex={0} aria-selected={selectedTag === tag.name}
+        onClick={() => setSelectedTag(tag.name)}
+        onFocus={() => setSelectedTag(tag.name)}
+        onContextMenu={event => openTagContext(event, tag.name)}
+        className={selectedTag === tag.name
+          ? "bg-sky-100 outline outline-1 outline-sky-400"
+          : "bg-white hover:bg-[#edf4ff]"}>
         <td className={cellClass}>
           {scope === "practice"
             ? <TextCell key={tag.name} label={"Nombre de " + tag.name} value={tag.name}
@@ -315,7 +381,7 @@ export function ControllerTags({
           {scope === "practice" && <button type="button" aria-label={"Eliminar tag " + tag.name}
             title="Eliminar tag si no tiene referencias en Ladder"
             onClick={() => {
-              if (window.confirm("¿Eliminar el tag " + tag.name + "?")) update(() => deleteTag(project, tag.name));
+              deleteSelectedTag(tag.name);
             }}
             className="rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"><Trash2 size={13}/></button>}
         </td>
@@ -382,7 +448,9 @@ export function ControllerTags({
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col">
-        <div className="min-h-0 flex-1 overflow-auto bg-[#fafafa]" role="region" aria-label="Tabla de Controller Tags" tabIndex={0}>
+        <div className="min-h-0 flex-1 overflow-auto bg-[#fafafa]" role="region"
+          aria-label="Tabla de Controller Tags" tabIndex={0}
+          onKeyDown={handleTagTableKeyDown}>
           <div className="flex min-h-full w-max min-w-full flex-col">
             <table className="w-max min-w-full table-fixed border-collapse text-slate-800">
               <thead><tr>{tab === "monitor" ? monitorHeaders : editHeaders}</tr></thead>
@@ -396,6 +464,27 @@ export function ControllerTags({
             )}
           </div>
         </div>
+        {scope === "practice" && (
+          <p className="shrink-0 border-t border-slate-200 bg-[#f1f5f9] px-3 py-1 text-[10px] text-slate-600">
+            Selecciona un tag y pulsa Supr para eliminarlo · Clic derecho: Cross Reference
+          </p>
+        )}
+        {contextMenu && (
+          <div role="menu" aria-label={"Acciones de " + contextMenu.tag}
+            onPointerDown={event => event.stopPropagation()}
+            style={{ position: "fixed", zIndex: 11000,
+              left: Math.max(8, contextMenu.x), top: Math.max(8, contextMenu.y) }}
+            className="w-[208px] rounded border border-slate-400 bg-white p-1.5 text-slate-900 shadow-xl">
+            <div className="truncate border-b border-slate-200 px-2 py-1.5 font-mono text-[11px]">
+              {contextMenu.tag}
+            </div>
+            <button type="button" role="menuitem"
+              onClick={() => { onCrossReference(contextMenu.tag); setContextMenu(null); }}
+              className="w-full rounded px-2 py-1.5 text-left text-xs hover:bg-sky-100">
+              Cross Reference
+            </button>
+          </div>
+        )}
         {error && <p role="alert" className="shrink-0 border-t border-red-200 bg-red-50 px-3 py-1.5 text-xs text-red-700">{error}</p>}
         {notice && !error && <p role="status" className="shrink-0 bg-sky-50 px-3 py-1 text-[11px] text-sky-800">{notice}</p>}
         <div className="flex shrink-0 items-center justify-between gap-3 border-t border-slate-300 bg-[#e9edf2] px-2">
