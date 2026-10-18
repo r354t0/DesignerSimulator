@@ -290,7 +290,12 @@ export function ControllerTags({
     const display = tab === "monitor" ? (
       <>
         <tr key={tag.name} tabIndex={0} aria-selected={selectedTag === tag.name}
-          onClick={() => setSelectedTag(tag.name)}
+          onClick={event => {
+            setSelectedTag(tag.name);
+            if (!(event.target as HTMLElement).closest("input,textarea,select,button")) {
+              event.currentTarget.focus();
+            }
+          }}
           onFocus={() => setSelectedTag(tag.name)}
           onContextMenu={event => openTagContext(event, tag.name)}
           className={selectedTag === tag.name
@@ -325,7 +330,12 @@ export function ControllerTags({
         </tr>
         {expanded.includes(tag.name) && isStructured && Object.entries(tag.value as Record<string,TagMemberValue>).map(([member, value]) => (
           <tr key={tag.name + "." + member} tabIndex={0}
-            onClick={() => setSelectedTag(tag.name)}
+            onClick={event => {
+            setSelectedTag(tag.name);
+            if (!(event.target as HTMLElement).closest("input,textarea,select,button")) {
+              event.currentTarget.focus();
+            }
+          }}
             onContextMenu={event => openTagContext(event, tag.name + "." + member, tag.name)}
             className={selectedTag === tag.name ? "bg-sky-50" : "bg-[#f7f9fb]"}>
             <td className={cellClass + " pl-8 font-mono text-slate-600"}>{tag.name}.{member}</td>
@@ -340,7 +350,12 @@ export function ControllerTags({
       </>
     ) : (
       <tr key={tag.name} tabIndex={0} aria-selected={selectedTag === tag.name}
-        onClick={() => setSelectedTag(tag.name)}
+        onClick={event => {
+            setSelectedTag(tag.name);
+            if (!(event.target as HTMLElement).closest("input,textarea,select,button")) {
+              event.currentTarget.focus();
+            }
+          }}
         onFocus={() => setSelectedTag(tag.name)}
         onContextMenu={event => openTagContext(event, tag.name)}
         className={selectedTag === tag.name
