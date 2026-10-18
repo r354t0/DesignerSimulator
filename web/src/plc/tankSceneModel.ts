@@ -8,38 +8,38 @@ import {
 export const TANK_TAGS: readonly {
   name: string; type: TagType; direction: "Entrada" | "Salida" | "Interna"; description: string;
 }[] = [
-  { name: "Tank_StartPB", type: "BOOL", direction: "Entrada", description: "Pulsador START" },
-  { name: "Tank_StopPB", type: "BOOL", direction: "Entrada", description: "Pulsador STOP" },
-  { name: "Tank_DrainPB", type: "BOOL", direction: "Entrada", description: "Drenaje manual" },
-  { name: "Tank_ResetPB", type: "BOOL", direction: "Entrada", description: "RESET lote/alarma" },
-  { name: "Tank_LowLS", type: "BOOL", direction: "Entrada", description: "LSL · 15 %" },
-  { name: "Tank_HighLS", type: "BOOL", direction: "Entrada", description: "LSH · 90 %" },
-  { name: "Tank_LevelPct", type: "REAL", direction: "Entrada", description: "Nivel (%)" },
-  { name: "Tank_Pump", type: "BOOL", direction: "Salida", description: "Bomba P-01" },
-  { name: "Tank_InletValve", type: "BOOL", direction: "Salida", description: "Válvula XV-01" },
-  { name: "Tank_DrainValve", type: "BOOL", direction: "Salida", description: "Válvula XV-02" },
-  { name: "Tank_Mixer", type: "BOOL", direction: "Salida", description: "Agitador M-02" },
-  { name: "Tank_RunCmd", type: "BOOL", direction: "Interna", description: "Ciclo automático" },
-  { name: "Tank_FillStage", type: "BOOL", direction: "Interna", description: "Etapa llenado" },
-  { name: "Tank_MixStage", type: "BOOL", direction: "Interna", description: "Etapa mezclado" },
-  { name: "Tank_DrainStage", type: "BOOL", direction: "Interna", description: "Etapa vaciado" },
-  { name: "Tank_ToMix", type: "BOOL", direction: "Interna", description: "Paso a mezclado" },
-  { name: "Tank_ToDrain", type: "BOOL", direction: "Interna", description: "Paso a vaciado" },
-  { name: "Tank_ToFill", type: "BOOL", direction: "Interna", description: "Paso a llenado" },
-  { name: "Tank_Alarm", type: "BOOL", direction: "Interna", description: "Fallo de proceso" },
-  { name: "Tank_TStart", type: "TIMER", direction: "Interna", description: "Retardo bomba" },
-  { name: "Tank_TMix", type: "TIMER", direction: "Interna", description: "Tiempo mezclado" },
-  { name: "Tank_TFillMax", type: "TIMER", direction: "Interna", description: "Máximo llenado" },
-  { name: "Tank_TDrainMax", type: "TIMER", direction: "Interna", description: "Máximo vaciado" },
-  { name: "Tank_Batches", type: "COUNTER", direction: "Interna", description: "Lotes terminados" },
+  { name: "PB_Start", type: "BOOL", direction: "Entrada", description: "Pulsador START" },
+  { name: "PB_Stop", type: "BOOL", direction: "Entrada", description: "Pulsador STOP" },
+  { name: "PB_Drain", type: "BOOL", direction: "Entrada", description: "Drenaje manual" },
+  { name: "PB_Reset", type: "BOOL", direction: "Entrada", description: "RESET lote/alarma" },
+  { name: "DI_LowLevel", type: "BOOL", direction: "Entrada", description: "LSL · 15 %" },
+  { name: "DI_HighLevel", type: "BOOL", direction: "Entrada", description: "LSH · 90 %" },
+  { name: "AI_LevelPct", type: "REAL", direction: "Entrada", description: "Nivel (%)" },
+  { name: "DO_Pump", type: "BOOL", direction: "Salida", description: "Bomba P-01" },
+  { name: "DO_InletValve", type: "BOOL", direction: "Salida", description: "Válvula XV-01" },
+  { name: "DO_DrainValve", type: "BOOL", direction: "Salida", description: "Válvula XV-02" },
+  { name: "DO_Mixer", type: "BOOL", direction: "Salida", description: "Agitador M-02" },
+  { name: "ST_RunEnable", type: "BOOL", direction: "Interna", description: "Ciclo automático" },
+  { name: "ST_Filling", type: "BOOL", direction: "Interna", description: "Etapa llenado" },
+  { name: "ST_Mixing", type: "BOOL", direction: "Interna", description: "Etapa mezclado" },
+  { name: "ST_Draining", type: "BOOL", direction: "Interna", description: "Etapa vaciado" },
+  { name: "ST_ToMix", type: "BOOL", direction: "Interna", description: "Paso a mezclado" },
+  { name: "ST_ToDrain", type: "BOOL", direction: "Interna", description: "Paso a vaciado" },
+  { name: "ST_ToFill", type: "BOOL", direction: "Interna", description: "Paso a llenado" },
+  { name: "ALM_ProcessTimeout", type: "BOOL", direction: "Interna", description: "Fallo de proceso" },
+  { name: "TMR_StartDelay", type: "TIMER", direction: "Interna", description: "Retardo bomba" },
+  { name: "TMR_Mixing", type: "TIMER", direction: "Interna", description: "Tiempo mezclado" },
+  { name: "TMR_FillTimeout", type: "TIMER", direction: "Interna", description: "Máximo llenado" },
+  { name: "TMR_DrainTimeout", type: "TIMER", direction: "Interna", description: "Máximo vaciado" },
+  { name: "CNT_Batches", type: "COUNTER", direction: "Interna", description: "Lotes terminados" },
 ];
 
 export const TANK_BATCH_TARGET = 3;
 export const TANK_TIMER_PRESETS = {
-  Tank_TStart: 1500,
-  Tank_TMix: 4000,
-  Tank_TFillMax: 12000,
-  Tank_TDrainMax: 8000,
+  TMR_StartDelay: 1500,
+  TMR_Mixing: 4000,
+  TMR_FillTimeout: 12000,
+  TMR_DrainTimeout: 8000,
 } as const;
 
 export const TANK_LOW_PERCENT = 15;
@@ -68,7 +68,7 @@ export function readTankBool(project: PracticeProject, name: string): boolean {
   return t?.type === "BOOL" && t.value === true;
 }
 export function readTankLevel(project: PracticeProject): number | null {
-  const t = project.tags.find(item => item.name === "Tank_LevelPct");
+  const t = project.tags.find(item => item.name === "AI_LevelPct");
   return t?.type === "REAL" && typeof t.value === "number" ? t.value : null;
 }
 export function hasTankTags(project: PracticeProject): boolean {
@@ -99,9 +99,9 @@ export function prepareTankTags(project: PracticeProject): PracticeProject {
 export function initialTankProject(): PracticeProject {
   const result = prepareTankTags({ ...initialPracticeProject(), tags: [] });
   const values: Record<string, number | boolean> = {
-    Tank_LowLS: true,
-    Tank_HighLS: false,
-    Tank_LevelPct: TANK_INITIAL_PERCENT,
+    DI_LowLevel: true,
+    DI_HighLevel: false,
+    AI_LevelPct: TANK_INITIAL_PERCENT,
   };
   return {
     ...result,
@@ -125,7 +125,7 @@ export function createTankExampleProject(): PracticeProject {
   for (const [name, pre] of Object.entries(TANK_TIMER_PRESETS)) {
     p = setTagValue(p, name, pre, "PRE");
   }
-  p = setTagValue(p, "Tank_Batches", TANK_BATCH_TARGET, "PRE");
+  p = setTagValue(p, "CNT_Batches", TANK_BATCH_TARGET, "PRE");
   type Spec = { kind: EditableKind; tag: string };
   const contact = (kind: "XIC" | "XIO", tag: string): Spec => ({ kind, tag });
   const x = (tag: string) => contact("XIC", tag);
@@ -166,82 +166,82 @@ export function createTankExampleProject(): PracticeProject {
   };
 
   // R0. START or self-hold; STOP, watchdog alarm and batch DN break the latch.
-  or("rung-1", [x("Tank_StartPB")], [x("Tank_RunCmd")],
-    [nx("Tank_StopPB"), nx("Tank_Alarm"), nx("Tank_Batches.DN")],
-    output("OTE", "Tank_RunCmd"));
+  or("rung-1", [x("PB_Start")], [x("ST_RunEnable")],
+    [nx("PB_Stop"), nx("ALM_ProcessTimeout"), nx("CNT_Batches.DN")],
+    output("OTE", "ST_RunEnable"));
   // R1. Either start when the cycle has no active stages, OR accept the
   // completed drain-to-fill transition from the previous PLC scan.
-  // The Tank_ToFill branch bypasses ALL four series contacts.
+  // The ST_ToFill branch bypasses ALL four series contacts.
   or("tank-begin",
-    [x("Tank_RunCmd"), nx("Tank_FillStage"),
-      nx("Tank_MixStage"), nx("Tank_DrainStage")],
-    [x("Tank_ToFill")], [], output("OTL", "Tank_FillStage"));
-  make("tank-preopen", [x("Tank_FillStage"), x("Tank_RunCmd"),
-    output("TON", "Tank_TStart")]);
-  make("tank-fill-watchdog", [x("Tank_FillStage"), x("Tank_TStart.DN"),
-    nx("Tank_HighLS"), output("TON", "Tank_TFillMax")]);
-  make("tank-drain-watchdog", [x("Tank_DrainStage"), x("Tank_RunCmd"),
-    nx("Tank_LowLS"), output("TON", "Tank_TDrainMax")]);
+    [x("ST_RunEnable"), nx("ST_Filling"),
+      nx("ST_Mixing"), nx("ST_Draining")],
+    [x("ST_ToFill")], [], output("OTL", "ST_Filling"));
+  make("tank-preopen", [x("ST_Filling"), x("ST_RunEnable"),
+    output("TON", "TMR_StartDelay")]);
+  make("tank-fill-watchdog", [x("ST_Filling"), x("TMR_StartDelay.DN"),
+    nx("DI_HighLevel"), output("TON", "TMR_FillTimeout")]);
+  make("tank-drain-watchdog", [x("ST_Draining"), x("ST_RunEnable"),
+    nx("DI_LowLevel"), output("TON", "TMR_DrainTimeout")]);
   // Alarm latches from either independent timeout.
-  or("tank-watchdog-or", [x("Tank_TFillMax.DN")], [x("Tank_TDrainMax.DN")],
-    [], output("OTL", "Tank_Alarm"));
-  make("tank-reset-alarm", [x("Tank_ResetPB"), nx("Tank_RunCmd"),
-    output("OTU", "Tank_Alarm")]);
-  make("tank-reset-count", [x("Tank_ResetPB"), nx("Tank_RunCmd"),
-    output("RES", "Tank_Batches")]);
+  or("tank-watchdog-or", [x("TMR_FillTimeout.DN")], [x("TMR_DrainTimeout.DN")],
+    [], output("OTL", "ALM_ProcessTimeout"));
+  make("tank-reset-alarm", [x("PB_Reset"), nx("ST_RunEnable"),
+    output("OTU", "ALM_ProcessTimeout")]);
+  make("tank-reset-count", [x("PB_Reset"), nx("ST_RunEnable"),
+    output("RES", "CNT_Batches")]);
   // XV-01 opens before the pump; both deenergize on high level or alarm.
-  make("tank-inlet", [x("Tank_FillStage"), x("Tank_RunCmd"),
-    nx("Tank_HighLS"), nx("Tank_Alarm"), nx("Tank_DrainStage"),
-    output("OTE", "Tank_InletValve")]);
-  make("tank-pump", [x("Tank_FillStage"), x("Tank_RunCmd"),
-    x("Tank_TStart.DN"), nx("Tank_HighLS"), nx("Tank_Alarm"),
-    nx("Tank_DrainStage"), output("OTE", "Tank_Pump")]);
+  make("tank-inlet", [x("ST_Filling"), x("ST_RunEnable"),
+    nx("DI_HighLevel"), nx("ALM_ProcessTimeout"), nx("ST_Draining"),
+    output("OTE", "DO_InletValve")]);
+  make("tank-pump", [x("ST_Filling"), x("ST_RunEnable"),
+    x("TMR_StartDelay.DN"), nx("DI_HighLevel"), nx("ALM_ProcessTimeout"),
+    nx("ST_Draining"), output("OTE", "DO_Pump")]);
   // Capture the transition BEFORE clearing the source stage (same scan).
   // Fill → Mix: transition condition → OTU Fill → OTL Mix.
-  make("tank-to-mix", [x("Tank_FillStage"), x("Tank_HighLS"),
-    x("Tank_RunCmd"), nx("Tank_Alarm"), output("OTE", "Tank_ToMix")]);
-  or("tank-fill-end", [x("Tank_ToMix")], [nx("Tank_RunCmd")],
-    [], output("OTU", "Tank_FillStage"));
-  make("tank-mix-begin", [x("Tank_ToMix"),
-    output("OTL", "Tank_MixStage")]);
-  make("tank-mix-timer", [x("Tank_MixStage"), x("Tank_RunCmd"),
-    output("TON", "Tank_TMix")]);
-  make("tank-mixer", [x("Tank_MixStage"), x("Tank_RunCmd"),
-    nx("Tank_TMix.DN"), nx("Tank_Alarm"), output("OTE", "Tank_Mixer")]);
+  make("tank-to-mix", [x("ST_Filling"), x("DI_HighLevel"),
+    x("ST_RunEnable"), nx("ALM_ProcessTimeout"), output("OTE", "ST_ToMix")]);
+  or("tank-fill-end", [x("ST_ToMix")], [nx("ST_RunEnable")],
+    [], output("OTU", "ST_Filling"));
+  make("tank-mix-begin", [x("ST_ToMix"),
+    output("OTL", "ST_Mixing")]);
+  make("tank-mix-timer", [x("ST_Mixing"), x("ST_RunEnable"),
+    output("TON", "TMR_Mixing")]);
+  make("tank-mixer", [x("ST_Mixing"), x("ST_RunEnable"),
+    nx("TMR_Mixing.DN"), nx("ALM_ProcessTimeout"), output("OTE", "DO_Mixer")]);
   // Mix → Drain: transition condition → OTU Mix → OTL Drain.
-  make("tank-to-drain", [x("Tank_MixStage"), x("Tank_TMix.DN"),
-    x("Tank_RunCmd"), nx("Tank_Alarm"), output("OTE", "Tank_ToDrain")]);
-  or("tank-mix-end", [x("Tank_ToDrain")], [nx("Tank_RunCmd")],
-    [], output("OTU", "Tank_MixStage"));
-  make("tank-drain-begin", [x("Tank_ToDrain"),
-    output("OTL", "Tank_DrainStage")]);
+  make("tank-to-drain", [x("ST_Mixing"), x("TMR_Mixing.DN"),
+    x("ST_RunEnable"), nx("ALM_ProcessTimeout"), output("OTE", "ST_ToDrain")]);
+  or("tank-mix-end", [x("ST_ToDrain")], [nx("ST_RunEnable")],
+    [], output("OTU", "ST_Mixing"));
+  make("tank-drain-begin", [x("ST_ToDrain"),
+    output("OTL", "ST_Draining")]);
   // Manual drain is only possible with automation off; no simultaneous filling.
-  or("tank-drain-valve", [x("Tank_DrainStage"), x("Tank_RunCmd")],
-    [x("Tank_DrainPB"), nx("Tank_RunCmd")],
-    [nx("Tank_LowLS"), nx("Tank_Alarm"), nx("Tank_Pump"),
-      nx("Tank_InletValve")], output("OTE", "Tank_DrainValve"));
+  or("tank-drain-valve", [x("ST_Draining"), x("ST_RunEnable")],
+    [x("PB_Drain"), nx("ST_RunEnable")],
+    [nx("DI_LowLevel"), nx("ALM_ProcessTimeout"), nx("DO_Pump"),
+      nx("DO_InletValve")], output("OTE", "DO_DrainValve"));
   // Count the just-completed lot BEFORE deciding whether another is needed.
-  make("tank-batch-counter", [x("Tank_DrainStage"), x("Tank_LowLS"),
-    x("Tank_RunCmd"), output("CTU", "Tank_Batches")]);
+  make("tank-batch-counter", [x("ST_Draining"), x("DI_LowLevel"),
+    x("ST_RunEnable"), output("CTU", "CNT_Batches")]);
   // Drain → Fill: for lots 1 and 2. Capture ToFill here, then OTU Drain.
   // R1 reads ToFill and latches FillStage on the NEXT scan; at batch 3
   // Batches.DN prevents the transition and RunCmd drops out.
-  make("tank-to-fill", [x("Tank_DrainStage"), x("Tank_LowLS"),
-    x("Tank_RunCmd"), nx("Tank_Batches.DN"), nx("Tank_Alarm"),
-    output("OTE", "Tank_ToFill")]);
-  or("tank-drain-end", [x("Tank_LowLS")], [nx("Tank_RunCmd")],
-    [], output("OTU", "Tank_DrainStage"));
+  make("tank-to-fill", [x("ST_Draining"), x("DI_LowLevel"),
+    x("ST_RunEnable"), nx("CNT_Batches.DN"), nx("ALM_ProcessTimeout"),
+    output("OTE", "ST_ToFill")]);
+  or("tank-drain-end", [x("DI_LowLevel")], [nx("ST_RunEnable")],
+    [], output("OTU", "ST_Draining"));
   return p;
 }
 
 export function tankSensorInputs(levelPercent: number): {
-  Tank_LowLS: boolean; Tank_HighLS: boolean; Tank_LevelPct: number;
+  DI_LowLevel: boolean; DI_HighLevel: boolean; AI_LevelPct: number;
 } {
   const level = Math.max(0, Math.min(100, levelPercent));
   return {
-    Tank_LowLS: level <= TANK_LOW_PERCENT,
-    Tank_HighLS: level >= TANK_HIGH_PERCENT,
-    Tank_LevelPct: Math.round(level * 100) / 100,
+    DI_LowLevel: level <= TANK_LOW_PERCENT,
+    DI_HighLevel: level >= TANK_HIGH_PERCENT,
+    AI_LevelPct: Math.round(level * 100) / 100,
   };
 }
 
