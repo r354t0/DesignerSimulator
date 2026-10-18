@@ -19,7 +19,7 @@ import {
 test("prepare tags preserves the full current Ladder and does not duplicate tags", () => {
   let project = initialPracticeProject();
   project = insertInstruction(project, "rung-1", 0,
-    { id: "existing", kind: "XIC", tag: "ST_AutoMode" });
+    { id: "existing", kind: "XIC", tag: "Auto_Mode" });
   const original = project.rungs;
   const next = prepareConveyorTags(project);
   assert.deepEqual(next.rungs, original);
