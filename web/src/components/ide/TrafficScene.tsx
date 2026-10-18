@@ -48,7 +48,7 @@ function Lamp({x,y,green,yellow,red,title}:{
           fill={on?color:"#233641"} stroke={on?color:"#586e7a"}
           strokeWidth="1.5" opacity={on?1:0.6}/>)}
     <text x={x} y={y+91} textAnchor="middle" fontSize="12" fontWeight="700"
-      fill="#dbeafe">{title}</text>
+      fill="#1f3443">{title}</text>
   </g>;
 }
 export function TrafficScene({project,mode,state,onInputChange,onAddVehicle,onReset,
@@ -118,22 +118,16 @@ export function TrafficScene({project,mode,state,onInputChange,onAddVehicle,onRe
             <span className={"rounded bg-[#102534] px-2 py-1 font-mono text-[10px] "+
               (fault?"text-red-300":"text-sky-300")}>{fault?"ALARMA":phaseLabel}</span>
           </div>
-          <div className="overflow-x-auto rounded border border-[#344b5a] bg-[#0a1924]"
+          <div className="scada-process-canvas overflow-x-auto rounded border border-[#7d8992] bg-[#c0c0c0]"
             role="img" aria-label={"Intersección: NS "+(nsG?"verde":nsY?"amarillo":"rojo")+
               ", EW "+(ewG?"verde":ewY?"amarillo":"rojo")+
               ", peatones "+(walk?"cruzando":"esperando")}>
             <svg viewBox="0 0 760 440" className="block h-auto w-full min-w-[390px]"
               xmlns="http://www.w3.org/2000/svg">
-              <defs>
-                <pattern id="traffic-grass" width="25" height="25" patternUnits="userSpaceOnUse">
-                  <path d="M4 23L7 19M20 4L22 0" stroke="#34564f" opacity=".3"/>
-                </pattern>
-              </defs>
-              <rect width="760" height="440" fill="#17342f"/>
-              <rect width="760" height="440" fill="url(#traffic-grass)"/>
-              <rect x="308" y="0" width="144" height="440" fill="#293b48"/>
-              <rect x="0" y="149" width="760" height="142" fill="#293b48"/>
-              <rect x="308" y="149" width="144" height="142" fill="#364651"/>
+              <rect width="760" height="440" fill="#c0c0c0"/>
+              <rect x="308" y="0" width="144" height="440" fill="#485560"/>
+              <rect x="0" y="149" width="760" height="142" fill="#485560"/>
+              <rect x="308" y="149" width="144" height="142" fill="#3c4853"/>
               <path d="M380 0 V149 M380 291 V440 M0 220 H308 M452 220 H760"
                 stroke="#efde8a" strokeWidth="3" strokeDasharray="22 14"/>
               {Array.from({length:7},(_,i)=>(
@@ -156,7 +150,7 @@ export function TrafficScene({project,mode,state,onInputChange,onAddVehicle,onRe
                 const y=ns?24+391*car.position:251;
                 return <g key={car.id} transform={"translate("+x+" "+y+") rotate("+(ns?0:90)+")"}>
                   <rect x="-10" y="-17" width="20" height="34" rx="5"
-                    fill={ns?"#60a5fa":"#f9a8d4"} stroke="#e2e8f0" strokeWidth="1.5"/>
+                    fill={ns?"#3b82f6":"#f472b6"} stroke="#182735" strokeWidth="1.5"/>
                   <rect x="-7" y="-9" width="14" height="12" rx="2" fill="#23415b"/>
                   <path d="M-6 11H6" stroke="#e2e8f0" strokeWidth="2"/>
                 </g>;
