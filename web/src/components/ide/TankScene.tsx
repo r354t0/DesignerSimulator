@@ -20,6 +20,7 @@ interface Props {
   onPrepareTags: () => void;
   onOpenTags: () => void;
   onLoadExample: () => void;
+  onResetExample: () => void;
 }
 
 function Pilot({ label, active, tone }: {
@@ -43,7 +44,7 @@ function Pilot({ label, active, tone }: {
 /** Process-only SCADA view: no hidden auto-control or synthetic motor state. */
 export function TankScene({
   project, mode, state, setupError, onInputChange,
-  onReset, onPrepareTags, onOpenTags, onLoadExample,
+  onReset, onPrepareTags, onOpenTags, onLoadExample, onResetExample,
 }: Props) {
   const [infoOpen, setInfoOpen] = useState(false);
   const running = mode === "running";
@@ -372,7 +373,7 @@ export function TankScene({
       </div>
       <TankSceneInfoDialog open={infoOpen} project={project}
         onClose={() => setInfoOpen(false)}
-        onOpenTags={onOpenTags} onLoadExample={onLoadExample}/>
+        onOpenTags={onOpenTags} onLoadExample={onLoadExample} onResetExample={onResetExample}/>
     </section>
   );
 }
