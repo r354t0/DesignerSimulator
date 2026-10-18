@@ -58,14 +58,19 @@ export function readTrafficCount(project: PracticeProject, name: string): number
   return tag?.type==="COUNTER" && typeof tag.value==="object" &&
     typeof tag.value.ACC==="number" ? tag.value.ACC : 0;
 }
+export const TRAFFIC_IO_TAGS = TRAFFIC_TAGS.filter(tag => tag.direction !== "Interna");
+export const TRAFFIC_SOLUTION_TAGS = TRAFFIC_TAGS.filter(tag => tag.direction === "Interna");
+
 export function prepareTrafficTags(project: PracticeProject): PracticeProject {
-  for(const spec of TRAFFIC_TAGS) {
+  const specs=[...TRAFFIC_IO_TAGS, ...TRAFFIC_SOLUTION_TAGS.filter(spec =>
+    project.tags.some(tag => tag.name.toLowerCase()===spec.name.toLowerCase()))];
+  for(const spec of specs) {
     const tag=project.tags.find(t=>t.name.toLowerCase()===spec.name.toLowerCase());
     if(tag && (tag.name!==spec.name || tag.type!==spec.type))
       throw Error("Tag incompatible con semáforos: "+spec.name+" ("+spec.type+").");
   }
   let result=project;
-  for(const spec of TRAFFIC_TAGS) {
+  for(const spec of specs) {
     const tag=result.tags.find(t=>t.name===spec.name);
     if(!tag) result=createTag(result,spec.name,spec.description,spec.type);
     else if(!tag.description.trim()) result={...result,
@@ -80,6 +85,7 @@ export function initialTrafficProject(): PracticeProject {
 /** Explicit training solution: all decisions, phases, lamps and counts are Ladder-driven. */
 export function createTrafficExampleProject(): PracticeProject {
   let p=initialTrafficProject();
+  for(const tag of TRAFFIC_SOLUTION_TAGS) p=createTag(p,tag.name,tag.description,tag.type);
   for(const [name,pre] of Object.entries(TRAFFIC_TIMERS)) p=setTagValue(p,name,pre,"PRE");
   for(const tag of ["CNT_NS_Vehicles","CNT_EW_Vehicles"]) p=setTagValue(p,tag,9999,"PRE");
   type S={kind:EditableKind;tag:string};
