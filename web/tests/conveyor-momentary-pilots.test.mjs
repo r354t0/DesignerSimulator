@@ -14,10 +14,10 @@ const button = readFileSync(new URL("../src/components/ide/MomentaryPushButton.t
 test("SCADA START/STOP are momentary digital inputs instead of toggle buttons", () => {
   assert.match(scene,/MomentaryPushButton compact name="START"/);
   assert.match(scene,/MomentaryPushButton compact name="STOP"/);
-  assert.match(scene,/onChange=\{\(pressed\) => onInputChange\("Start_PB", pressed\)\}/);
-  assert.match(scene,/onChange=\{\(pressed\) => onInputChange\("Stop_PB", pressed\)\}/);
-  assert.doesNotMatch(scene,/onClick=\{\(\) => onInputChange\("Start_PB", !start\)\}/);
-  assert.doesNotMatch(scene,/onClick=\{\(\) => onInputChange\("Stop_PB", !stop\)\}/);
+  assert.match(scene,/onChange=\{\(pressed\) => onInputChange\("PB_Start", pressed\)\}/);
+  assert.match(scene,/onChange=\{\(pressed\) => onInputChange\("PB_Stop", pressed\)\}/);
+  assert.doesNotMatch(scene,/onClick=\{\(\) => onInputChange\("PB_Start", !start\)\}/);
+  assert.doesNotMatch(scene,/onClick=\{\(\) => onInputChange\("PB_Stop", !stop\)\}/);
 });
 
 test("momentary button handles pointer, touch, cancel, keyboard and focus interruptions", () => {
@@ -41,16 +41,16 @@ test("momentary START/STOP pulses still drive MainRoutine latch and unlatch", ()
   const input = (name, pressed) => {
     state = applyConveyorMomentaryInput(state, name, pressed);
   };
-  input("Start_PB",true);
-  assert.equal(readConveyorBool(state.project,"Motor_Run"),true);
-  input("Start_PB",false);
-  assert.equal(readConveyorBool(state.project,"Start_PB"),false);
-  assert.equal(readConveyorBool(state.project,"Motor_Run"),true);
-  input("Stop_PB",true);
-  assert.equal(readConveyorBool(state.project,"Motor_Run"),false);
-  input("Stop_PB",false);
-  assert.equal(readConveyorBool(state.project,"Stop_PB"),false);
-  assert.equal(readConveyorBool(state.project,"Motor_Run"),false);
+  input("PB_Start",true);
+  assert.equal(readConveyorBool(state.project,"DO_Motor"),true);
+  input("PB_Start",false);
+  assert.equal(readConveyorBool(state.project,"PB_Start"),false);
+  assert.equal(readConveyorBool(state.project,"DO_Motor"),true);
+  input("PB_Stop",true);
+  assert.equal(readConveyorBool(state.project,"DO_Motor"),false);
+  input("PB_Stop",false);
+  assert.equal(readConveyorBool(state.project,"PB_Stop"),false);
+  assert.equal(readConveyorBool(state.project,"DO_Motor"),false);
 });
 
 test("drive motor is on the left, no longer a right-side appendage", () => {
@@ -75,7 +75,7 @@ test("pilot LEDs replace raw tag/value table while retaining box counter", () =>
   assert.match(scene,/Cajas detectadas/);
   assert.match(scene,/readConveyorCount\(project\)/);
   assert.doesNotMatch(scene,/Señales de la escena/);
-  assert.doesNotMatch(scene,/Motor_Run = \{Number\(motorOn\)\}/);
+  assert.doesNotMatch(scene,/DO_Motor = \{Number\(motorOn\)\}/);
   assert.match(scene,/Objetivo y mapa E\/S/);
   assert.match(scene,/aria-label="Información de la escena"/);
 });
