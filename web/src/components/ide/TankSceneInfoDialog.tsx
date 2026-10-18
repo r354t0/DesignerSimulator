@@ -3,7 +3,7 @@ import { RecommendedSolutionPanel } from "./RecommendedSolutionPanel";
 import { useEffect, useRef } from "react";
 import { BookOpen, Info, X } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
-import { TANK_TAGS, TANK_BATCH_TARGET, TANK_TIMER_PRESETS, readTankBool, readTankLevel } from "../../plc/tankSceneModel";
+import { TANK_IO_TAGS, TANK_SOLUTION_TAGS, TANK_BATCH_TARGET, TANK_TIMER_PRESETS } from "../../plc/tankSceneModel";
 
 interface Props {
   open: boolean;
