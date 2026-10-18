@@ -14,7 +14,7 @@ interface Props {
   state: TankState;
   setupError: string | null;
   onInputChange: (
-    name: "Tank_StartPB" | "Tank_StopPB" | "Tank_DrainPB" | "Tank_ResetPB", pressed: boolean
+    name: "PB_Start" | "PB_Stop" | "PB_Drain" | "PB_Reset", pressed: boolean
   ) => void;
   onReset: () => void;
   onPrepareTags: () => void;
@@ -47,16 +47,16 @@ export function TankScene({
 }: Props) {
   const [infoOpen, setInfoOpen] = useState(false);
   const running = mode === "running";
-  const pump = running && readTankBool(project, "Tank_Pump");
-  const inlet = running && readTankBool(project, "Tank_InletValve");
-  const drain = running && readTankBool(project, "Tank_DrainValve");
-  const mixer = running && readTankBool(project, "Tank_Mixer");
-  const alarm = readTankBool(project, "Tank_Alarm");
-  const auto = running && readTankBool(project, "Tank_RunCmd");
-  const filling = auto && readTankBool(project, "Tank_FillStage");
-  const mixing = auto && readTankBool(project, "Tank_MixStage");
-  const draining = auto && readTankBool(project, "Tank_DrainStage");
-  const batch = project.tags.find(t => t.name === "Tank_Batches");
+  const pump = running && readTankBool(project, "DO_Pump");
+  const inlet = running && readTankBool(project, "DO_InletValve");
+  const drain = running && readTankBool(project, "DO_DrainValve");
+  const mixer = running && readTankBool(project, "DO_Mixer");
+  const alarm = readTankBool(project, "ALM_ProcessTimeout");
+  const auto = running && readTankBool(project, "ST_RunEnable");
+  const filling = auto && readTankBool(project, "ST_Filling");
+  const mixing = auto && readTankBool(project, "ST_Mixing");
+  const draining = auto && readTankBool(project, "ST_Draining");
+  const batch = project.tags.find(t => t.name === "CNT_Batches");
   const batches = batch?.type === "COUNTER" && typeof batch.value === "object" &&
     typeof batch.value.ACC === "number" ? batch.value.ACC : 0;
   const complete = batches >= TANK_BATCH_TARGET;
@@ -72,8 +72,8 @@ export function TankScene({
       acc: typeof value?.ACC === "number" ? value.ACC : 0,
       done: value?.DN === true };
   });
-  const low = readTankBool(project, "Tank_LowLS");
-  const high = readTankBool(project, "Tank_HighLS");
+  const low = readTankBool(project, "DI_LowLevel");
+  const high = readTankBool(project, "DI_HighLevel");
   const level = Math.max(0, Math.min(100, state.levelPercent));
   const waterHeight = level * 1.72;
   const waterY = 236 - waterHeight;
@@ -280,20 +280,20 @@ export function TankScene({
             <h3 className="mb-2 text-[11px] font-semibold">Tablero de mando</h3>
             <div className="scada-command-buttons grid max-w-[210px] grid-cols-2 gap-2">
               <MomentaryPushButton compact name="START" tone="start"
-                pressed={readTankBool(project, "Tank_StartPB")}
-                onChange={(pressed) => onInputChange("Tank_StartPB", pressed)}
+                pressed={readTankBool(project, "PB_Start")}
+                onChange={(pressed) => onInputChange("PB_Start", pressed)}
                 icon={<Play size={15} aria-hidden="true"/>}>START</MomentaryPushButton>
               <MomentaryPushButton compact name="STOP" tone="stop"
-                pressed={readTankBool(project, "Tank_StopPB")}
-                onChange={(pressed) => onInputChange("Tank_StopPB", pressed)}
+                pressed={readTankBool(project, "PB_Stop")}
+                onChange={(pressed) => onInputChange("PB_Stop", pressed)}
                 icon={<Pause size={15} aria-hidden="true"/>}>STOP</MomentaryPushButton>
               <MomentaryPushButton compact name="DRENAR" tone="drain"
-                pressed={readTankBool(project, "Tank_DrainPB")}
-                onChange={(pressed) => onInputChange("Tank_DrainPB", pressed)}
+                pressed={readTankBool(project, "PB_Drain")}
+                onChange={(pressed) => onInputChange("PB_Drain", pressed)}
                 icon={<Droplets size={15} aria-hidden="true"/>}>DRENAR</MomentaryPushButton>
               <MomentaryPushButton compact name="RESET" tone="drain"
-                pressed={readTankBool(project, "Tank_ResetPB")}
-                onChange={(pressed) => onInputChange("Tank_ResetPB", pressed)}
+                pressed={readTankBool(project, "PB_Reset")}
+                onChange={(pressed) => onInputChange("PB_Reset", pressed)}
                 icon={<RotateCcw size={15} aria-hidden="true"/>}>RESET</MomentaryPushButton>
             </div>
           </section>
