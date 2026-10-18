@@ -15,7 +15,7 @@ interface Props {
   project: PracticeProject;
   mode: ScanMode;
   scene: ConveyorState;
-  onInputChange: (name: "Start_PB" | "Stop_PB" | "CV_ResetPB", value: boolean) => void;
+  onInputChange: (name: "PB_Start" | "PB_Stop" | "PB_Reset", value: boolean) => void;
   onAddItem: () => void;
   onResetScene: () => void;
   onPrepareTags: () => void;
@@ -49,14 +49,14 @@ export function ConveyorScene({
   onPrepareTags, onOpenTags, setupError, onLoadExample,
 }: Props) {
   const running = mode === "running";
-  const motorOn = running && readConveyorBool(project, "Motor_Run");
-  const start = readConveyorBool(project, "Start_PB");
-  const stop = readConveyorBool(project, "Stop_PB");
+  const motorOn = running && readConveyorBool(project, "DO_Motor");
+  const start = readConveyorBool(project, "PB_Start");
+  const stop = readConveyorBool(project, "PB_Stop");
   const resetAvailable = project.tags.some(tag =>
-    tag.name === "CV_ResetPB" && tag.type === "BOOL");
-  const reset = resetAvailable && readConveyorBool(project, "CV_ResetPB");
-  const batchDone = project.tags.some(tag => tag.name === "CV_StopRequest") &&
-    project.tags.some(tag => tag.name === "CV_Count" && tag.type === "COUNTER" &&
+    tag.name === "PB_Reset" && tag.type === "BOOL");
+  const reset = resetAvailable && readConveyorBool(project, "PB_Reset");
+  const batchDone = project.tags.some(tag => tag.name === "ST_StopRequest") &&
+    project.tags.some(tag => tag.name === "CNT_Boxes" && tag.type === "COUNTER" &&
       typeof tag.value === "object" && tag.value.DN === true);
   const sensor = readConveyorBool(project, CONVEYOR_SENSOR_TAG);
   const count = readConveyorCount(project);
@@ -239,14 +239,14 @@ export function ConveyorScene({
             </div>
             <div className="scada-command-buttons grid max-w-[210px] grid-cols-2 gap-2">
               <MomentaryPushButton compact name="START" tone="start" pressed={start}
-                onChange={(pressed) => onInputChange("Start_PB", pressed)}
+                onChange={(pressed) => onInputChange("PB_Start", pressed)}
                 icon={<Play size={15} aria-hidden="true"/>}>START</MomentaryPushButton>
               <MomentaryPushButton compact name="STOP" tone="stop" pressed={stop}
-                onChange={(pressed) => onInputChange("Stop_PB", pressed)}
+                onChange={(pressed) => onInputChange("PB_Stop", pressed)}
                 icon={<Pause size={15} aria-hidden="true"/>}>STOP</MomentaryPushButton>
               {resetAvailable && (
                 <MomentaryPushButton compact name="RESET LOTE" tone="drain" pressed={reset}
-                  onChange={(pressed) => onInputChange("CV_ResetPB", pressed)}
+                  onChange={(pressed) => onInputChange("PB_Reset", pressed)}
                   icon={<RotateCcw size={15} aria-hidden="true"/>}>RESET</MomentaryPushButton>
               )}
             </div>
@@ -264,7 +264,7 @@ export function ConveyorScene({
             </div>
             <div className="mt-3 flex items-center justify-between border-t border-slate-700 pt-2 text-[11px]">
               <span className="text-slate-400">Cajas detectadas</span>
-              <output aria-label="Conteo de cajas CV_Count.ACC"
+              <output aria-label="Conteo de cajas CNT_Boxes.ACC"
                 className="font-mono text-sm font-bold tabular-nums text-sky-200">
                 {count ?? "—"}
               </output>
