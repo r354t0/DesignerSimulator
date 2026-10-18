@@ -94,7 +94,7 @@ test("six alternating A/B boxes correctly route, count, empty and stop with 500m
   assert.equal(count(plc,"CNT_ExitA"),3);
   assert.equal(count(plc,"CNT_ExitB"),3);
   assert.equal(count(plc,"CNT_BatchBoxes"),SORT_BATCH_SIZE);
-  assert.equal(count(plc,"CNT_Batches"),1);
+  assert.equal(count(plc,"CNT_Lotes"),1);
   assert.equal(isOn(plc,"ST_StopRequest"),true);
   assert.equal(isOn(plc,"DO_Motor"),false);
   assert.equal(isOn(plc,"DI_LineClear"),true);
@@ -107,17 +107,17 @@ test("RESET when the lines are empty resets A, B and TOTAL, not lifetime batches
     initialPracticeScanState(createSortExampleProject()),500));
   plc=pulse(plc,"PB_Start");
   ({plc}=runSix(plc,["A","B","A","B","A","B"]));
-  assert.equal(count(plc,"CNT_Batches"),1);
+  assert.equal(count(plc,"CNT_Lotes"),1);
   plc=pulse(plc,"PB_Reset");
   assert.equal(isOn(plc,"PB_Reset"),false);
   for(const tag of ["CNT_ExitA","CNT_ExitB","CNT_BatchBoxes"])
     assert.equal(count(plc,tag),0,"reset "+tag);
-  assert.equal(count(plc,"CNT_Batches"),1,"lifetime counter must survive reset");
+  assert.equal(count(plc,"CNT_Lotes"),1,"lifetime counter must survive reset");
   assert.equal(isOn(plc,"ST_StopRequest"),false);
   plc=pulse(plc,"PB_Start");
   assert.equal(isOn(plc,"DO_Motor"),true);
   ({plc}=runSix(plc,["B","A","B","A","B","A"]));
-  assert.equal(count(plc,"CNT_Batches"),2,"batch CTU must count second finished lot");
+  assert.equal(count(plc,"CNT_Lotes"),2,"batch CTU must count second finished lot");
   assert.equal(count(plc,"CNT_BatchBoxes"),6);
   assert.equal(isOn(plc,"DO_Motor"),false);
 });
@@ -142,7 +142,7 @@ test("SCADA, physical inputs and tutorial mention advanced control and count wid
   assert.match(view,/Pilot label="LOTE COMPLETO"/);
   assert.match(view,/Pilot label="LÍNEAS LIBRES"/);
   assert.match(view,/CNT_BatchBoxes/);
-  assert.match(view,/CNT_Batches/);
+  assert.match(view,/CNT_Lotes/);
   assert.match(app,/applySortSensorInput\(state, name, value\)/);
   assert.match(app,/applySortMomentaryInput\(state, tag, value\)/);
   assert.match(app,/\["DI_LineClear", next\.lineClear\]/);
