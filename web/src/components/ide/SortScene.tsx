@@ -26,6 +26,7 @@ interface Props {
   onPrepareTags: () => void;
   onOpenTags: () => void;
   onLoadExample: () => void;
+  onResetExample: () => void;
 }
 
 function Pilot({ label, active, color }: {
@@ -53,7 +54,7 @@ function Pilot({ label, active, color }: {
 /** PLC-controlled SCADA. No simulation state or process commands are faked by the UI. */
 export function SortScene({
   project, mode, state, setupError, onInputChange, onAddBox, onReset,
-  onPrepareTags, onOpenTags, onLoadExample,
+  onPrepareTags, onOpenTags, onLoadExample, onResetExample,
 }: Props) {
   const [infoOpen, setInfoOpen] = useState(false);
   const running = mode === "running";
@@ -244,7 +245,7 @@ export function SortScene({
       </div>
       <SortSceneInfoDialog open={infoOpen} project={project}
         onClose={() => setInfoOpen(false)}
-        onOpenTags={onOpenTags} onLoadExample={onLoadExample}/>
+        onOpenTags={onOpenTags} onLoadExample={onLoadExample} onResetExample={onResetExample}/>
     </section>
   );
 }
