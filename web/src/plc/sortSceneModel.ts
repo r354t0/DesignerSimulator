@@ -19,8 +19,8 @@ export const SORT_TAGS: readonly {
   { name: "DI_ExitB", type: "BOOL", direction: "Entrada", description: "Sensor salida B" },
   { name: "DO_Motor", type: "BOOL", direction: "Salida", description: "Motor principal" },
   { name: "DO_Diverter", type: "BOOL", direction: "Salida", description: "Desviador línea B" },
-  { name: "CNT_ExitA", type: "COUNTER", direction: "Interna", description: "Conteo salida A" },
-  { name: "CNT_ExitB", type: "COUNTER", direction: "Interna", description: "Conteo salida B" },
+  { name: "PB_Reset", type: "BOOL", direction: "Entrada", description: "RESET lote" },
+  { name: "DI_LineClear", type: "BOOL", direction: "Entrada", description: "Líneas vacías" },
 ];
 
 /** Keep user-edited descriptions; migrate only previously generated defaults. */
@@ -38,10 +38,8 @@ const SORT_LEGACY_DESCRIPTIONS: Readonly<Record<string, string>> = {
 
 /** Installed only when the user accepts the advanced Ladder solution. */
 export const SORT_TEMPLATE_TAGS: readonly (typeof SORT_TAGS)[number][] = [
-  { name: "PB_Reset", type: "BOOL", direction: "Entrada",
-    description: "RESET lote" },
-  { name: "DI_LineClear", type: "BOOL", direction: "Entrada",
-    description: "Líneas vacías" },
+  { name: "CNT_ExitA", type: "COUNTER", direction: "Interna", description: "Conteo salida A" },
+  { name: "CNT_ExitB", type: "COUNTER", direction: "Interna", description: "Conteo salida B" },
   { name: "ST_StopRequest", type: "BOOL", direction: "Interna",
     description: "Parada STOP/lote" },
   { name: "CNT_BatchBoxes", type: "COUNTER", direction: "Interna",
@@ -131,8 +129,10 @@ export function prepareSortTags(project: PracticeProject): PracticeProject {
 /** A scene-specific MainRoutine; prior scene projects are preserved by App. */
 export function initialSortProject(): PracticeProject {
   const prepared = prepareSortTags({ ...initialPracticeProject(), tags: [] });
-  return { ...prepared, tags: SORT_TAGS.map((spec) =>
-    prepared.tags.find((tag) => tag.name === spec.name)!) };
+  return { ...prepared, tags: SORT_TAGS.map((spec) => {
+    const tag = prepared.tags.find((item) => item.name === spec.name)!;
+    return spec.name === "DI_LineClear" ? { ...tag, value: true } : tag;
+  }) };
 }
 
 /**
