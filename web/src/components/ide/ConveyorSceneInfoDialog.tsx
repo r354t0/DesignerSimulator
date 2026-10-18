@@ -61,7 +61,7 @@ export function ConveyorSceneInfoDialog({
           </h3>
           <p className="text-xs leading-relaxed text-slate-200">
             Programa en MainRoutine el arranque y enclavamiento de marcha con ramas OR
-            (START o Motor_Run), protegido por una solicitud de parada.
+            (START o DO_Motor), protegido por una solicitud de parada.
             Cuenta las cajas mediante CTU al cruzar PE-01, situado en la
             descarga. Al completar un lote de cinco cajas, detén la faja
             únicamente después de que la quinta salga por completo.
@@ -138,10 +138,10 @@ export function ConveyorSceneInfoDialog({
               Ver orientación para desarrollar el Ladder (opcional)
             </summary>
             <div className="mt-2 space-y-1 font-mono text-[11px] text-slate-300">
-              <p>Rung 0: OR (Start_PB | Motor_Run) + XIO CV_StopRequest → OTE Motor_Run</p>
-              <p>Rung 1: OR (Stop_PB | CV_Count.DN + XIO CV_BoxSensor) → OTE CV_StopRequest</p>
-              <p>Rung 2: CV_BoxSensor → CTU CV_Count (PRE=5)</p>
-              <p>Rung 3: XIO CV_BoxSensor + CV_ResetPB → RES CV_Count</p>
+              <p>Rung 0: OR (PB_Start | DO_Motor) + XIO ST_StopRequest → OTE DO_Motor</p>
+              <p>Rung 1: OR (PB_Stop | CNT_Boxes.DN + XIO DI_BoxSensor) → OTE ST_StopRequest</p>
+              <p>Rung 2: DI_BoxSensor → CTU CNT_Boxes (PRE=5)</p>
+              <p>Rung 3: XIO DI_BoxSensor + PB_Reset → RES CNT_Boxes</p>
               <p className="pt-2 font-sans text-slate-400">
                 PE-01 está en la boca de descarga. Tras cinco detecciones,
                 la faja se detiene cuando la última caja sale por completo
@@ -156,8 +156,8 @@ export function ConveyorSceneInfoDialog({
             Cargar plantilla Ladder (reemplaza MainRoutine)
           </button>
           <p className="mt-2 text-[11px] text-slate-400">
-            La plantilla avanzada requiere confirmación y añade CV_ResetPB y
-            CV_StopRequest. Registrar los cinco tags básicos no agrega rungs ni activa salidas.
+            La plantilla avanzada requiere confirmación y añade PB_Reset y
+            ST_StopRequest. Registrar los cinco tags básicos no agrega rungs ni activa salidas.
           </p>
         </section>
       </div>
