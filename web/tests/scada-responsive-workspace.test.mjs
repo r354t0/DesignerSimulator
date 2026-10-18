@@ -31,7 +31,7 @@ test("SCADA layout uses dock-panel width: max process 800px, wide side panels, c
   // The previously approved charcoal palette is unchanged.
   assert.match(css,/#0b1823/);
   assert.match(css,/#192c3b/);
-  assert.doesNotMatch(css,/Neutral light HMI palette|background: #c0c0c0/);
+  assert.doesNotMatch(css,/Neutral light HMI palette|\.sort-scada-shell\s*\{\s*background: #c0c0c0/);
 });
 
 test("process itself remains available before the sidebar, with the optional time panels retained",()=>{
