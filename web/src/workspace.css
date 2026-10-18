@@ -123,3 +123,44 @@ button.ide-tree-row:hover {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+/* Size the SCADA by its own docked panel, not the browser viewport.
+   Process drawings stop growing at an ergonomic 800 px while commands,
+   pilots and auxiliary supervision use the remaining space on the right. */
+.scada-scene-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+}
+.scada-process-panel {
+  width: 100%;
+  max-width: 800px;
+  min-width: 0;
+}
+.scada-scene-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+@container scada (min-width: 1000px) {
+  .scada-scene-workspace {
+    grid-template-columns: minmax(0, 800px) minmax(270px, 1fr);
+  }
+  .scada-dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .scada-pilot-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container scada (min-width: 1550px) {
+  .scada-dashboard-grid {
+    grid-template-columns: 205px minmax(0, 1fr);
+  }
+  .scada-pilot-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
