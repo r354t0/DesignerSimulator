@@ -112,7 +112,7 @@ export function ConveyorScene({
               Vista de proceso
             </h3>
           </div>
-          <div className="overflow-x-auto rounded-md border border-slate-600 bg-[#0f1b26]"
+          <div className="scada-process-canvas overflow-x-auto rounded-md border border-[#7d8992] bg-[#c0c0c0]"
             role="img" aria-label={"Vista lateral de faja transportadora con " +
               scene.items.length + " cajas, motor " +
               (motorOn ? "encendido y girando" : "detenido") +
@@ -125,6 +125,7 @@ export function ConveyorScene({
                   <stop offset="100%" stopColor="#293d50"/>
                 </linearGradient>
               </defs>
+              <rect width="760" height="260" fill="#c0c0c0"/>
               {/* Move the conveyor to the right to make room for the drive motor on the left. */}
               <g transform="translate(100 0)">
               {/* Mechanical support structure, entirely fixed to the ground. */}
@@ -184,7 +185,7 @@ export function ConveyorScene({
                 <path d="M0 58 V108" stroke={sensor ? "#fbbf24" : "#38bdf8"}
                   strokeWidth="2" strokeDasharray="4 4"
                   opacity={sensor ? "0.95" : "0.55"}/>
-                <text x="13" y="54" fontSize="11" fill="#a8cbe3">PE-01</text>
+                <text x="13" y="54" fontSize="11" fill="#183c51" fontWeight="700">PE-01</text>
               </g>
               </g>
               {/* Left-side gearmotor, output pulley and coupler. */}
@@ -214,7 +215,7 @@ export function ConveyorScene({
               </g>
               <circle cx="89" cy="206" r="4" fill="#d5e4ed"/>
               <text x="89" y="250" fontSize="10" textAnchor="middle"
-                fill={motorOn ? "#6ee7b7" : "#94a3b8"}>
+                fill={motorOn ? "#047857" : "#334155"} fontWeight="700">
                 MOTOR {motorOn ? "RUN" : "OFF"}
               </text>
             </svg>
