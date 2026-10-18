@@ -13,12 +13,12 @@ const source=(path)=>readFileSync(new URL(path,import.meta.url),"utf8");
 test("Studio-style direct edit changes only TIMER.TT to TIMER.DN on a XIC contact",()=>{
   let p=createTankExampleProject();
   p=createRung(p,"inline-test");
-  p=insertInstruction(p,"inline-test",0,{id:"edit-me",kind:"XIC",tag:"Tank_TMix.TT"});
-  p=insertInstruction(p,"inline-test",1,{id:"out",kind:"OTE",tag:"Tank_Mixer"});
+  p=insertInstruction(p,"inline-test",0,{id:"edit-me",kind:"XIC",tag:"TMR_Mixing.TT"});
+  p=insertInstruction(p,"inline-test",1,{id:"out",kind:"OTE",tag:"DO_Mixer"});
   const before=p.rungs.find(r=>r.id==="inline-test");
-  const updated=changeInstructionTag(p,"edit-me","Tank_TMix.DN");
-  assert.equal(findInstruction(updated,"edit-me").instruction.tag,"Tank_TMix.DN");
-  assert.equal(findInstruction(p,"edit-me").instruction.tag,"Tank_TMix.TT",
+  const updated=changeInstructionTag(p,"edit-me","TMR_Mixing.DN");
+  assert.equal(findInstruction(updated,"edit-me").instruction.tag,"TMR_Mixing.DN");
+  assert.equal(findInstruction(p,"edit-me").instruction.tag,"TMR_Mixing.TT",
     "the original immutable project must not change");
   assert.deepEqual(updated.rungs.find(r=>r.id==="inline-test").instructions
     .filter(i=>i.id==="out"),before.instructions.filter(i=>i.id==="out"));
@@ -27,18 +27,18 @@ test("Studio-style direct edit changes only TIMER.TT to TIMER.DN on a XIC contac
 
 test("invalid direct edits are rejected without changing assigned Ladder operands",()=>{
   const p=createTankExampleProject();
-  const contact=p.rungs.flatMap(r=>r.instructions).find(i=>i.kind==="XIC"&&i.tag==="Tank_TStart.DN");
+  const contact=p.rungs.flatMap(r=>r.instructions).find(i=>i.kind==="XIC"&&i.tag==="TMR_StartDelay.DN");
   assert.ok(contact);
-  for(const invalid of ["Tank_TStart.TN","Tank_TStart.ACC","Tank_TStart","NoExistingTag.DN","Tank_TStart.DN.X"]) {
+  for(const invalid of ["TMR_StartDelay.TN","TMR_StartDelay.ACC","TMR_StartDelay","NoExistingTag.DN","TMR_StartDelay.DN.X"]) {
     assert.throws(()=>changeInstructionTag(p,contact.id,invalid));
-    assert.equal(findInstruction(p,contact.id).instruction.tag,"Tank_TStart.DN");
+    assert.equal(findInstruction(p,contact.id).instruction.tag,"TMR_StartDelay.DN");
   }
   // The same editing rules apply to OR branch contacts.
   const branch=p.rungs.flatMap(r=>r.parallelBranches??[])
     .flatMap(b=>b.instructions).find(i=>i.kind==="XIC");
   assert.ok(branch);
-  const replacement=changeInstructionTag(p,branch.id,"Tank_ToMix");
-  assert.equal(findInstruction(replacement,branch.id).instruction.tag,"Tank_ToMix");
+  const replacement=changeInstructionTag(p,branch.id,"ST_ToMix");
+  assert.equal(findInstruction(replacement,branch.id).instruction.tag,"ST_ToMix");
   assert.equal(findInstruction(p,branch.id).instruction.tag,branch.tag);
 });
 
