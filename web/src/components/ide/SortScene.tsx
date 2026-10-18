@@ -221,7 +221,7 @@ export function SortScene({
                 </div>
                 <div className="mt-2 text-[10px] text-slate-400">
                   Lotes terminados: <span className="font-mono font-semibold text-emerald-300">
-                    {readSortCount(project, "CNT_Batches") ?? "—"}
+                    {readSortCount(project, "CNT_Lotes") ?? "—"}
                   </span>
                 </div>
               </div>
