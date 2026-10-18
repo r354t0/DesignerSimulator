@@ -407,6 +407,20 @@ export function PracticeEditor({
     }
   };
 
+  const editSelectedTag = (draft: string): string | null => {
+    if (!tagSelector) return "No se encontró la instrucción seleccionada.";
+    try {
+      const next = changeInstructionTag(project, tagSelector.instructionId, draft);
+      onChange(next);
+      setError("");
+      setSelected(tagSelector.instructionId);
+      return null;
+    } catch (cause) {
+      // Invalid edits must never replace the previously assigned operand.
+      return cause instanceof Error ? cause.message : "Operando inválido.";
+    }
+  };
+
   const dragOverTagTarget = (event: DragEvent<HTMLButtonElement>, targetId: string) => {
     if (!event.dataTransfer.types.includes(LADDER_TAG_MIME)) return;
     event.preventDefault();
@@ -823,11 +837,13 @@ export function PracticeEditor({
               <button key={"tag-" + item.id} type="button" draggable={Boolean(item.tag)}
                 data-practice-tag-label
                 title={item.tag
-                  ? "Clic: buscar tag · Doble clic: explorar variables · Arrastrar: copiar " + item.tag
+                  ? "Clic: editar texto · Doble clic: explorar variables · Arrastrar: copiar " + item.tag
                   : "Sin tag · Clic para asignar variable · Doble clic para explorar variables"}
-                aria-label={"Seleccionar variable de " + item.kind + " " + (item.tag || "sin asignar")}
+                aria-label={(item.tag ? "Editar variable de " : "Seleccionar variable de ") +
+                  item.kind + " " + (item.tag || "sin asignar")}
                 onClick={(event) => {
-                  if (event.detail <= 1) openTagSelector(event, item.id, "suggestions");
+                  if (event.detail <= 1) openTagSelector(event, item.id,
+                    item.tag ? "edit" : "suggestions");
                 }}
                 onDoubleClick={(event) => openTagSelector(event, item.id, "dialog")}
                 onContextMenu={(event) => openBitContextMenu(event, item.id)}
@@ -1435,6 +1451,9 @@ export function PracticeEditor({
               tags={project.tags}
               selector={tagSelector}
               onSelect={assignSelectedTag}
+              onEdit={editSelectedTag}
+              onBrowse={() => setTagSelector((current) =>
+                current ? { ...current, mode: "dialog" } : null)}
               onClose={() => setTagSelector(null)}
             />
           )}
