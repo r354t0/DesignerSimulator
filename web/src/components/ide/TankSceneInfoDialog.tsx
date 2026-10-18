@@ -48,13 +48,13 @@ export function TankSceneInfoDialog({ open, project, onClose, onOpenTags, onLoad
           <p className="text-xs leading-relaxed text-slate-200">
             Programa tres lotes automáticos con ramas OR, temporizadores TON y
             contador CTU. START enclava el ciclo (START OR RunCmd). Primero se
-            abre XV-01; tras {TANK_TIMER_PRESETS.Tank_TStart / 1000} s arranca
+            abre XV-01; tras {TANK_TIMER_PRESETS.TMR_StartDelay / 1000} s arranca
             P-01. Al alcanzar el 90 % se cierra la entrada y M-02 mezcla durante
-            {TANK_TIMER_PRESETS.Tank_TMix / 1000} s. Después XV-02 drena hasta
-            el nivel bajo de 15 %, se incrementa Tank_Batches y comienza el
+            {TANK_TIMER_PRESETS.TMR_Mixing / 1000} s. Después XV-02 drena hasta
+            el nivel bajo de 15 %, se incrementa CNT_Batches y comienza el
             siguiente lote. Tras {TANK_BATCH_TARGET} lotes se detiene el ciclo.
-            Los watchdogs TON de llenado ({TANK_TIMER_PRESETS.Tank_TFillMax / 1000} s)
-            y vaciado ({TANK_TIMER_PRESETS.Tank_TDrainMax / 1000} s) disparan
+            Los watchdogs TON de llenado ({TANK_TIMER_PRESETS.TMR_FillTimeout / 1000} s)
+            y vaciado ({TANK_TIMER_PRESETS.TMR_DrainTimeout / 1000} s) disparan
             una alarma enclavada. STOP detiene el proceso; RESET elimina la
             alarma y pone a cero el contador solo con el ciclo detenido.
             DRENAR permite vaciado manual únicamente fuera del automático,
