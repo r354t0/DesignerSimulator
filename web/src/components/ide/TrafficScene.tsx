@@ -13,7 +13,7 @@ interface Props {
   project:PracticeProject;
   mode:ScanMode;
   state:TrafficState;
-  onInputChange:(name:"Tr_StartPB"|"Tr_StopPB"|"Tr_ResetPB"|"Tr_PedPB",pressed:boolean)=>void;
+  onInputChange:(name:"PB_Start"|"PB_Stop"|"PB_Reset"|"PB_Pedestrian",pressed:boolean)=>void;
   onAddVehicle:(direction:TrafficDirection)=>void;
   onReset:()=>void;
   onPrepareTags:()=>void;
@@ -55,18 +55,18 @@ export function TrafficScene({project,mode,state,onInputChange,onAddVehicle,onRe
   const [infoOpen,setInfoOpen]=useState(false);
   const running=mode==="running";
   const b=(name:string)=>running&&readTrafficBool(project,name);
-  const nsG=b("Tr_NS_Green"),ewG=b("Tr_EW_Green");
-  const nsY=b("Tr_NS_Yellow"),ewY=b("Tr_EW_Yellow");
-  const nsR=b("Tr_NS_Red"),ewR=b("Tr_EW_Red");
-  const walk=b("Tr_Walk");
-  const pending=readTrafficBool(project,"Tr_PedPending");
-  const fault=readTrafficBool(project,"Tr_Fault");
+  const nsG=b("DO_NS_GreenLight"),ewG=b("DO_EW_GreenLight");
+  const nsY=b("DO_NS_YellowLight"),ewY=b("DO_EW_YellowLight");
+  const nsR=b("DO_NS_RedLight"),ewR=b("DO_EW_RedLight");
+  const walk=b("DO_PedestrianWalk");
+  const pending=readTrafficBool(project,"ST_PedPending");
+  const fault=readTrafficBool(project,"ALM_PhaseConflict");
   const phase=TRAFFIC_PHASES.find(p=>readTrafficBool(project,p));
   const phaseLabels: Record<string,string> = {
-    Tr_NSPhase:"VERDE N-S",Tr_NSYPhase:"AMARILLO N-S",
-    Tr_Red1Phase:"ROJO DE SEGURIDAD",Tr_EWPhase:"VERDE E-O",
-    Tr_EWYPhase:"AMARILLO E-O",Tr_Red2Phase:"ROJO DE SEGURIDAD",
-    Tr_WalkPhase:"CRUCE PEATONAL",
+    ST_NS_GreenPhase:"VERDE N-S",ST_NS_YellowPhase:"AMARILLO N-S",
+    ST_AllRed1Phase:"ROJO DE SEGURIDAD",ST_EW_GreenPhase:"VERDE E-O",
+    ST_EW_YellowPhase:"AMARILLO E-O",ST_AllRed2Phase:"ROJO DE SEGURIDAD",
+    ST_PedestrianPhase:"CRUCE PEATONAL",
   };
   const phaseLabel=phaseLabels[phase??""]??"EN ESPERA";
   const timer=Object.keys(TRAFFIC_TIMERS).find(name=>{
@@ -75,10 +75,10 @@ export function TrafficScene({project,mode,state,onInputChange,onAddVehicle,onRe
   });
   const timed=project.tags.find(t=>t.name===timer);
   const timerValue=timed?.type==="TIMER"&&typeof timed.value==="object"?timed.value:null;
-  const valid=["Tr_StartPB","Tr_NS_Green","Tr_CountNS","Tr_PedPB"]
+  const valid=["PB_Start","DO_NS_GreenLight","CNT_NS_Vehicles","PB_Pedestrian"]
     .every(name=>project.tags.some(t=>t.name===name));
-  const nsCount=readTrafficCount(project,"Tr_CountNS");
-  const ewCount=readTrafficCount(project,"Tr_CountEW");
+  const nsCount=readTrafficCount(project,"CNT_NS_Vehicles");
+  const ewCount=readTrafficCount(project,"CNT_EW_Vehicles");
   return (
     <section aria-label="SCADA · Control semaforizado"
       className="sort-scada-shell scada-control-shell flex h-full min-h-0 flex-col overflow-y-auto text-slate-100">
@@ -201,20 +201,20 @@ export function TrafficScene({project,mode,state,onInputChange,onAddVehicle,onRe
             </h3>
             <div className="scada-command-buttons grid max-w-[210px] grid-cols-2 gap-2">
               <MomentaryPushButton compact name="START" tone="start"
-                pressed={readTrafficBool(project,"Tr_StartPB")}
-                onChange={value=>onInputChange("Tr_StartPB",value)}
+                pressed={readTrafficBool(project,"PB_Start")}
+                onChange={value=>onInputChange("PB_Start",value)}
                 icon={<Play size={15}/>}>START</MomentaryPushButton>
               <MomentaryPushButton compact name="STOP" tone="stop"
-                pressed={readTrafficBool(project,"Tr_StopPB")}
-                onChange={value=>onInputChange("Tr_StopPB",value)}
+                pressed={readTrafficBool(project,"PB_Stop")}
+                onChange={value=>onInputChange("PB_Stop",value)}
                 icon={<Pause size={15}/>}>STOP</MomentaryPushButton>
               <MomentaryPushButton compact name="PEATÓN" tone="drain"
-                pressed={readTrafficBool(project,"Tr_PedPB")}
-                onChange={value=>onInputChange("Tr_PedPB",value)}
+                pressed={readTrafficBool(project,"PB_Pedestrian")}
+                onChange={value=>onInputChange("PB_Pedestrian",value)}
                 icon={<Users size={15}/>}>PEATÓN</MomentaryPushButton>
               <MomentaryPushButton compact name="RESET" tone="drain"
-                pressed={readTrafficBool(project,"Tr_ResetPB")}
-                onChange={value=>onInputChange("Tr_ResetPB",value)}
+                pressed={readTrafficBool(project,"PB_Reset")}
+                onChange={value=>onInputChange("PB_Reset",value)}
                 icon={<RotateCcw size={15}/>}>RESET</MomentaryPushButton>
             </div>
           </section>
