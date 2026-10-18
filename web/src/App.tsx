@@ -114,6 +114,9 @@ export default function App() {
     traffic: initialPracticeScanState(initialTrafficProject()),
   });
   const activeControllerScene = useRef<ProgrammingScene>("conveyor");
+  // Each scene keeps the learner's program immediately before inserting
+  // its reference solution. Switching scenes must not discard that snapshot.
+  const solutionSnapshots = useRef<Partial<Record<ProgrammingScene, PracticeProject>>>({});
   const practice = scanState.project;
   const practiceMode = scanState.mode;
   // Serialize timer ticks and input/UI edits against the same synchronous
@@ -554,6 +557,9 @@ export default function App() {
     if (!window.confirm(
       "Se reemplazarán MainRoutine y Controller Tags de la escena SEMÁFOROS. ¿Continuar?",
     )) return;
+    if (!solutionSnapshots.current.traffic) {
+      solutionSnapshots.current.traffic = scanRef.current.project;
+    }
     changeScan(state=>({
       ...initialPracticeScanState(createTrafficExampleProject()),
       scanPeriodMs:state.scanPeriodMs,
@@ -566,6 +572,9 @@ export default function App() {
     if (!window.confirm(
       "Se reemplazará MainRoutine y sus Controller Tags de la escena TANQUE por la plantilla Ladder. ¿Continuar?",
     )) return;
+    if (!solutionSnapshots.current.tank) {
+      solutionSnapshots.current.tank = scanRef.current.project;
+    }
     changeScan(state => ({
       ...initialPracticeScanState(createTankExampleProject()),
       scanPeriodMs: state.scanPeriodMs,
@@ -578,6 +587,9 @@ export default function App() {
     if (!window.confirm(
       "Se reemplazará el MainRoutine y los Controller Tags del CLASIFICADOR por su plantilla Ladder. ¿Continuar?",
     )) return;
+    if (!solutionSnapshots.current.sorting) {
+      solutionSnapshots.current.sorting = scanRef.current.project;
+    }
     changeScan((state) => ({
       ...initialPracticeScanState(createSortExampleProject()),
       scanPeriodMs: state.scanPeriodMs,
@@ -590,6 +602,9 @@ export default function App() {
     if (!window.confirm("Se reemplazará MainRoutine y sus Controller Tags por el ejemplo de faja. ¿Continuar?")) {
       return;
     }
+    if (!solutionSnapshots.current.conveyor) {
+      solutionSnapshots.current.conveyor = scanRef.current.project;
+    }
     changeScan((state) => ({
       ...initialPracticeScanState(createConveyorExampleProject()),
       scanPeriodMs: state.scanPeriodMs,
@@ -597,6 +612,28 @@ export default function App() {
     changeConveyor(() => initialConveyorState());
     openEditorView("practice");
   }, [changeScan, changeConveyor, openEditorView]);
+
+  const resetRecommendedSolution = useCallback((scene: ProgrammingScene) => {
+    if (activeControllerScene.current !== scene) return;
+    const saved = solutionSnapshots.current[scene];
+    if (!window.confirm(saved
+      ? "Se descartarán los cambios del ejemplo y se recuperará tu programa anterior a la solución recomendada. ¿Continuar?"
+      : "No hay una copia previa de la solución. Se limpiará MainRoutine y quedarán únicamente las E/S del SCADA. ¿Continuar?"
+    )) return;
+    const initial = scene === "conveyor" ? initialConveyorProject()
+      : scene === "sorting" ? initialSortProject()
+      : scene === "tank" ? initialTankProject() : initialTrafficProject();
+    changeScan(state => ({
+      ...initialPracticeScanState(saved ?? initial),
+      scanPeriodMs: state.scanPeriodMs,
+    }));
+    delete solutionSnapshots.current[scene];
+    if (scene === "conveyor") changeConveyor(() => initialConveyorState());
+    else if (scene === "sorting") changeSort(() => initialSortState());
+    else if (scene === "tank") changeTank(() => initialTankState());
+    else changeTraffic(() => initialTrafficState());
+    openEditorView("practice");
+  }, [changeScan, changeConveyor, changeSort, changeTank, changeTraffic, openEditorView]);
 
   const onToolbarDragStart = useCallback((event: DragEvent<HTMLButtonElement>, kind: Instruction) => {
     if (!isEditableKind(kind)) {
@@ -669,7 +706,8 @@ export default function App() {
                       onPrepareTags={prepareConveyor}
                       setupError={conveyorTagSetupError}
                       onOpenTags={() => openEditorView("tags")}
-                      onLoadExample={loadConveyorExample}/>
+                      onLoadExample={loadConveyorExample}
+                      onResetExample={() => resetRecommendedSolution("conveyor")}/>
                   : simulationTab === "sorting"
                     ? <SortScene project={practice} mode={practiceMode} state={sortState}
                         onInputChange={setSortInput}
@@ -678,7 +716,8 @@ export default function App() {
                         onPrepareTags={prepareSort}
                         setupError={sortSetupError}
                         onOpenTags={() => openEditorView("tags")}
-                        onLoadExample={loadSortExample}/>
+                        onLoadExample={loadSortExample}
+                      onResetExample={() => resetRecommendedSolution("sorting")}/>
                     : simulationTab === "tank"
                       ? <TankScene project={practice} mode={practiceMode} state={tankState}
                           onInputChange={setTankInput}
@@ -686,7 +725,8 @@ export default function App() {
                           onPrepareTags={prepareTank}
                           setupError={tankSetupError}
                           onOpenTags={() => openEditorView("tags")}
-                          onLoadExample={loadTankExample}/>
+                          onLoadExample={loadTankExample}
+                      onResetExample={() => resetRecommendedSolution("tank")}/>
                     : simulationTab === "traffic"
                       ? <TrafficScene project={practice} mode={practiceMode} state={trafficState}
                           onInputChange={setTrafficInput}
@@ -696,7 +736,8 @@ export default function App() {
                           onPrepareTags={prepareTraffic}
                           setupError={trafficSetupError}
                           onOpenTags={() => openEditorView("tags")}
-                          onLoadExample={loadTrafficExample}/>
+                          onLoadExample={loadTrafficExample}
+                      onResetExample={() => resetRecommendedSolution("traffic")}/>
                       : <SimulationScene online={online} inputs={inputs} values={values}
                         onTagChange={handleTagChange}/>}
               </div>
@@ -711,7 +752,7 @@ export default function App() {
       pausePractice, resumePractice, stepPractice, changeScanPeriod, handleTagChange,
       handleResetCounters, openEditorView, onToolbarDragStart, simulationTab, conveyor,
       setConveyorInput, changeConveyor, resetConveyor, prepareConveyor,
-      conveyorTagSetupError, loadConveyorExample, sortState, setSortInput,
+      conveyorTagSetupError, loadConveyorExample, resetRecommendedSolution, sortState, setSortInput,
       changeSort, resetSort, prepareSort, sortSetupError, loadSortExample,
       chooseSimulationTab, tankState, changeTank, setTankInput, resetTank,
       prepareTank, tankSetupError, loadTankExample, trafficState, changeTraffic,
