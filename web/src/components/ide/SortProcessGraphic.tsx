@@ -84,7 +84,7 @@ export function SortProcessGraphic({ state, motor, divert, detection }: Props) {
       " cajas en tránsito; motor " + (motor ? "encendido" : "detenido") +
       "; desviador hacia " + (divert ? "B" : "A") +
       "; salida A " + state.exitA + ", salida B " + state.exitB}
-      className="sort-process-canvas scada-process-canvas overflow-x-auto rounded-lg border border-[#7d8992] bg-[#c0c0c0]">
+      className="sort-process-canvas scada-process-canvas overflow-x-auto rounded-lg border border-[#7d8992] bg-[#ffffff]">
       <svg viewBox="0 0 760 320" xmlns="http://www.w3.org/2000/svg"
         className="block h-auto w-full min-w-[600px]" aria-hidden="true">
         <defs>
@@ -103,7 +103,7 @@ export function SortProcessGraphic({ state, motor, divert, detection }: Props) {
             <stop offset="100%" stopColor="#192c3c"/>
           </linearGradient>
         </defs>
-        <rect width="760" height="320" fill="#c0c0c0"/>
+        <rect width="760" height="320" fill="#ffffff"/>
         <rect width="760" height="320" fill="url(#sort-floor-grid)"/>
         <g fontFamily="Arial, sans-serif">
           <text x="25" y="25" fill="#263b4b" fontSize="10"
