@@ -72,7 +72,7 @@ export function readTankLevel(project: PracticeProject): number | null {
   return t?.type === "REAL" && typeof t.value === "number" ? t.value : null;
 }
 export function hasTankTags(project: PracticeProject): boolean {
-  return TANK_TAGS.every(spec => project.tags.some(tag =>
+  return TANK_IO_TAGS.every(spec => project.tags.some(tag =>
     tag.name === spec.name && tag.type === spec.type));
 }
 export const TANK_IO_TAGS = TANK_TAGS.filter(tag => tag.direction !== "Interna");
