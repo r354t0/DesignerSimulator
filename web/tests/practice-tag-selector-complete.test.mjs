@@ -2,8 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { getTagPickerRows } from "../src/plc/practiceTagPicker.ts";
-import { initialTrafficProject } from "../src/plc/trafficSceneModel.ts";
-import { initialTankProject } from "../src/plc/tankSceneModel.ts";
+import { createTrafficExampleProject } from "../src/plc/trafficSceneModel.ts";
+import { createTankExampleProject } from "../src/plc/tankSceneModel.ts";
 
 const selectorSource = readFileSync(
   new URL("../src/components/ide/PracticeTagSelector.tsx", import.meta.url), "utf8",
@@ -19,7 +19,7 @@ test("the quick Ladder tag selector never truncates suggestions at eight entries
 });
 
 test("large scene-4 tag list can be browsed without typing any search text", () => {
-  const project = initialTrafficProject();
+  const project = createTrafficExampleProject();
   for (const kind of ["XIC", "XIO", "OTE", "OTL", "OTU"]) {
     const rows = getTagPickerRows(project.tags, kind, "");
     const relevant = project.tags.filter(t => t.type === "BOOL");
@@ -34,7 +34,7 @@ test("large scene-4 tag list can be browsed without typing any search text", () 
 });
 
 test("timer members remain browsable and searching still filters compatible tags", () => {
-  const project = initialTankProject();
+  const project = createTankExampleProject();
   const collapsed = getTagPickerRows(project.tags, "XIC", "");
   assert.ok(collapsed.find(row => row.name === "TMR_Mixing" && row.expandable));
   const expanded = getTagPickerRows(project.tags, "XIC", "", ["TMR_Mixing"]);
