@@ -53,13 +53,13 @@ export function TrafficSceneInfoDialog({open,project,onClose,onOpenTags,onLoadEx
           <h3 className="mb-2 font-semibold text-slate-100">Secuencia de referencia</h3>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {[
-              ["Verde N-S",TRAFFIC_TIMERS.Tr_TNSGreen],
-              ["Amarillo N-S",TRAFFIC_TIMERS.Tr_TNSYellow],
-              ["Ambos rojos",TRAFFIC_TIMERS.Tr_TAllRed1],
-              ["Verde E-O",TRAFFIC_TIMERS.Tr_TEWGreen],
-              ["Amarillo E-O",TRAFFIC_TIMERS.Tr_TEWYellow],
-              ["Ambos rojos",TRAFFIC_TIMERS.Tr_TAllRed2],
-              ["Peatonal (si se solicitó)",TRAFFIC_TIMERS.Tr_TWalk],
+              ["Verde N-S",TRAFFIC_TIMERS.TMR_NS_Green],
+              ["Amarillo N-S",TRAFFIC_TIMERS.TMR_NS_Yellow],
+              ["Ambos rojos",TRAFFIC_TIMERS.TMR_AllRed1],
+              ["Verde E-O",TRAFFIC_TIMERS.TMR_EW_Green],
+              ["Amarillo E-O",TRAFFIC_TIMERS.TMR_EW_Yellow],
+              ["Ambos rojos",TRAFFIC_TIMERS.TMR_AllRed2],
+              ["Peatonal (si se solicitó)",TRAFFIC_TIMERS.TMR_Pedestrian],
             ].map(([name,ms],i)=>(
               <div key={i} className="rounded border border-slate-600 bg-[#102130] p-2">
                 <div>{name}</div><div className="mt-1 font-mono text-sky-300">{Number(ms)/1000} s</div>
@@ -69,7 +69,7 @@ export function TrafficSceneInfoDialog({open,project,onClose,onOpenTags,onLoadEx
           <p className="mt-2 text-slate-400">
             La solicitud peatonal queda pendiente hasta el segundo rojo de seguridad.
             Si no existe solicitud, comienza el próximo ciclo N-S.
-            Las entradas Tr_NSWaiting y Tr_EWWaiting permiten practicar extensiones adaptativas.
+            Las entradas DI_NSWaiting y DI_EWWaiting permiten practicar extensiones adaptativas.
           </p>
         </section>
         <section>
