@@ -1,7 +1,9 @@
+import { SceneTagTable } from "./SceneTagTable";
+import { RecommendedSolutionPanel } from "./RecommendedSolutionPanel";
 import { useEffect, useRef } from "react";
 import { BookOpen, Info, X } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
-import { TRAFFIC_TAGS, TRAFFIC_TIMERS, readTrafficBool, readTrafficCount } from "../../plc/trafficSceneModel";
+import { TRAFFIC_IO_TAGS, TRAFFIC_SOLUTION_TAGS, TRAFFIC_TIMERS } from "../../plc/trafficSceneModel";
 
 interface Props {
   open:boolean;
@@ -9,8 +11,9 @@ interface Props {
   onClose:()=>void;
   onOpenTags:()=>void;
   onLoadExample:()=>void;
+  onResetExample:()=>void;
 }
-export function TrafficSceneInfoDialog({open,project,onClose,onOpenTags,onLoadExample}:Props) {
+export function TrafficSceneInfoDialog({open,project,onClose,onOpenTags,onLoadExample,onResetExample}:Props) {
   const dialogRef=useRef<HTMLDialogElement>(null);
   useEffect(()=>{
     const d=dialogRef.current;
@@ -49,29 +52,6 @@ export function TrafficSceneInfoDialog({open,project,onClose,onOpenTags,onLoadEx
             únicamente transmite entradas y obedece las salidas de MainRoutine.
           </p>
         </section>
-        <section className="rounded border border-slate-700 bg-[#182b3a] p-3">
-          <h3 className="mb-2 font-semibold text-slate-100">Secuencia de referencia</h3>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {[
-              ["Verde N-S",TRAFFIC_TIMERS.TMR_NS_Green],
-              ["Amarillo N-S",TRAFFIC_TIMERS.TMR_NS_Yellow],
-              ["Ambos rojos",TRAFFIC_TIMERS.TMR_AllRed1],
-              ["Verde E-O",TRAFFIC_TIMERS.TMR_EW_Green],
-              ["Amarillo E-O",TRAFFIC_TIMERS.TMR_EW_Yellow],
-              ["Ambos rojos",TRAFFIC_TIMERS.TMR_AllRed2],
-              ["Peatonal (si se solicitó)",TRAFFIC_TIMERS.TMR_Pedestrian],
-            ].map(([name,ms],i)=>(
-              <div key={i} className="rounded border border-slate-600 bg-[#102130] p-2">
-                <div>{name}</div><div className="mt-1 font-mono text-sky-300">{Number(ms)/1000} s</div>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2 text-slate-400">
-            La solicitud peatonal queda pendiente hasta el segundo rojo de seguridad.
-            Si no existe solicitud, comienza el próximo ciclo N-S.
-            Las entradas DI_NSWaiting y DI_EWWaiting permiten practicar extensiones adaptativas.
-          </p>
-        </section>
         <section>
           <div className="mb-2 flex items-center justify-between gap-2">
             <h3 className="font-semibold">Mapa E/S · Semáforos</h3>
@@ -80,52 +60,19 @@ export function TrafficSceneInfoDialog({open,project,onClose,onOpenTags,onLoadEx
               Abrir Controller Tags
             </button>
           </div>
-          <div className="max-h-64 overflow-auto rounded border border-slate-700">
-            <table className="w-full min-w-[570px] text-left text-[11px]">
-              <thead className="sticky top-0 bg-[#203449] text-slate-300">
-                <tr>{["Tag","Tipo","Función","Descripción","Valor"].map(v=>
-                  <th key={v} className="px-2 py-2">{v}</th>)}</tr>
-              </thead>
-              <tbody className="divide-y divide-slate-700/70">
-                {TRAFFIC_TAGS.map(spec=>{
-                  const tag=project.tags.find(t=>t.name===spec.name);
-                  const value=tag?.type==="COUNTER" ? readTrafficCount(project,spec.name) :
-                    tag?.type==="TIMER" && typeof tag.value==="object" ?
-                      String(tag.value.ACC)+"/"+String(tag.value.PRE) :
-                      tag?.type==="BOOL" ? Number(readTrafficBool(project,spec.name)) : "—";
-                  return <tr key={spec.name} className="hover:bg-slate-700/20">
-                    <td className="px-2 py-1.5 font-mono text-sky-200">{spec.name}</td>
-                    <td className="px-2 py-1.5">{spec.type}</td>
-                    <td className="px-2 py-1.5">{spec.direction}</td>
-                    <td className="px-2 py-1.5">{tag?.description??spec.description}</td>
-                    <td className="px-2 py-1.5 text-right font-mono text-emerald-300">{value}</td>
-                  </tr>;
-                })}
-              </tbody>
-            </table>
-          </div>
+          <SceneTagTable specs={TRAFFIC_IO_TAGS} project={project}/>
         </section>
-        <section className="rounded border border-slate-700 bg-[#1a2b3b] p-3">
-          <details>
-            <summary className="cursor-pointer font-semibold text-sky-300">
-              Orientación Ladder y pruebas FAT
-            </summary>
-            <p className="mt-2 leading-relaxed text-slate-300">
-              Prueba START/STOP, cada transición del ciclo, amarillos y ambos rojos;
-              comprueba la prioridad de la petición peatonal, que NS y EW nunca
-              tengan GREEN simultáneamente, el conteo individual de vehículos
-              y que PAUSE congele los temporizadores y el movimiento.
-              Verifica que los estados retenidos se desactiven al pulsar STOP.
-            </p>
-          </details>
-          <button type="button" onClick={()=>{onClose();onLoadExample();}}
-            className="mt-3 rounded border border-sky-600 px-3 py-1.5 font-semibold text-sky-300 hover:bg-sky-950">
-            Cargar plantilla Ladder (reemplaza MainRoutine de esta escena)
-          </button>
-          <p className="mt-2 text-[11px] text-slate-400">
-            Solo se reemplaza la rutina y los tags de semáforos, previa confirmación.
-          </p>
-        </section>
+        <RecommendedSolutionPanel
+          project={project} specs={TRAFFIC_SOLUTION_TAGS}
+          onImplement={() => { onClose(); onLoadExample(); }}
+          onReset={() => { onClose(); onResetExample(); }}>
+          <div className="space-y-2 text-[11px] text-slate-300">
+  <p>Secuencia N-S verde/amarillo → ambos rojos → E-O verde/amarillo → ambos rojos.</p>
+  <p>Solicitud peatonal retenida con ST_PedPending y habilitada solo en rojo de seguridad.</p>
+  <p>Los timers TMR_ controlan las fases, CNT_ registra vehículos y ALM_PhaseConflict bloquea fases incompatibles.</p>
+  <p>Comprueba STOP, PAUSE, exclusión de verdes y tiempo de seguridad.</p>
+</div>
+        </RecommendedSolutionPanel>
       </div>
       <footer className="sticky bottom-0 flex justify-end border-t border-slate-600 bg-[#1b2d3d] px-4 py-2.5">
         <button type="button" onClick={onClose}
