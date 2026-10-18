@@ -23,6 +23,13 @@ import { ConveyorScene } from "./components/ide/ConveyorScene";
 import { SortScene } from "./components/ide/SortScene";
 import { TankScene } from "./components/ide/TankScene";
 import { TrafficScene } from "./components/ide/TrafficScene";
+import { BatchMixerScene } from "./components/ide/BatchMixerScene";
+import {
+  initialBatchProject, createBatchSolution, prepareBatchTags,
+  initialBatchState, stepBatchPhysics, batchDigitalSensors,
+  batchBool, batchInt,
+  type BatchMixerState, type BatchExercise, type BatchMode,
+} from "./plc/batchMixerSceneModel";
 import {
   addTrafficVehicle, createTrafficExampleProject,
   initialTrafficProject, initialTrafficState,
@@ -81,8 +88,8 @@ const layoutConfig: IJsonModel = {
   },
 };
 
-type SimulationTab = "conveyor" | "sorting" | "tank" | "traffic" | "motor";
-type ProgrammingScene = "conveyor" | "sorting" | "tank" | "traffic";
+type SimulationTab = "conveyor" | "sorting" | "tank" | "traffic" | "batch" | "motor";
+type ProgrammingScene = "conveyor" | "sorting" | "tank" | "traffic" | "batch";
 
 interface DemoMachineState {
   inputs: DemoInputs;
@@ -114,6 +121,7 @@ export default function App() {
     conveyor: scanState, sorting: initialPracticeScanState(initialSortProject()),
     tank: initialPracticeScanState(initialTankProject()),
     traffic: initialPracticeScanState(initialTrafficProject()),
+    batch: initialPracticeScanState(initialBatchProject()),
   });
   const activeControllerScene = useRef<ProgrammingScene>("conveyor");
   // Each scene keeps the learner's program immediately before inserting
@@ -182,6 +190,18 @@ export default function App() {
       setTrafficState(next);
     }
   }, []);
+
+  const [batchSetupError, setBatchSetupError] = useState<string | null>(null);
+  const [batchExercise, setBatchExercise] = useState<BatchExercise | null>(null);
+  const [batchState, setBatchState] = useState<BatchMixerState>(initialBatchState);
+  const batchRef = useRef(batchState);
+  const changeBatch = useCallback((op:(state:BatchMixerState)=>BatchMixerState) => {
+    const next=op(batchRef.current);
+    if(next!==batchRef.current) {
+      batchRef.current=next;
+      setBatchState(next);
+    }
+  },[]);
 
   const chooseSimulationTab = useCallback((next: SimulationTab) => {
     if (next === simulationTab) return;
@@ -306,6 +326,46 @@ export default function App() {
     return () => window.clearInterval(id);
   }, [practiceMode,simulationTab,changeTraffic,changeScan]);
 
+  // Scene 05: process physics only follows the physical PLC output bits.
+  // Flowmeter pulses are sampled as 0-ms scan edges for CTU and CTD.
+  // Temperature remains an internal simulated state: only DI_Thermostat
+  // is published to MainRoutine when temperature reaches integer INT_TempSP.
+  useEffect(() => {
+    if (practiceMode!=="running" || activeControllerScene.current!=="batch") return;
+    const id=window.setInterval(() => {
+      const previous=batchRef.current;
+      const plc=scanRef.current;
+      if (plc.mode!=="running" || activeControllerScene.current!=="batch") return;
+      const next=stepBatchPhysics(previous,{
+        pump1:batchBool(plc.project,"DO_Pump1"),
+        pump2:batchBool(plc.project,"DO_Pump2"),
+        pump3:batchBool(plc.project,"DO_Pump3"),
+        heater:batchBool(plc.project,"DO_Heater"),
+      },50);
+      if(next!==previous)changeBatch(()=>next);
+      changeScan(state=>{
+        let result=state;
+        const pulseNames=["DI_Flowmeter1","DI_Flowmeter2","DI_Flowmeter3"] as const;
+        for(let n=0;n<3;n++) {
+          const name=pulseNames[n];
+          if(!result.project.tags.some(t=>t.name===name&&t.type==="BOOL"))continue;
+          for(let pulse=previous.totalPulses[n];pulse<next.totalPulses[n];pulse++){
+            result=applySceneSensorBoolInput(result,name,true);
+            result=applySceneSensorBoolInput(result,name,false);
+          }
+        }
+        const sensors=batchDigitalSensors(next,batchInt(result.project,"INT_TempSP"));
+        for(const [name,value] of Object.entries(sensors)){
+          const tag=result.project.tags.find(t=>t.name===name);
+          if(tag?.type==="BOOL"&&tag.value!==value)
+            result=applySceneSensorBoolInput(result,name,value);
+        }
+        return result;
+      });
+    },50);
+    return ()=>window.clearInterval(id);
+  },[practiceMode,simulationTab,changeBatch,changeScan]);
+
   // Tank process physics follows the real PLC output values and is never
   // active while this scene is stopped, paused, or not the selected controller.
   useEffect(() => {
@@ -374,6 +434,61 @@ export default function App() {
   }, []);
   const handlePracticeChange = useCallback((next: PracticeProject) =>
     changeScan((state) => changePracticeScanProject(state, next)), [changeScan]);
+
+  const setBatchInput = useCallback((tag:"PB_Start"|"PB_Stop"|"PB_Enter",
+    pressed:boolean) => {
+    if(activeControllerScene.current!=="batch")return;
+    changeScan(state=>applyMomentaryBoolInput(state,tag,pressed,tag==="PB_Stop"));
+  },[changeScan]);
+  const setBatchMode = useCallback((nextMode:BatchMode) => {
+    if(activeControllerScene.current!=="batch"||scanRef.current.mode!=="stopped")return;
+    changeScan(state=>{
+      let project=state.project;
+      for(const mode of ["A","B","C"] as const)
+        project=setTagValue(project,"DI_Mode"+mode,mode===nextMode);
+      return changePracticeScanProject(state,project);
+    });
+  },[changeScan]);
+  const setBatchIntegers = useCallback((values:{
+    INT_TempSP:number;INT_RatioP1:number;INT_BatchTarget:number;
+  })=>{
+    if(activeControllerScene.current!=="batch"||scanRef.current.mode!=="stopped")return;
+    changeScan(state=>{
+      let project=state.project;
+      for(const [name,value] of Object.entries(values))
+        project=setTagValue(project,name,value);
+      return changePracticeScanProject(state,project);
+    });
+  },[changeScan]);
+  const resetBatch = useCallback(()=>{
+    if(activeControllerScene.current!=="batch"||scanRef.current.mode!=="stopped")return;
+    changeBatch(()=>initialBatchState());
+    changeScan(state=>{
+      let project=state.project;
+      for(const [name,value] of Object.entries(batchDigitalSensors(initialBatchState(),
+        batchInt(state.project,"INT_TempSP")))){
+        const tag=project.tags.find(t=>t.name===name);
+        if(tag?.type==="BOOL"&&tag.value!==value)
+          project=setTagValue(project,name,value);
+      }
+      for(const name of ["DI_Flowmeter1","DI_Flowmeter2","DI_Flowmeter3"]){
+        const tag=project.tags.find(t=>t.name===name);
+        if(tag?.type==="BOOL"&&tag.value)project=setTagValue(project,name,false);
+      }
+      return project===state.project?state:changePracticeScanProject(state,project);
+    });
+  },[changeBatch,changeScan]);
+  const prepareBatch = useCallback(()=>{
+    try{
+      changeScan(state=>{
+        const prepared=prepareBatchTags(state.project);
+        return prepared===state.project?state:changePracticeScanProject(state,prepared);
+      });
+      setBatchSetupError(null);
+    }catch(error){
+      setBatchSetupError(error instanceof Error?error.message:"No se registraron las E/S.");
+    }
+  },[changeScan]);
 
   const setTrafficInput = useCallback((tag:
     "PB_Start" | "PB_Stop" | "PB_Reset" | "PB_Pedestrian", pressed:boolean) => {
@@ -523,7 +638,8 @@ export default function App() {
     else if (simulationTab === "sorting") prepareSort();
     else if (simulationTab === "tank") prepareTank();
     else if (simulationTab === "traffic") prepareTraffic();
-  }, [simulationTab, prepareConveyor, prepareSort, prepareTank, prepareTraffic]);
+    else if (simulationTab === "batch") prepareBatch();
+  }, [simulationTab, prepareConveyor, prepareSort, prepareTank, prepareTraffic, prepareBatch]);
 
   const startPractice = useCallback(() =>
     changeScan(startPracticeScans), [changeScan]);
@@ -568,6 +684,21 @@ export default function App() {
     });
     openEditorView("practice");
   }, [openEditorView]);
+
+  const loadBatchSolution=useCallback((exercise:BatchExercise)=>{
+    if(activeControllerScene.current!=="batch")return;
+    if(!window.confirm("Implementar la solución del ejercicio "+exercise+
+      " de Batch Mixer? Se reemplazarán MainRoutine y los Controller Tags de esta escena."))return;
+    if(!solutionSnapshots.current.batch)
+      solutionSnapshots.current.batch=scanRef.current.project;
+    changeScan(state=>({
+      ...initialPracticeScanState(createBatchSolution(exercise)),
+      scanPeriodMs:state.scanPeriodMs,
+    }));
+    changeBatch(()=>initialBatchState());
+    setBatchExercise(exercise);
+    openEditorView("practice");
+  },[changeScan,changeBatch,openEditorView]);
 
   const loadTrafficExample = useCallback(() => {
     if (!window.confirm(
@@ -638,7 +769,8 @@ export default function App() {
     )) return;
     const initial = scene === "conveyor" ? initialConveyorProject()
       : scene === "sorting" ? initialSortProject()
-      : scene === "tank" ? initialTankProject() : initialTrafficProject();
+      : scene === "tank" ? initialTankProject()
+      : scene === "traffic" ? initialTrafficProject() : initialBatchProject();
     changeScan(state => ({
       ...initialPracticeScanState(saved ?? initial),
       scanPeriodMs: state.scanPeriodMs,
@@ -647,9 +779,13 @@ export default function App() {
     if (scene === "conveyor") changeConveyor(() => initialConveyorState());
     else if (scene === "sorting") changeSort(() => initialSortState());
     else if (scene === "tank") changeTank(() => initialTankState());
-    else changeTraffic(() => initialTrafficState());
+    else if (scene === "traffic") changeTraffic(() => initialTrafficState());
+    else {
+      changeBatch(()=>initialBatchState());
+      setBatchExercise(null);
+    }
     openEditorView("practice");
-  }, [changeScan, changeConveyor, changeSort, changeTank, changeTraffic, openEditorView]);
+  }, [changeScan, changeConveyor, changeSort, changeTank, changeTraffic, changeBatch, openEditorView]);
 
   const onToolbarDragStart = useCallback((event: DragEvent<HTMLButtonElement>, kind: Instruction) => {
     if (!isEditableKind(kind)) {
@@ -712,6 +848,7 @@ export default function App() {
                   <option value="sorting">Clasificación de cajas</option>
                   <option value="tank">Sistema de llenado de tanques</option>
                   <option value="traffic">Intersección semaforizada</option>
+                  <option value="batch">Batch Mixer · Mezcla por lotes</option>
                   <option value="motor">Motor · DEMO</option>
                 </select>
               </div>
@@ -756,6 +893,18 @@ export default function App() {
                           onOpenTags={() => openEditorView("tags")}
                           onLoadExample={loadTrafficExample}
                       onResetExample={() => resetRecommendedSolution("traffic")}/>
+                    : simulationTab === "batch"
+                      ? <BatchMixerScene project={practice} mode={practiceMode}
+                          state={batchState} selectedExercise={batchExercise}
+                          setupError={batchSetupError}
+                          onInputChange={setBatchInput}
+                          onModeChange={setBatchMode}
+                          onSetIntegers={setBatchIntegers}
+                          onReset={resetBatch}
+                          onPrepareTags={prepareBatch}
+                          onOpenTags={() => openEditorView("tags")}
+                          onLoadSolution={loadBatchSolution}
+                          onResetSolution={() => resetRecommendedSolution("batch")}/>
                       : <SimulationScene online={online} inputs={inputs} values={values}
                         onTagChange={handleTagChange}/>}
               </div>
@@ -776,7 +925,8 @@ export default function App() {
       chooseSimulationTab, tankState, changeTank, setTankInput, resetTank,
       prepareTank, tankSetupError, loadTankExample, trafficState, changeTraffic,
       setTrafficInput, resetTraffic, prepareTraffic, trafficSetupError,
-      loadTrafficExample],
+      loadTrafficExample, batchState, batchExercise, batchSetupError,
+      setBatchInput, setBatchMode, setBatchIntegers, resetBatch, prepareBatch, loadBatchSolution],
   );
 
   const syncTabSelection = useCallback((updatedModel: Model) => {
@@ -844,7 +994,8 @@ export default function App() {
         <span className="text-slate-600">|</span>
         <span>{online ? "Monitoreo DEMO · Sin controlador físico" : "Sin conexión a controlador"}</span>
         <span className="ml-auto">
-          {simulationTab === "traffic" ? "Escena 04 · Intersección semaforizada"
+          {simulationTab === "batch" ? "Escena 05 · Batch Mixer"
+            : simulationTab === "traffic" ? "Escena 04 · Intersección semaforizada"
             : simulationTab === "tank" ? "Escena 03 · Tanque por lotes"
             : simulationTab === "sorting" ? "Escena 02 · Clasificación de cajas"
             : simulationTab === "conveyor" ? "Escena 01 · Faja transportadora"
