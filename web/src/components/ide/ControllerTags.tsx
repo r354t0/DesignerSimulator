@@ -9,7 +9,7 @@ import {
 import { demoTagMetadata, type DemoInputs, type DemoValues, type InputTag } from "../../plc/demoModel";
 
 interface Props {
-  activeScene: "conveyor" | "sorting" | "tank" | "traffic" | "motor";
+  activeScene: "conveyor" | "sorting" | "tank" | "traffic" | "batch" | "motor";
   project: PracticeProject;
   onChange: (next: PracticeProject) => void;
   practiceRunning: boolean;
@@ -443,6 +443,7 @@ export function ControllerTags({
             : activeScene === "sorting" ? "MainRoutine · Clasificación de cajas"
             : activeScene === "tank" ? "MainRoutine · Sistema de llenado de tanques"
             : activeScene === "traffic" ? "MainRoutine · Intersección semaforizada"
+            : activeScene === "batch" ? "MainRoutine · Batch Mixer"
             : "MainRoutine · Faja transportadora"}
         </span>
         <label className="flex items-center gap-1">
