@@ -75,8 +75,13 @@ export function hasTankTags(project: PracticeProject): boolean {
   return TANK_TAGS.every(spec => project.tags.some(tag =>
     tag.name === spec.name && tag.type === spec.type));
 }
+export const TANK_IO_TAGS = TANK_TAGS.filter(tag => tag.direction !== "Interna");
+export const TANK_SOLUTION_TAGS = TANK_TAGS.filter(tag => tag.direction === "Interna");
+
 export function prepareTankTags(project: PracticeProject): PracticeProject {
-  for (const spec of TANK_TAGS) {
+  const specs = [...TANK_IO_TAGS, ...TANK_SOLUTION_TAGS.filter(spec =>
+    project.tags.some(tag => tag.name.toLowerCase() === spec.name.toLowerCase()))];
+  for (const spec of specs) {
     const old = project.tags.find(tag => tag.name.toLowerCase() === spec.name.toLowerCase());
     if (old && (old.name !== spec.name || old.type !== spec.type)) {
       throw new Error("Tag incompatible con el tanque: " + spec.name +
@@ -84,7 +89,7 @@ export function prepareTankTags(project: PracticeProject): PracticeProject {
     }
   }
   let result = project;
-  for (const spec of TANK_TAGS) {
+  for (const spec of specs) {
     const old = result.tags.find(tag => tag.name === spec.name);
     if (!old) result = createTag(result, spec.name, spec.description, spec.type);
     else if (!old.description.trim()) {
@@ -105,7 +110,7 @@ export function initialTankProject(): PracticeProject {
   };
   return {
     ...result,
-    tags: TANK_TAGS.map(spec => {
+    tags: TANK_IO_TAGS.map(spec => {
       const t = result.tags.find(tag => tag.name === spec.name)!;
       return Object.hasOwn(values, spec.name) ? { ...t, value: values[spec.name] } : t;
     }),
@@ -122,6 +127,7 @@ export function initialTankProject(): PracticeProject {
  */
 export function createTankExampleProject(): PracticeProject {
   let p = initialTankProject();
+  for (const tag of TANK_SOLUTION_TAGS) p = createTag(p, tag.name, tag.description, tag.type);
   for (const [name, pre] of Object.entries(TANK_TIMER_PRESETS)) {
     p = setTagValue(p, name, pre, "PRE");
   }
