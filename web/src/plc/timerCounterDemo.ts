@@ -31,11 +31,11 @@ export const DEMO_BLOCKS: ReadonlyArray<{
   description: string;
   bits: readonly DemoBit[];
 }> = [
-  { kind: "TON", tag: "TMR_StartDelay", contact: "Start_PB", description: "Retardo a la conexión", bits: ["EN", "TT", "DN"] },
-  { kind: "TOF", tag: "TMR_StopDelay", contact: "Motor_Run", description: "Retardo a la desconexión", bits: ["EN", "TT", "DN"] },
-  { kind: "TONOFF", tag: "TMR_DualDelay", contact: "Auto_Mode", description: "Retardo ON/OFF · personalizado", bits: ["EN", "TT", "DN"] },
-  { kind: "CTU", tag: "CNT_BoxesUp", contact: "Start_PB", description: "Contador ascendente", bits: ["CU", "DN", "OV"] },
-  { kind: "CTD", tag: "CNT_BoxesDown", contact: "Stop_PB", description: "Contador descendente", bits: ["CD", "DN", "UN"] },
+  { kind: "TON", tag: "TMR_StartDelay", contact: "PB_Start", description: "Retardo a la conexión", bits: ["EN", "TT", "DN"] },
+  { kind: "TOF", tag: "TMR_StopDelay", contact: "DO_Motor", description: "Retardo a la desconexión", bits: ["EN", "TT", "DN"] },
+  { kind: "TONOFF", tag: "TMR_DualDelay", contact: "DI_AutoMode", description: "Retardo ON/OFF · personalizado", bits: ["EN", "TT", "DN"] },
+  { kind: "CTU", tag: "CNT_BoxesUp", contact: "PB_Start", description: "Contador ascendente", bits: ["CU", "DN", "OV"] },
+  { kind: "CTD", tag: "CNT_BoxesDown", contact: "PB_Stop", description: "Contador descendente", bits: ["CD", "DN", "UN"] },
 ];
 
 function blank(pre: number, acc = 0): DemoBlockState {
@@ -122,11 +122,11 @@ export function stepDemoBlocks(
 ): DemoBlockRuntime {
   const dt = Math.max(0, Math.min(elapsedMs, 250));
   return {
-    TON: stepTon(previous.TON, values.Start_PB, dt),
-    TOF: stepTof(previous.TOF, values.Motor_Run, dt),
-    TONOFF: stepTonoff(previous.TONOFF, values.Auto_Mode, dt),
-    CTU: stepCtu(previous.CTU, values.Start_PB),
-    CTD: stepCtd(previous.CTD, values.Stop_PB),
+    TON: stepTon(previous.TON, values.PB_Start, dt),
+    TOF: stepTof(previous.TOF, values.DO_Motor, dt),
+    TONOFF: stepTonoff(previous.TONOFF, values.DI_AutoMode, dt),
+    CTU: stepCtu(previous.CTU, values.PB_Start),
+    CTD: stepCtd(previous.CTD, values.PB_Stop),
   };
 }
 
