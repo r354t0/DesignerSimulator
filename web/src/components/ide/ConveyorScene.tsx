@@ -112,7 +112,7 @@ export function ConveyorScene({
               Vista de proceso
             </h3>
           </div>
-          <div className="scada-process-canvas overflow-x-auto rounded-md border border-[#7d8992] bg-[#c0c0c0]"
+          <div className="scada-process-canvas overflow-x-auto rounded-md border border-[#7d8992] bg-[#ffffff]"
             role="img" aria-label={"Vista lateral de faja transportadora con " +
               scene.items.length + " cajas, motor " +
               (motorOn ? "encendido y girando" : "detenido") +
@@ -125,7 +125,7 @@ export function ConveyorScene({
                   <stop offset="100%" stopColor="#293d50"/>
                 </linearGradient>
               </defs>
-              <rect width="760" height="260" fill="#c0c0c0"/>
+              <rect width="760" height="260" fill="#ffffff"/>
               {/* Move the conveyor to the right to make room for the drive motor on the left. */}
               <g transform="translate(100 0)">
               {/* Mechanical support structure, entirely fixed to the ground. */}
