@@ -97,17 +97,17 @@ export function SortSceneInfoDialog({ open, project, onClose, onOpenTags, onLoad
               Orientación Ladder (opcional)
             </summary>
             <div className="mt-2 space-y-1 font-mono text-[11px] text-slate-300">
-              <p>R0: OR (Sort_StartPB | Sort_Motor) + XIO Sort_StopRequest → OTE Sort_Motor</p>
-              <p>R1: OR (Sort_StopPB | Sort_CountTotal.DN + Sort_LineClear) → OTE Sort_StopRequest</p>
-              <p>R2: Sort_Motor + Sort_TypeB → OTE Sort_Divert</p>
-              <p>R3: Sort_AExit → CTU Sort_CountA</p>
-              <p>R4: Sort_BExit → CTU Sort_CountB</p>
-              <p>R5: OR (Sort_AExit | Sort_BExit) → CTU Sort_CountTotal (PRE=6)</p>
-              <p>R6: Sort_CountTotal.DN + Sort_LineClear → CTU Sort_Batches</p>
-              <p>R7–R9: Sort_LineClear + Sort_ResetPB → RES CountA / CountB / CountTotal</p>
+              <p>R0: OR (PB_Start | DO_Motor) + XIO ST_StopRequest → OTE DO_Motor</p>
+              <p>R1: OR (PB_Stop | CNT_BatchBoxes.DN + DI_LineClear) → OTE ST_StopRequest</p>
+              <p>R2: DO_Motor + DI_TypeB → OTE DO_Diverter</p>
+              <p>R3: DI_ExitA → CTU CNT_ExitA</p>
+              <p>R4: DI_ExitB → CTU CNT_ExitB</p>
+              <p>R5: OR (DI_ExitA | DI_ExitB) → CTU CNT_BatchBoxes (PRE=6)</p>
+              <p>R6: CNT_BatchBoxes.DN + DI_LineClear → CTU CNT_Batches</p>
+              <p>R7–R9: DI_LineClear + PB_Reset → RES CountA / CountB / CountTotal</p>
               <p className="pt-2 font-sans text-slate-400">
                 La parada automática espera la descarga de todas las cajas.
-                RESET LOTE funciona solo con ambas líneas vacías y no borra Sort_Batches.
+                RESET LOTE funciona solo con ambas líneas vacías y no borra CNT_Batches.
               </p>
             </div>
           </details>
