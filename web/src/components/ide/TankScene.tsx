@@ -117,7 +117,7 @@ export function TankScene({
             <ScanLine size={16} className="text-sky-300" aria-hidden="true"/>
             <h3 id="tank-process-title" className="text-xs font-semibold">Vista de proceso</h3>
           </div>
-          <div className="scada-process-canvas overflow-x-auto rounded-md border border-[#7d8992] bg-[#c0c0c0]"
+          <div className="scada-process-canvas overflow-x-auto rounded-md border border-[#7d8992] bg-[#ffffff]"
             role="img" aria-label={"TK-01 nivel " + level.toFixed(1) +
               " %, bomba " + (pump ? "encendida" : "apagada") +
               ", válvula de entrada " + (inlet ? "abierta" : "cerrada") +
@@ -131,7 +131,7 @@ export function TankScene({
                   <stop offset="100%" stopColor="#125a9b"/>
                 </linearGradient>
               </defs>
-              <rect width="760" height="290" fill="#c0c0c0"/>
+              <rect width="760" height="290" fill="#ffffff"/>
               {/* Equipment frame and tank. */}
               <path d="M48 253 H705" stroke="#334b5b" strokeWidth="5" strokeLinecap="round"/>
               <path d="M319 240 L310 254 H333 L338 240 M472 240 L467 254 H490 L495 240"
