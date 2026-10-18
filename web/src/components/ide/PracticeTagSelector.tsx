@@ -4,7 +4,7 @@ import { Check, Search, X, ChevronDown, ChevronRight } from "lucide-react";
 import { getTagPickerRows } from "../../plc/practiceTagPicker";
 import { type PracticeTag, type EditableKind } from "../../plc/practiceDocument";
 
-export type TagSelectorMode = "suggestions" | "dialog";
+export type TagSelectorMode = "suggestions" | "dialog" | "edit";
 
 export interface TagSelectorState {
   instructionId: string;
@@ -18,11 +18,17 @@ interface Props {
   tags: readonly PracticeTag[];
   selector: TagSelectorState;
   onSelect: (tag: string) => void;
+  /** Return a validation error or null after an accepted inline edit. */
+  onEdit: (tag: string) => string | null;
+  onBrowse: () => void;
   onClose: () => void;
 }
 
-export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props) {
+export function PracticeTagSelector({ tags, selector, onSelect, onClose, onEdit, onBrowse }: Props) {
   const [query, setQuery] = useState("");
+  // Direct editing keeps the existing operand verbatim, not a selected search query.
+  const [draft, setDraft] = useState(selector.currentTag);
+  const [editError, setEditError] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const [expandedTimers, setExpandedTimers] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -33,6 +39,7 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
     getTagPickerRows(tags, selector.kind as EditableKind, query, expandedTimers),
     [tags, selector.kind, query, expandedTimers]);
   const suggestions = selector.mode === "suggestions";
+  const editing = selector.mode === "edit";
   // Show every compatible tag in both selector modes. The quick popup stays
   // compact through a scrollable viewport rather than silently hiding rows.
   const shown = rows;
@@ -55,7 +62,12 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
 
   useEffect(() => {
     inputRef.current?.focus();
-    inputRef.current?.select();
+    if (selector.mode === "edit") {
+      const end = inputRef.current?.value.length ?? 0;
+      inputRef.current?.setSelectionRange(end, end);
+    } else {
+      inputRef.current?.select();
+    }
     const currentRoot = selector.currentTag.split(".")[0];
     if (selector.currentTag.includes(".")) {
       setExpandedTimers((prev) => prev.includes(currentRoot) ? prev : [...prev, currentRoot]);
@@ -76,6 +88,29 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
     document.addEventListener("pointerdown", closeOnOutside);
     return () => document.removeEventListener("pointerdown", closeOnOutside);
   }, [onClose, suggestions]);
+
+  const commitEdit = () => {
+    if (draft.trim() === selector.currentTag) { onClose(); return; }
+    const message = onEdit(draft.trim());
+    if (message) {
+      setEditError(message);
+      inputRef.current?.focus();
+      return;
+    }
+    onClose();
+  };
+
+  // Direct edits behave like Studio: Enter confirms, Escape discards and
+  // clicking away confirms only a valid declared BOOL / structured member.
+  useEffect(() => {
+    if (!editing) return;
+    const commitOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && panelRef.current?.contains(event.target)) return;
+      commitEdit();
+    };
+    document.addEventListener("pointerdown", commitOutside);
+    return () => document.removeEventListener("pointerdown", commitOutside);
+  });
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
@@ -172,6 +207,55 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose }: Props
       )}
     </div>
   );
+
+  if (editing) {
+    const width = Math.min(300, window.innerWidth - 16);
+    const left = Math.max(8, Math.min(selector.anchor.left - 25,
+      window.innerWidth - width - 8));
+    const top = Math.max(8, Math.min(selector.anchor.bottom + 5,
+      window.innerHeight - 110));
+    return createPortal(
+      <div ref={panelRef} role="dialog"
+        aria-label={"Editar variable de " + selector.kind}
+        style={{position: "fixed", left, top, width, zIndex: 1200}}
+        className="rounded-md border border-sky-500 bg-white p-2 text-slate-900 shadow-xl"
+        onKeyDown={(event) => {
+          event.stopPropagation();
+          if (event.key === "Enter") { event.preventDefault(); commitEdit(); }
+          if (event.key === "Escape") { event.preventDefault(); onClose(); }
+          if (event.key === "ArrowDown" && event.altKey) {
+            event.preventDefault(); onBrowse();
+          }
+        }}>
+        <div className="mb-1.5 text-[11px] font-semibold text-slate-700">
+          Editar operando · {selector.kind}
+        </div>
+        <div className="flex gap-1.5">
+          <input ref={inputRef} type="text" spellCheck={false}
+            aria-label="Editar texto del tag existente"
+            value={draft}
+            onChange={(event) => {setDraft(event.target.value); setEditError("");}}
+            className="min-w-0 flex-1 rounded border border-slate-300 px-2 py-1.5 font-mono text-xs outline-none focus:border-sky-500 focus:ring-1 focus:ring-sky-300"
+          />
+          <button type="button" onClick={commitEdit}
+            aria-label="Guardar operando editado"
+            className="rounded border border-sky-600 bg-sky-700 px-2.5 text-xs font-semibold text-white hover:bg-sky-600">
+            <Check size={15}/>
+          </button>
+          <button type="button" onClick={onBrowse}
+            aria-label="Explorar variables disponibles"
+            title="Seleccionar otra variable de la lista"
+            className="rounded border border-slate-300 px-2.5 text-slate-700 hover:bg-slate-100">
+            <Search size={15}/>
+          </button>
+        </div>
+        {editError && <p role="alert" className="mt-1.5 text-[11px] text-red-700">{editError}</p>}
+        <p className="mt-1.5 text-[10px] text-slate-500">
+          Edita solo los caracteres necesarios · Enter guardar · Esc cancelar
+        </p>
+      </div>,document.body,
+    );
+  }
 
   if (suggestions) {
     const width = 340;
