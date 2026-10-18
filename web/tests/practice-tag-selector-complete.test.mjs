@@ -26,8 +26,8 @@ test("large scene-4 tag list can be browsed without typing any search text", () 
     assert.ok(rows.length > 8, kind + " should have many options");
     assert.equal(rows.filter(row => row.selectable).length, relevant.length,
       kind + " must expose ALL BOOL tags without losing additional structured parents");
-    assert.ok(rows.some(row => row.name === "Tr_EWWaiting" && row.selectable));
-    assert.ok(rows.some(row => row.name === "Tr_Walk" && row.selectable));
+    assert.ok(rows.some(row => row.name === "DI_EWWaiting" && row.selectable));
+    assert.ok(rows.some(row => row.name === "DO_PedestrianWalk" && row.selectable));
   }
   assert.equal(getTagPickerRows(project.tags, "TON", "").length, 7);
   assert.equal(getTagPickerRows(project.tags, "CTU", "").length, 2);
@@ -36,10 +36,10 @@ test("large scene-4 tag list can be browsed without typing any search text", () 
 test("timer members remain browsable and searching still filters compatible tags", () => {
   const project = initialTankProject();
   const collapsed = getTagPickerRows(project.tags, "XIC", "");
-  assert.ok(collapsed.find(row => row.name === "Tank_TMix" && row.expandable));
-  const expanded = getTagPickerRows(project.tags, "XIC", "", ["Tank_TMix"]);
-  assert.ok(expanded.find(row => row.name === "Tank_TMix.DN" && row.selectable));
-  assert.ok(expanded.find(row => row.name === "Tank_TMix.ACC" && !row.selectable));
-  const searched = getTagPickerRows(project.tags, "XIC", "Tank_MixStage");
-  assert.deepEqual(searched.map(row => row.name), ["Tank_MixStage"]);
+  assert.ok(collapsed.find(row => row.name === "TMR_Mixing" && row.expandable));
+  const expanded = getTagPickerRows(project.tags, "XIC", "", ["TMR_Mixing"]);
+  assert.ok(expanded.find(row => row.name === "TMR_Mixing.DN" && row.selectable));
+  assert.ok(expanded.find(row => row.name === "TMR_Mixing.ACC" && !row.selectable));
+  const searched = getTagPickerRows(project.tags, "XIC", "ST_Mixing");
+  assert.deepEqual(searched.map(row => row.name), ["ST_Mixing"]);
 });
