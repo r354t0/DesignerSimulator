@@ -148,7 +148,8 @@ test("SCADA, physical inputs and tutorial mention advanced control and count wid
   assert.match(app,/\["DI_LineClear", next\.lineClear\]/);
   assert.match(info,/CNT_BatchBoxes\.DN/);
   assert.match(info,/RecommendedSolutionPanel/);
-  assert.match(info,/R5: OR \(DI_ExitA \| DI_ExitB\)/);
+  assert.match(info,/RecommendedSolutionPanel/);
+  assert.match(info,/CTU CNT_ExitA, CNT_ExitB, CNT_BatchBoxes, CNT_Lotes/);
 });
 
 test("optional tag registration is idempotent and preserves custom descriptions",()=>{
