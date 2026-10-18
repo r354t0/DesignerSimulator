@@ -150,6 +150,9 @@ test("advanced exercise 5: mode B runs batches up to INT target and display incr
     assert.equal(count(plc,"CNT_Lotes"),lot);
     assert.equal(batchInt(plc.project,"INT_DisplayValue"),lot);
     if(lot===1){
+      // The fill coil precedes the completed-lot transition; it turns on
+      // at the following PLC scan, as expected for a top-to-bottom Ladder.
+      plc=tickPracticeScan(plc);
       assert.equal(output(plc,"DO_Pump1"),true);
       plc=setBOOL(plc,"DI_LowLevel",false);
       plc=setBOOL(plc,"DI_Thermostat",false);
