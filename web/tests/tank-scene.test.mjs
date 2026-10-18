@@ -4,7 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   initialTankProject, createTankExampleProject, initialTankState,
   prepareTankTags, tankSensorInputs, stepTankState, readTankBool,
-  hasTankTags, TANK_TAGS, TANK_INITIAL_PERCENT,
+  hasTankTags, TANK_TAGS, TANK_IO_TAGS, TANK_SOLUTION_TAGS, TANK_INITIAL_PERCENT,
   TANK_HIGH_PERCENT, TANK_LOW_PERCENT, TANK_BATCH_TARGET, TANK_TIMER_PRESETS,
 } from "../src/plc/tankSceneModel.ts";
 import { setTagValue, editTag, insertInstruction } from "../src/plc/practiceDocument.ts";
@@ -19,8 +19,8 @@ import {
 test("tank MainRoutine starts empty, with documented process, timer and batch tags",()=>{
   const project=initialTankProject();
   assert.equal(hasTankTags(project),true);
-  assert.deepEqual(project.tags.map(t=>t.name),TANK_TAGS.map(t=>t.name));
-  assert.equal(project.tags.length,24);
+  assert.deepEqual(project.tags.map(t=>t.name),TANK_IO_TAGS.map(t=>t.name));
+  assert.equal(project.tags.length,TANK_IO_TAGS.length);
   assert.equal(project.rungs.length,1);
   assert.equal(project.rungs[0].instructions.length,0);
   assert.equal(project.tags.find(t=>t.name==="AI_LevelPct").value,TANK_INITIAL_PERCENT);
@@ -28,7 +28,7 @@ test("tank MainRoutine starts empty, with documented process, timer and batch ta
   assert.equal(project.tags.find(t=>t.name==="DI_HighLevel").value,false);
   assert.equal(prepareTankTags(project),project);
   assert.equal(project.tags.some(t=>t.name==="Sort_Motor"||t.name==="Motor_Run"),false);
-  for(const def of TANK_TAGS) assert.equal(project.tags.find(t=>t.name===def.name).description,def.description);
+  for(const def of TANK_IO_TAGS) assert.equal(project.tags.find(t=>t.name===def.name).description,def.description);
 });
 
 test("tank automatic tag registration is idempotent, does not mutate user rungs or tags",()=>{
