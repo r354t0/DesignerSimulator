@@ -117,7 +117,7 @@ export function TankScene({
             <ScanLine size={16} className="text-sky-300" aria-hidden="true"/>
             <h3 id="tank-process-title" className="text-xs font-semibold">Vista de proceso</h3>
           </div>
-          <div className="overflow-x-auto rounded-md border border-slate-600 bg-[#0f1d29]"
+          <div className="scada-process-canvas overflow-x-auto rounded-md border border-[#7d8992] bg-[#c0c0c0]"
             role="img" aria-label={"TK-01 nivel " + level.toFixed(1) +
               " %, bomba " + (pump ? "encendida" : "apagada") +
               ", válvula de entrada " + (inlet ? "abierta" : "cerrada") +
@@ -131,6 +131,7 @@ export function TankScene({
                   <stop offset="100%" stopColor="#125a9b"/>
                 </linearGradient>
               </defs>
+              <rect width="760" height="290" fill="#c0c0c0"/>
               {/* Equipment frame and tank. */}
               <path d="M48 253 H705" stroke="#334b5b" strokeWidth="5" strokeLinecap="round"/>
               <path d="M319 240 L310 254 H333 L338 240 M472 240 L467 254 H490 L495 240"
@@ -160,7 +161,7 @@ export function TankScene({
                   fill="none" stroke={mixer ? "#6ee7b7" : "#a9c4d6"}
                   strokeWidth="6" strokeLinecap="round"/>
               </g>
-              <g fontSize="11" textAnchor="end" fill="#cbd5e1">
+              <g fontSize="11" textAnchor="end" fill="#334155" fontWeight="700">
                 <text x="280" y="77">100 %</text>
                 <text x="280" y="91">90 %</text>
                 <text x="280" y="214">15 %</text>
@@ -175,10 +176,10 @@ export function TankScene({
                     fill={sensor.active ? "#fbbf24" : "#253d4c"}
                     stroke="#9bb5c5" strokeWidth="2"/>
                   <text x="528" y={sensor.y+4} fontSize="11"
-                    fill={sensor.active ? "#fbbf24" : "#b3c2cf"}>{sensor.name}</text>
+                    fill={sensor.active ? "#92400e" : "#334155"} fontWeight="700">{sensor.name}</text>
                 </g>
               ))}
-              <g fontSize="11" textAnchor="middle" fill="#a8c3d5">
+              <g fontSize="11" textAnchor="middle" fill="#253e50" fontWeight="700">
                 <text x="403" y="48">TK-01</text>
               </g>
               <rect x="357" y="114" width="95" height="48" rx="6"
@@ -204,7 +205,7 @@ export function TankScene({
               </g>
               <circle cx="114" cy="175" r="4" fill="#d6e9ef"/>
               <text x="114" y="228" fontSize="11" textAnchor="middle"
-                fill={pump ? "#6ee7b7" : "#a1b3c2"}>P-01</text>
+                fill={pump ? "#047857" : "#334155"} fontWeight="700">P-01</text>
 
               {/* Inlet solenoid valve and flow — only when both outputs on. */}
               <g transform="translate(237 94)">
@@ -219,7 +220,7 @@ export function TankScene({
                 <path d="M181 94 H291" stroke="#7dd3fc" strokeWidth="3"
                   strokeDasharray="7 9" className="tank-flow-motion"/>
               )}
-              <g fontSize="11" fill="#a8c3d5">
+              <g fontSize="11" fill="#253e50" fontWeight="700">
                 <text x="214" y="40">XV-01</text>
                 <text x="72" y="126">ENTRADA</text>
               </g>
