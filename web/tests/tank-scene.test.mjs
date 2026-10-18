@@ -75,7 +75,7 @@ test("tank reference Ladder builds with actual independent OR, TON and CTU",()=>
   for (const [name,pre] of Object.entries(TANK_TIMER_PRESETS)) {
     assert.equal(project.tags.find(t=>t.name===name).value.PRE,pre);
   }
-  assert.equal(project.tags.find(t=>t.name==="CNT_Batches").value.PRE,TANK_BATCH_TARGET);
+  assert.equal(project.tags.find(t=>t.name==="CNT_Lotes").value.PRE,TANK_BATCH_TARGET);
   // Mix and drain activate in the same scan AFTER their source stage's OTU.
   // Drain-to-fill loops back to R1, therefore its OTL runs NEXT scan.
   for (const [transition, ending, start, oldStage, newStage] of [
@@ -105,7 +105,7 @@ test("tank reference Ladder builds with actual independent OR, TON and CTU",()=>
     project.rungs.findIndex(r=>r.id==="tank-to-fill"),
     "batch CTU must be evaluated before deciding on another batch");
   assert.ok(project.rungs.find(r=>r.id==="tank-to-fill").instructions
-    .some(i=>i.kind==="XIO"&&i.tag==="CNT_Batches.DN"),
+    .some(i=>i.kind==="XIO"&&i.tag==="CNT_Lotes.DN"),
     "the last batch cannot cause a fourth fill");
 });
 
@@ -163,7 +163,7 @@ test("transition flags preserve OTU→OTL semantics in one scan",()=>{
   assert.equal(readTankBool(plc.project,"ST_Draining"),false);
   assert.equal(readTankBool(plc.project,"ST_Filling"),false,
     "R1 is above the transition rung and must not latch FillStage in this scan");
-  assert.equal(plc.project.tags.find(t=>t.name==="CNT_Batches").value.ACC,1);
+  assert.equal(plc.project.tags.find(t=>t.name==="CNT_Lotes").value.ACC,1);
   // The following scan loops back through R1, latches FillStage, then ToFill
   // resets as a non-retentive OTE without creating a separate rung 22.
   plc=tickPracticeScan(plc);
@@ -220,14 +220,14 @@ test("tank preopens inlet, delays pump, mixes, drains and stops after three batc
     highSeen ||= readTankBool(plc.project,"DI_HighLevel");
     if (i%10===9) plc=tickPracticeScan(plc);
     assertExclusiveStages(plc,"tank cyclic scan "+i);
-    const count=plc.project.tags.find(t=>t.name==="CNT_Batches").value.ACC;
+    const count=plc.project.tags.find(t=>t.name==="CNT_Lotes").value.ACC;
     if(count===TANK_BATCH_TARGET && !readTankBool(plc.project,"ST_RunEnable"))break;
     if(i===1449) assert.fail("three-batch sequence did not complete");
   }
   assert.equal(alarm,false,"normal process must not trip either watchdog");
   assert.equal(mixed,true); assert.equal(drained,true);
   assert.equal(lowCleared,true);assert.equal(highSeen,true);
-  assert.equal(plc.project.tags.find(t=>t.name==="CNT_Batches").value.ACC,3);
+  assert.equal(plc.project.tags.find(t=>t.name==="CNT_Lotes").value.ACC,3);
   for(const output of ["DO_Pump","DO_InletValve","DO_Mixer","DO_DrainValve"]){
     assert.equal(readTankBool(plc.project,output),false,output);
   }
