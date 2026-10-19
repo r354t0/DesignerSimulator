@@ -126,11 +126,13 @@ export function setInstructionPreset(
   }
   if (preset?.mode === "tag") {
     const tag = project.tags.find((item) => item.name === preset.tag);
-    if (!tag || tag.type !== "DINT") throw new Error("PRE requiere un tag DINT existente.");
+    if (!tag || (tag.type !== "INT" && tag.type !== "DINT")) {
+      throw new Error("PRE requiere un tag INT o DINT existente.");
+    }
     if (typeof tag.value !== "number" || !valid(tag.value)) {
       throw new Error(isCounter
-        ? "La variable DINT debe contener un PRE de 32 bits válido."
-        : "La variable DINT debe contener un PRE no negativo.");
+        ? "La variable INT/DINT debe contener un PRE válido para el contador."
+        : "La variable INT/DINT debe contener un PRE no negativo.");
     }
   }
   return { ...project, rungs: project.rungs.map((rung) => ({
@@ -1051,11 +1053,12 @@ export function setTagValue(
       item.name === name ? { ...item, value: next } : item) };
   }
   assertValidTagValue(tag.type, value);
-  if (tag.type === "DINT" && project.rungs.some((rung) => allInstructions(rung).some((item) =>
-    ["TON", "TOF", "RTO"].includes(item.kind) &&
-    item.preset?.mode === "tag" && item.preset.tag === name)) &&
+  if ((tag.type === "INT" || tag.type === "DINT") &&
+      project.rungs.some((rung) => allInstructions(rung).some((item) =>
+        ["TON", "TOF", "RTO"].includes(item.kind) &&
+        item.preset?.mode === "tag" && item.preset.tag === name)) &&
       !isValidTimerPreset(value as number)) {
-    throw new Error("DINT usado como PRE requiere un entero no negativo en milisegundos.");
+    throw new Error("INT/DINT usado como PRE de temporizador requiere un entero no negativo en milisegundos.");
   }
   return { ...project, tags: project.tags.map((item) =>
     item.name === name ? { ...item, value } : item) };
