@@ -2,7 +2,7 @@ import { useEffect,useRef,useState } from "react";
 import { BookOpen, Info, X } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import {
-  BATCH_EXERCISES,BATCH_IO_TAGS,batchSolutionTags,batchSolutionUsedTags,
+  BATCH_EXERCISES,BATCH_IO_TAGS,batchSolutionUsedTags,
   type BatchExercise,
 } from "../../plc/batchMixerSceneModel";
 import { SceneTagTable } from "./SceneTagTable";
