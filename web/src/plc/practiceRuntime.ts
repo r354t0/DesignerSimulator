@@ -1,3 +1,4 @@
+import { initialGearSequenceState, evaluateGearSequence, type GearCycleStateCode } from "./gearSpraySequence.ts";
 import { OR_JUNCTION_KIND, isMathKind, isCompareKind, isCounterKind, isOutputKind, isTimerKind, isValidTimerPreset, type PracticeProject, type PracticeTag, type PracticeInstruction } from "./practiceDocument.ts";
 import { compareValues, readComparisonOperand } from "./practiceCompare.ts";
 import { convertMathResult, evaluateMath, readMathSource } from "./practiceMath.ts";
@@ -114,6 +115,13 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
     }
     if (!validDint(pre)) throw new Error("PRE del contador requiere un DINT válido.");
     let next = { ...previous, PRE: pre };
+    // CCW CTU RESET terminal is sampled before the count edge, within rung 4.
+    if(instruction.resetTag && tagValues.get(instruction.resetTag)===true){
+      next={...next,ACC:0,CU:false,CD:false,DN:false,OV:false,UN:false};
+      counters.set(instruction.tag,next);
+      counterUpdates.set(instruction.tag,next);
+      return next;
+    }
     if (instruction.kind === "RES") {
       if (enabled) next = { ...next, ACC: 0, CU: false, CD: false,
         DN: false, OV: false, UN: false };
@@ -315,6 +323,44 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
     }
 
     for (const instruction of rung.instructions.filter((item) => isOutputKind(item.kind))) {
+      if (instruction.kind==="GEAR_SEQ"){
+        const read=(name:string)=>tagValues.get(name)===true;
+        const stateTag=project.tags.find(tag=>tag.name==="SM_Cycle_State");
+        const stored=typeof stateTag?.value==="number"?stateTag.value:0;
+        const prior=([0,10,20,30,90] as number[]).includes(stored)?
+          stored as GearCycleStateCode:initialGearSequenceState().state;
+        const result=evaluateGearSequence({
+          state:prior,
+          blockLatched:read("SM_Cycle_BlockLatched"),
+          recoveryHold:read("SM_Cycle_RearmHold"),
+        },{
+          run:power&&read("ST_Run_Rly"),
+          healthy:read("DO_LS_Healthy"),
+          manual:read("ST_Man_Mode"),
+          freqDone:read("TMR_Freq_Dn"),
+          startupDone:read("TMR_Startup_Cycle_Dn"),
+          extraPulse:read("PB_Extra"),
+          flowDone:read("CNT_Lubeflo_Dn"),
+          purgeActive:read("TMR_Purge_Dn"),
+          resetPulse:read("PB_Reset"),
+          tripActive:read("ST_General_Trip_Rly"),
+        });
+        for(const [name,value] of [
+          ["ST_Cycle_Rly",result.output.cycleRun],
+          ["SM_Cycle_Blocked",result.output.blocked],
+          ["SM_Cycle_RearmHold",result.output.rearmHold],
+          ["SM_Cycle_BlockLatched",result.memory.blockLatched],
+        ] as const){
+          tagValues.set(name,value);
+          writes[name]=value;
+        }
+        numericWrites.set("SM_Cycle_State",result.output.state);
+        instructionFlow[instruction.id]={
+          powerIn:power,condition:result.output.cycleRun,
+          powerOut:result.output.cycleRun,value:result.output.cycleRun,
+        };
+        continue;
+      }
       if (isMathKind(instruction.kind)) {
         let success = false;
         if (power) {
@@ -341,12 +387,20 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
       if (isCounterKind(instruction.kind) ||
           (instruction.kind === "RES" && counters.has(instruction.tag))) {
         const output = updateCounter(instruction, power);
+        if(instruction.doneTag){
+          tagValues.set(instruction.doneTag,output.DN);
+          writes[instruction.doneTag]=output.DN;
+        }
         instructionFlow[instruction.id] = { powerIn: power, condition: power,
           powerOut: power, value: output.DN };
         continue;
       }
       if (isTimerKind(instruction.kind)) {
         const output = updateTimer(instruction, power);
+        if(instruction.doneTag){
+          tagValues.set(instruction.doneTag,output.DN);
+          writes[instruction.doneTag]=output.DN;
+        }
         instructionFlow[instruction.id] = { powerIn: power, condition: power,
           powerOut: power, value: output.DN };
         continue;
