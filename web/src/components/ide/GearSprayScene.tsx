@@ -130,7 +130,7 @@ function ProcessGraphic({project}: {project:PracticeProject}){
   );
 
   return <svg viewBox="0 0 1120 690" role="img"
-    aria-label="Gear Spray: aire instrumental desde acometida a SV-2560, SV-2563 y colector; transmisor PI-2561 próximo al dosificador; tambor, bomba, filtro, SV-2561, PI-2560, dosificador y seis boquillas"
+    aria-label="Gear Spray: aire instrumental desde acometida a SV-2560, SV-2563 y colector; transmisor PI-2561 próximo al dosificador; tambor, bomba, filtro, PI-2560, SV-2561, dosificador y seis boquillas"
     className="block h-auto w-full min-w-[700px] rounded-lg border border-slate-300 bg-white">
     <rect x="0" y="0" width="1120" height="690" rx="10" fill="#fff"/>
     <text x="24" y="29" fontSize="17" fontWeight="750" fill="#0f2940">
@@ -157,7 +157,7 @@ function ProcessGraphic({project}: {project:PracticeProject}){
     </text>
     <text x="38" y="282" fontSize="10.5" fill="#475569">Acometida de planta</text>
     {pipe("M42 305 H230 V156 H964 V548","air",air)}
-    {pipe("M230 305 H465 V412 H446","air",pump)}
+    {pipe("M230 305 H370 V412 H305","air",pump)}
     {tee(230,305,"air")}
     <path d="M42 293 L27 305 L42 317" fill="none"
       stroke="#0284c7" strokeWidth="3"/>
@@ -165,7 +165,7 @@ function ProcessGraphic({project}: {project:PracticeProject}){
       AIRE DE ATOMIZACIÓN
     </text>
     {solenoid(464,156,"SV-2563",air,"air")}
-    {solenoid(394,305,"SV-2560",pump,"air")}
+    {solenoid(300,305,"SV-2560",pump,"air")}
 
     {/* Presión de aire en la zona del bloque dosificador.
         La toma parte directamente del cabezal neumático mediante una tee. */}
@@ -185,57 +185,57 @@ function ProcessGraphic({project}: {project:PracticeProject}){
 
     {/* GRASA: succión desde el tambor, descarga de la bomba, filtro y
         válvula SV-2561 hasta la entrada lateral del dosificador. */}
-    <text x="515" y="315" fontSize="11.5" fontWeight="700" fill="#92400e">
+    <text x="414" y="315" fontSize="11.5" fontWeight="700" fill="#92400e">
       CIRCUITO DE GRASA
     </text>
-    <rect x="352" y="483" width="103" height="109" rx="9"
+    <rect x="208" y="483" width="103" height="109" rx="9"
       fill="#334155" stroke="#0f172a" strokeWidth="3"/>
-    <ellipse cx="403" cy="483" rx="51" ry="11"
+    <ellipse cx="259" cy="483" rx="51" ry="11"
       fill="#64748b" stroke="#0f172a" strokeWidth="2"/>
-    <path d="M352 521 H455 M352 555 H455" stroke="#94a3b8" strokeWidth="3"/>
-    <text x="403" y="529" fontSize="11" fontWeight="750" fill="#fff"
+    <path d="M208 521 H311 M208 555 H311" stroke="#94a3b8" strokeWidth="3"/>
+    <text x="259" y="529" fontSize="11" fontWeight="750" fill="#fff"
       textAnchor="middle">TAMBOR</text>
-    <text x="403" y="547" fontSize="10" fill="#e2e8f0"
+    <text x="259" y="547" fontSize="10" fill="#e2e8f0"
       textAnchor="middle">310-LU-003-HE</text>
-    <circle cx="475" cy="537" r="9" fill={low?"#ef4444":"#34d399"}
+    <circle cx="331" cy="537" r="9" fill={low?"#ef4444":"#34d399"}
       stroke="#0f172a" strokeWidth="2"/>
-    <text x="492" y="541" fontSize="10.5" fontWeight="650"
+    <text x="348" y="541" fontSize="10.5" fontWeight="650"
       fill="#334155">LSL {low?"BAJO":"OK"}</text>
-    {pipe("M403 483 V445 H779","lube",grease&&pump)}
-    <rect x="367" y="412" width="79" height="55" rx="8"
+    {pipe("M259 483 V445 H779","lube",grease&&pump)}
+    <rect x="224" y="412" width="79" height="55" rx="8"
       fill={pump?"#ccf5e3":"#dce4ec"}
       stroke={pump?surfaces.active:"#475569"} strokeWidth="3"/>
-    <circle cx="406" cy="439" r="19" fill="#fff" stroke="#475569" strokeWidth="2"/>
-    <path d="M394 449 L406 427 L418 449 Z"
+    <circle cx="263" cy="439" r="19" fill="#fff" stroke="#475569" strokeWidth="2"/>
+    <path d="M251 449 L263 427 L275 449 Z"
       fill={pump?surfaces.active:"#94a3b8"}/>
-    <rect x="439" y="405" width="15" height="14" rx="2"
+    <rect x="296" y="405" width="15" height="14" rx="2"
       fill={pump?"#0ea5e9":"#cbd5e1"} stroke="#475569" strokeWidth="2"/>
-    <text x="404" y="395" fontSize="11" fontWeight="750"
+    <text x="263" y="395" fontSize="11" fontWeight="750"
       fill="#334155" textAnchor="middle">BOMBA NEUMÁTICA</text>
 
     {/* Equipos montados sobre la tubería de grasa, sin juntas ficticias. */}
     {/* Filtro compacto para liberar espacio respecto al transmisor PI-2560. */}
-    <rect x="492" y="432" width="32" height="26" rx="4"
+    <rect x="389" y="432" width="32" height="26" rx="4"
       fill="#fff" stroke="#64748b" strokeWidth="2.5"/>
-    <path d="M497 454 L518 435 M497 443 L505 435 M510 454 L520 445"
+    <path d="M394 454 L415 435 M394 443 L402 435 M407 454 L417 445"
       stroke="#94a3b8" strokeWidth="2.4"/>
-    <text x="508" y="418" fontSize="10.5" fontWeight="750" fill="#334155"
+    <text x="405" y="418" fontSize="10.5" fontWeight="750" fill="#334155"
       textAnchor="middle">FILTRO</text>
-    {solenoid(665,445,"SV-2561",grease,"lube")}
+    {solenoid(659,445,"SV-2561",grease,"lube")}
 
     {/* PI-2560: presión de lubricante en la toma entre el FILTRO y SV-2561.
         Derivación vertical conectada al mismo tramo continuo de grasa. */}
-    <path d="M575 445 V416" stroke="#64748b" strokeWidth="4" fill="none"/>
-    {tee(575,445,"lube")}
-    <circle cx="575" cy="402" r="14" fill="#ffedd5"
+    <path d="M530 445 V416" stroke="#64748b" strokeWidth="4" fill="none"/>
+    {tee(530,445,"lube")}
+    <circle cx="530" cy="402" r="14" fill="#ffedd5"
       stroke="#d97706" strokeWidth="3"/>
-    <path d="M575 402 L583 396" stroke="#92400e" strokeWidth="2.5"/>
-    <text x="575" y="337" textAnchor="middle" fontSize="11.5" fontWeight="750" fill="#334155">
+    <path d="M530 402 L538 396" stroke="#92400e" strokeWidth="2.5"/>
+    <text x="530" y="337" textAnchor="middle" fontSize="11.5" fontWeight="750" fill="#334155">
       PI-2560 · GRASA
     </text>
-    <rect x="518" y="345" width="114" height="34" rx="5"
+    <rect x="473" y="345" width="114" height="34" rx="5"
       fill="#ffedd5" stroke="#d97706" strokeWidth="1.5"/>
-    <text x="575" y="367" textAnchor="middle" fontSize="17" fontWeight="750"
+    <text x="530" y="367" textAnchor="middle" fontSize="17" fontWeight="750"
       fill="#92400e">{gearNumber(project,"_310_PI_2560").toFixed(1)}</text>
 
     {/* Sensor de proximidad colocado encima del bloque. */}
