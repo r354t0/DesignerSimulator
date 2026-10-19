@@ -73,6 +73,56 @@ test("five recommended solutions build independently and introduce only their ow
     assert.equal(display.type,"INT");
   }
 });
+test("Ejercicio 1: six rungs exactly match reference, with two parallel output coils in rung 4",()=>{
+  const project=createBatchSolution(1);
+  assert.equal(project.rungs.length,6);
+  const expected=[
+    [["XIC","PB_Start"],["XIO","PB_Stop"],["OTE","ST_RunEnable"]],
+    [["XIC","ST_RunEnable"],["XIC","PB_Start"],["OTL","ST_Filling"]],
+    [["XIC","ST_RunEnable"],["XIC","ST_Filling"],["OTE","DO_Pump1"]],
+    [["XIC","ST_RunEnable"],["XIC","ST_Filling"],
+      ["XIC","DI_Flowmeter1"],["CTU","CNT_Volume"]],
+    [["XIC","ST_RunEnable"],["XIC","ST_Filling"],
+      ["GEQ",""],["OTU","ST_Filling"],["OTL","ST_Full"]],
+    [["XIC","ST_RunEnable"],["XIC","ST_Full"],["OTE","DO_FullLamp"]],
+  ];
+  project.rungs.forEach((rung,index)=>{
+    assert.deepEqual(rung.instructions.map(item=>[item.kind,item.tag]),expected[index],
+      "rung "+index+" must match the diagram");
+  });
+  const first=project.rungs[0];
+  assert.equal(first.parallelBranches.length,1);
+  assert.deepEqual(first.parallelBranches[0].instructions.map(item=>[item.kind,item.tag]),
+    [["XIC","ST_RunEnable"]]);
+  assert.equal(first.parallelBranches[0].anchorId,first.instructions[0].id);
+  const transition=project.rungs[4];
+  assert.equal(transition.parallelBranches?.length??0,0);
+  assert.deepEqual(transition.instructions.slice(-2).map(x=>x.kind),["OTU","OTL"]);
+  assert.deepEqual(transition.instructions[2].compareA,
+    {mode:"tag",tag:"CNT_Volume.ACC"});
+  assert.deepEqual(transition.instructions[2].compareB,
+    {mode:"literal",value:900});
+  assert.equal(project.tags.find(t=>t.name==="CNT_Volume").value.PRE,900);
+  assert.ok(!project.rungs.some(rung=>rung.instructions.some(item=>
+    ["RTO","TON","CTD","MOV"].includes(item.kind))),"no extra solution rungs");
+  assert.equal(buildPracticeProject(project).success,true);
+});
+
+test("Ejercicio 1: STOP pauses pump and FULL pilot until run is reenabled",()=>{
+  let plc=started(1);
+  assert.equal(output(plc,"DO_Pump1"),true);
+  for(let i=0;i<900;i++)plc=pulse(plc,"DI_Flowmeter1");
+  assert.equal(output(plc,"DO_Pump1"),false);
+  assert.equal(output(plc,"DO_FullLamp"),true);
+  plc=press(plc,"PB_Stop");
+  assert.equal(output(plc,"DO_FullLamp"),false);
+  assert.equal(output(plc,"DO_Pump1"),false);
+  assert.equal(batchBool(plc.project,"ST_Full"),true,"FULL latch persists");
+  plc=press(plc,"PB_Start");
+  assert.equal(output(plc,"DO_FullLamp"),true);
+  assert.equal(output(plc,"DO_Pump1"),false,"counter is already at preset");
+});
+
 test("lab 01 exercise 1: P1 fills via 900 rising pulses (0.1 % each), FULL and stop behave",()=>{
   let plc=started(1);
   assert.equal(output(plc,"DO_Pump1"),true);
