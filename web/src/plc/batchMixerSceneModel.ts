@@ -408,8 +408,12 @@ export interface BatchMixerState {
   pulseCarry: [number,number,number];
   totalPulses: [number,number,number];
 }
+/** Temperature of the incoming products and the empty vessel (°C). */
+export const BATCH_AMBIENT_TEMPERATURE=20;
+export const BATCH_MAX_TEMPERATURE=95;
 export const initialBatchState=():BatchMixerState=>({
-  level:0,temperature:20,pulseCarry:[0,0,0],totalPulses:[0,0,0],
+  level:0,temperature:BATCH_AMBIENT_TEMPERATURE,
+  pulseCarry:[0,0,0],totalPulses:[0,0,0],
 });
 /** The flowmeters emit 10 pulses per 1% of nominal tank capacity. */
 export const BATCH_VOLUME_PER_PULSE_PERCENT=0.1;
@@ -450,7 +454,31 @@ export function stepBatchPhysics(state:BatchMixerState,outputs:{
       total[i]++;
     }
   }
-  const temperature=Math.max(20,Math.min(95,state.temperature+
-    (outputs.heater&&level>0 ? dt*4 : 0)));
+  // Simplified thermal model: as hot liquid leaves, the displayed vessel
+  // temperature cools progressively toward ambient with the remaining volume.
+  // The vessel reaches ambient exactly at 0%, ready for a fresh batch.
+  // This does not write PLC logic or introduce an analog temperature input.
+  const drained=(total[2]-state.totalPulses[2])*BATCH_VOLUME_PER_PULSE_PERCENT;
+  const incoming=((total[0]-state.totalPulses[0])+
+    (total[1]-state.totalPulses[1]))*BATCH_VOLUME_PER_PULSE_PERCENT;
+  const remaining=Math.max(0,state.level-drained);
+  let temperature=state.temperature;
+  if(drained>0&&state.level>0) {
+    temperature=BATCH_AMBIENT_TEMPERATURE+
+      (temperature-BATCH_AMBIENT_TEMPERATURE)*(remaining/state.level);
+  }
+  // Fresh products enter at ambient; mix them with any hot liquid remaining.
+  // Simultaneous filling/draining in a custom Ladder also behaves predictably.
+  if(incoming>0&&remaining+incoming>0) {
+    temperature=BATCH_AMBIENT_TEMPERATURE+
+      (temperature-BATCH_AMBIENT_TEMPERATURE)*(remaining/(remaining+incoming));
+  }
+  if(level<=0) {
+    temperature=BATCH_AMBIENT_TEMPERATURE;
+  } else if(outputs.heater&&!outputs.pump3) {
+    temperature+=dt*4;
+  }
+  temperature=Math.max(BATCH_AMBIENT_TEMPERATURE,
+    Math.min(BATCH_MAX_TEMPERATURE,temperature));
   return {...state,level,temperature,pulseCarry:carry,totalPulses:total};
 }
