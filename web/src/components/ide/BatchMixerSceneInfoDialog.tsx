@@ -111,13 +111,13 @@ export function BatchMixerSceneInfoDialog({open,project,selectedExercise,onClose
           salidas e interbloqueos. Las variables adicionales solo se crean al implementarla.
         </p>
         <h4 className="mb-2 font-semibold">
-          {exercise<=2?"Variables utilizadas en la solución":"Variables adicionales"} · Ejercicio {exercise}
+          {exercise<=3?"Variables utilizadas en la solución":"Variables adicionales"} · Ejercicio {exercise}
         </h4>
         <SceneTagTable
-          specs={exercise===1||exercise===2
-            ? batchSolutionUsedTags(exercise) : batchSolutionTags(exercise)}
+          specs={exercise<=3
+            ? batchSolutionUsedTags(exercise as 1|2|3) : batchSolutionTags(exercise)}
           project={project} preview/>
-        {exercise<=2&&<p className="mt-1.5 text-[10px] text-slate-400">
+        {exercise<=3&&<p className="mt-1.5 text-[10px] text-slate-400">
           Solo aparecen los tags referenciados en los rungs de este ejercicio.
           Las E/S ya existen en el SCADA; las variables internas se crean al
           implementar la solución.
@@ -125,6 +125,7 @@ export function BatchMixerSceneInfoDialog({open,project,selectedExercise,onClose
         <p className="mt-2 text-[11px] text-slate-400">
           {exercise===1?"FM1 incrementa CNT_Volume hasta 900 pulsos (90 %).":
             exercise===2?"FM1 incrementa y FM3 decrementa CNT_Volume. TON TMR_Mixing utiliza PRE = 8000 ms; su bit TT habilita el mezclador y DN inicia el drenaje.":
+            exercise===3?"Utiliza los 12 rungs del ejercicio 2 y añade después del rung 0 dos rungs: IDLE enclavado con STOP / desactivado por START, y RUN controlado por ST_RunEnable.":
             exercise===3?"Cada pulso de FM1 y FM3 equivale a 0,1 % y CNT_Volume registra los pulsos netos.":
             "El termostato es una DI. El Ladder convierte INT_RatioP1 a pulsos mediante MUL × 10 y compara el resultado con CNT_Product1.ACC; la temperatura real pertenece a la física simulada."}
         </p>
