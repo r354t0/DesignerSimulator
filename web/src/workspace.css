@@ -229,3 +229,28 @@ button.ide-tree-row:hover {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+
+/* Maximizing the SIMULATION tabset gives process graphics up to half of
+   the actual available SCADA workspace (not half the browser width).
+   The other half is reserved for buttons, LED groups and supervision.
+   Restoring the tabset preserves each scene's ordinary responsive layout.
+   This rule comes AFTER the Batch Mixer 1120px override on purpose. */
+@container scada (min-width: 1024px) {
+  .scada-tabset-maximized .scada-scene-workspace,
+  .scada-tabset-maximized .batch-scada-shell .scada-scene-workspace {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .scada-tabset-maximized .scada-process-panel,
+  .scada-tabset-maximized .batch-scada-shell .scada-process-panel {
+    max-width: 100%;
+  }
+}
+/* At narrow widths the two columns would make the process SVG illegible;
+   keep process and supervision stacked even when the tabset is maximized. */
+@container scada (max-width: 1023.98px) {
+  .scada-tabset-maximized .scada-scene-workspace,
+  .scada-tabset-maximized .batch-scada-shell .scada-scene-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
