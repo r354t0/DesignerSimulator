@@ -153,6 +153,8 @@ export interface ParallelBranch {
 }
 export interface PracticeRung {
   id: string;
+  /** Optional free-form rung annotation; metadata only, never PLC logic. */
+  comment?: string;
   instructions: PracticeInstruction[];
   parallelBranches?: ParallelBranch[];
   /** Output-side OR lanes created before an OTE is placed on them. */
@@ -260,6 +262,18 @@ export function createRung(project: PracticeProject, id: string): PracticeProjec
  * append at the end. IDs are stable; the visible rung numbers are derived
  * from the array order. Never mutate the original project.
  */
+/** Update or clear a rung annotation without affecting its Ladder topology. */
+export function setRungComment(
+  project:PracticeProject,rungId:string,comment:string,
+):PracticeProject {
+  const rung=project.rungs.find(r=>r.id===rungId);
+  if(!rung)throw new Error("No se encontró el rung.");
+  const normalized=comment.slice(0,240);
+  if((rung.comment??"")===normalized)return project;
+  return {...project,rungs:project.rungs.map(r=>
+    r.id===rungId?{...r,comment:normalized}:r)};
+}
+
 export function insertRungBelow(
   project: PracticeProject,
   id: string,
