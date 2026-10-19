@@ -41,11 +41,11 @@ function NumberSetting({label,name,value,onCommit,integer=false,caption,
   const [draft,setDraft]=useState(String(value));
   const [error,setError]=useState("");
   const [windowMax,setWindowMax]=useState(()=>
-    Math.max(100,Math.ceil(Math.max(value,0)/100)*100));
+    Math.min(2147483647,Math.max(100,Math.ceil(Math.max(value,0)/100)*100)));
   useEffect(()=>setDraft(String(value)),[value]);
   useEffect(()=>{
     if(max===undefined&&value>windowMax)
-      setWindowMax(Math.ceil(value/100)*100);
+      setWindowMax(Math.min(2147483647,Math.ceil(value/100)*100));
   },[max,value,windowMax]);
   const sliderMax=max??windowMax;
   const sliderStep=step??(integer?1:0.1);
