@@ -43,7 +43,7 @@ Mantener **separación estricta** entre:
 ## Estructura interna y diagnósticos
 **Modos y marcha:** `ST_Auto_Mode`, `ST_Man_Mode`, `ST_Maint_Mode`, `ST_Run_Rly`, `ST_Auto_Selected`.  
 **Ciclo:** `ST_Cycle_Rly`, `ST_Pump_Rly`, `ST_Airsol_Rly`, `ST_Pump_Sol_Rly`, `SM_Cycle_State`, `SM_Cycle_Blocked`, `SM_Cycle_RearmHold`.  
-**Flujo:** `DI_PDB`, `CNT_Lubeflo_Dn`, `CNT_Lubeflo_Rst`, `CNT_LubeFlo_SP`.  
+**Flujo:** `DI_PDB`, `CTN_Lubeflo.DN`, `RES CTN_Lubeflo`, `CNT_LubeFlo_SP`.  
 **Presiones:** `AI_AirPressure_Scaled`, `AI_LubePressure_Scaled`, `ST_AirPress_In`, `ST_LubePress_800`, `ST_LubePress_1000`, `ST_LubePress_Lo`, `ST_LubePress_Hi`.  
 **Alarmas:** `ALM_AirFail_Rly`, `ALM_LoFlo_Rly`, `ALM_LoPress_Rly`, `ALM_HiPress_Rly`, `ALM_LoLevel_Rly`, `WARN_PreShutdown`, `Fault_Code`.  
 **Salidas:** todas las `DO_` mapeadas, con sus señales físicas `_310_`.
@@ -111,7 +111,7 @@ Mantener **separación estricta** entre:
 
 ## Inicio Fase 3A — P01 y P02 en Ladder editable
 - Se añadió `web/src/plc/gearSprayPhase3Program.ts` con `createGearPhase3AProject()`: proyecto Ladder optativo e independiente de la plantilla FAT, que registra sus propios tags de proceso y rungs editables.
-- **P01**: copia de presiones de aire/lubricante (`MOV`), límites aire **>40**, lubricante alto **>1500** y bajo **<400** habilitado por marcha; entrada física de molino, proximidad, copia a `DI_PDB` y memoria de flanco (`ONS`), nivel bajo; puente entre variables internas de mando y salidas de campo.
+- **P01**: copia de presiones de aire/lubricante (`MOV`), límites aire **>40**, lubricante alto **>1500** y bajo **<400** habilitado por marcha; entrada física de molino, proximidad y copia a `DI_PDB`, nivel bajo; puente entre variables internas de mando y salidas de campo.
 - **P02**: selección retenida AUTO/MANUAL/MANT y condición `ST_Run_Rly`; cada ecuación y cada enclavamiento están en **un único rung Ladder** con contactos y ramas OR reales, sin auxiliares que introduzcan dependencia entre scans. La expresión de marcha usa distribución booleana equivalente para representar tres caminos paralelos en un rung. El estado de marcha alimenta `_310_YI_LubricationSystemRunning`.
 - **Límite de la antigua plantilla Fase 3A:** implementaba P01/P02 solamente y se conserva para pruebas de regresión. La **plantilla cargable actual** incluye además P03; siguen pendientes P04–P07, incluidos el mando neumático real y las alarmas completas.
 - **Correspondencia que requiere FAT:** `Run_Rly` se alimenta de `ST_Run_Rly` como interpretación de implementación para la condición de baja presión de P01. No se asume equivalencia definitiva hasta la revisión funcional del usuario.
@@ -125,16 +125,22 @@ Mantener **separación estricta** entre:
 - **Orden de evaluación:** el adaptador `Run_Rly ← ST_Run_Rly` queda al final del ensamblado P01/P02 y alimenta el valor observado por el rung 5 en el siguiente scan. Esta latencia deriva del orden secuencial de estas plantillas y se conserva deliberadamente hasta revisar el cableado CCW original.
 - **P03 — primera subetapa (modelo ST independiente):** `web/src/plc/gearSpraySequence.ts` implementa `FB_GearSpray_Sequence` como una **función pura por scan**, conservando los estados `0` inactivo, `10` espera, `20` lubricación, `30` purga y `90` bloqueo, los permisos, solicitud de ciclo, prioridad del trip, `BlockLatched`, `RecoveryHold` y criterio de rearme.
 - Se añadieron pruebas automatizadas en `web/tests/gear-spray-sequence.test.mjs` para arranque, solicitud por frecuencia/arranque, secuencia lubricación→purga, modo manual, trip, bloqueo retenido, reset y rearme.
-- **P03 implementado:** `GEAR_SEQ` aparece como bloque funcional visible en el rung 5 y se evalúa en el escaneo nativo; temporizadores TON/TOF y contador CTU publican Q en el mismo rung y CTU lee RESET. Falta aprobar el FAT visual y portar P04–P07.
+- **P03 implementado:** `GEAR_SEQ` está visible y ejecutable en el rung 5. Los temporizadores y contador se consultan por miembros nativos `.DN`; el contador se reinicia con `RES CTN_Lubeflo` en el rung 11. Falta aprobar el FAT visual y portar P04–P07.
 - El documento CCW seleccionado es la versión de P03 con `FB_GearSpray_Sequence`, no el exportado antiguo sin UDFB que comparte nombre en la biblioteca.
 
+## Revisión de limpieza — rungs editor 8 y 24
+- El editor numera desde **0**. Eliminado el rung 8 de P01 (`gear3a-p01-pulse-rise`) junto con `PDB_RisingTrig` y `P01_PDB_EdgeMemory`. La conexión de proximidad a `DI_PDB` se mantiene.
+- Eliminado el rung 24 original del editor (primer rung de P03, `gear-p03-r01`, conversión de consigna). El siguiente TON usa `TMR_Freq_SP` directamente como PRE.
+- Eliminados los BOOL innecesarios `TMR_Freq_Dn`, `TMR_Startup_Cycle_Dn`, `CNT_Lubeflo_Dn`, `CNT_Lubeflo_Rst`, `TMR_Purge_Dn`, además de `TMR_Freq_SP_Time`. Los contactos leen los miembros TIMER/COUNTER, y el contador se reinicia con RES.
+- Pruebas de compilación y lógica actualizadas en `web/tests/gear-spray-phase3a.test.mjs` y `web/tests/gear-spray-phase3b-p03.test.mjs`.
+
 ## Fase 3B — P03 Cycle Manager implementado
-- `web/src/plc/gearSprayP03Program.ts` genera **exactamente 11 rungs de P03** en el orden del exportado CCW vigente, posterior a P01/P02. Preserva P01 `LubePress_Lo` en su rung 5 original.
-- R1 `MOV TMR_Freq_SP → TMR_Freq_SP_Time`; la conversión `ANY_TO_TIME` se interpreta como valor DINT en milisegundos, pendiente de cotejar en PLC físico.
-- R2 `TON TMR_Freq` con condiciones `ST_Run_Rly`, negaciones de ciclo, mantenimiento, bloqueo y rearme; Q → `TMR_Freq_Dn`. R3 `TON TMR_Startup_Cycle` de 1000 ms; Q → `TMR_Startup_Cycle_Dn`.
-- R4 `CTU CTN_Lubeflo` cuenta flancos de `DI_PDB` durante marcha, utiliza preset `CNT_LubeFlo_SP`, RESET ← `CNT_Lubeflo_Rst`, Q → `CNT_Lubeflo_Dn` **en el mismo rung**.
+- `web/src/plc/gearSprayP03Program.ts` genera los **10 rungs restantes de P03** (rungs CCW originales 2–11), sin el rung de conversión inicial. Preserva `LubePress_Lo` en el rung 5 de P01.
+- R1 eliminado por indicación del usuario: no existe `TMR_Freq_SP_Time`. El TON de R2 usa el valor entero `TMR_Freq_SP` directamente como preset en milisegundos.
+- R2 `TON TMR_Freq` con condiciones `ST_Run_Rly`, negaciones de ciclo, mantenimiento, bloqueo y rearme; se consume `TMR_Freq.DN`. R3 `TON TMR_Startup_Cycle` de 1000 ms; se consume `TMR_Startup_Cycle.DN`.
+- R4 `CTU CTN_Lubeflo` cuenta flancos de `DI_PDB` durante marcha, con preset `CNT_LubeFlo_SP`. Se utiliza `CTN_Lubeflo.DN` y se reinicia con un `RES CTN_Lubeflo` en R11, no con un BOOL auxiliar.
 - R5 `XIC ST_Run_Rly → GEAR_SEQ`: UDFB `FB_GearSpray_Sequence` **ejecutable dentro de Ladder**. La memoria se guarda en `SM_Cycle_State`, `SM_Cycle_BlockLatched` y `SM_Cycle_RearmHold`; salidas `ST_Cycle_Rly`, `SM_Cycle_Blocked` y estado. Nunca se calcula la secuencia por separado desde React.
-- R6 OR completo en un rung: `(ST_Run_Rly AND ST_Cycle_Rly) OR PB_Lubpress_Release → DO_Lubecon_Sol`. R7: `ST_Run_Rly AND (ST_Cycle_Rly OR ST_Auto_Mode) → ST_Pump_Rly`. R8 `TOF TMR_Purge` de 30 s; Q → `TMR_Purge_Dn`. R9 `ST_Airsol_Rly`; R10 `Air_Sol`; R11 `(NOT TMR_Purge_Dn) OR (NOT ST_Run_Rly) → CNT_Lubeflo_Rst`.
+- R6 OR en un rung: `(ST_Run_Rly AND ST_Cycle_Rly) OR PB_Lubpress_Release → DO_Lubecon_Sol`. R7: `ST_Run_Rly AND (ST_Cycle_Rly OR ST_Auto_Mode) → ST_Pump_Rly`. R8 `TOF TMR_Purge` de 30 s, su miembro `TMR_Purge.DN` se utiliza en R9 y R11. R9 `ST_Airsol_Rly`; R10 `Air_Sol`; R11 `(NOT TMR_Purge.DN) OR (NOT ST_Run_Rly) → RES CTN_Lubeflo`.
 - El mapeo existente de salida P01 hacia `_310_SV_2561` lee ahora `DO_Lubecon_Sol`, el nombre operativo generado por P03, sin mover el rung de mapeo. Su evaluación anterior en el orden de escaneo introduce una latencia de un scan para reflejar la salida en campo; revisar durante FAT.
 - **Provisional y visible:** `DO_LS_Healthy` comienza TRUE para permitir ensayar P03 **antes de portar P05**. No equivale a una verificación real de salud ni a una lógica de seguridad. `ST_General_Trip_Rly` puede inyectarse en Controller Tags para ensayos de bloqueo. P04 todavía debe traducir `ST_Pump_Rly` en el mando de la bomba `_310_SV_2560`.
 - El SCADA muestra el estado de la máquina y el acumulado del contador. STOP desenergiza `ST_Cycle_Rly` y salidas Q no retentivas; PAUSE conserva los estados y detiene el tiempo simulado.
