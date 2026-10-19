@@ -237,10 +237,10 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
   any("rung-1",[X("PB_Start"),X("ST_RunEnable")],
       [N("PB_Stop")],O("OTE","ST_RunEnable"));
   // A fresh START after a finished single batch clears the completion latch.
-  if(!continuous&&exercise!==1)
+  if(!continuous)
     rung("bm-rearm",[X("PB_Start"),N("DI_LowLevel"),O("OTU","ST_BatchDone")]);
   const init=[X("PB_Start"),N("DI_LowLevel"),N("ST_Filling"),
-    ...(exercise>=2?[N("ST_Mixing"),N("ST_Draining")]:[])];
+    N("ST_Mixing"),N("ST_Draining")];
   if(advanced) init.push(X(exercise===4?"DI_ModeA":"DI_ModeB"));
   if(exercise===2||exercise===4||exercise===5) init.push(N("ST_BatchDone"));
   rung("bm-start-fill",[...init,O("OTL","ST_Filling")]);
@@ -260,11 +260,8 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
     rung("bm-ctu-level",[X("DI_Flowmeter1"),O("CTU","CNT_Volume")]);
   }
 
-  if(exercise===1) {
-    rung("bm-reach-90",[X("ST_Filling"),endCondition,O("OTL","ST_Full")]);
-    rung("bm-stop-fill",[X("ST_Full"),O("OTU","ST_Filling")]);
-    rung("bm-full-lamp",[X("ST_Full"),O("OTE","DO_FullLamp")]);
-  }else{
+  // Exercises 2–5: progressive mixing, heating and discharge sequence.
+  {
     rung("bm-to-mix",[X("ST_Filling"),endCondition,O("OTE","ST_ToMix")]);
     rung("bm-leave-fill",[X("ST_ToMix"),O("OTU","ST_Filling")]);
     rung("bm-enter-mix",[X("ST_ToMix"),O("OTL","ST_Mixing")]);
@@ -314,7 +311,7 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
     }
     rung("bm-leave-drain",[X("ST_ToDone"),O("OTU","ST_Draining")]);
   }
-  const runningOutputs=exercise===1?["DO_Pump1"]:exercise>=4?
+  const runningOutputs=advanced?
     ["DO_Pump1","DO_Pump2","DO_Pump3","DO_Mixer"]:
     ["DO_Pump1","DO_Pump3","DO_Mixer"];
   any("bm-run-lamp",runningOutputs.map(X),[],O("OTE","DO_RunLamp"));
