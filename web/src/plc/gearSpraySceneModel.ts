@@ -11,7 +11,7 @@ import {
 export interface GearTagSpec {
   name: string;
   type: TagType;
-  direction: "Entrada" | "Salida" | "HMI";
+  direction: "Entrada" | "Salida" | "HMI" | "Interna";
   description: string;
 }
 
@@ -23,7 +23,7 @@ export const GEAR_FIELD_INPUTS: readonly GearTagSpec[] = [
   {name:"_310_PLC104_YI_MillRun",type:"BOOL",direction:"Entrada",
     description:"DI confirmación externa de molino en marcha"},
   {name:"_310_SQS_2561",type:"BOOL",direction:"Entrada",
-    description:"DI pulso físico de dosificador, P01 mapea a DI_PDB_2"},
+    description:"DI pulso del dosificador; corresponde a DI_PDB"},
   {name:"_310_LSL",type:"BOOL",direction:"Entrada",
     description:"DI sensor de nivel bajo (polaridad pendiente de confirmar)"},
 ];
@@ -64,9 +64,16 @@ export const GEAR_HMI_SETPOINTS: readonly GearTagSpec[] = [
     description:"Duración del permiso de mantenimiento, minutos"},
 ];
 
+export const GEAR_DOSER_PULSE_TAG="DI_PDB" as const;
+export const GEAR_CYCLE_INPUTS: readonly GearTagSpec[] = [
+  {name:GEAR_DOSER_PULSE_TAG,type:"BOOL",direction:"Interna",
+    description:"Pulso de dosificación para conteo del ciclo"},
+];
+
 export const GEAR_SCADA_TAGS: readonly GearTagSpec[] = [
   ...GEAR_FIELD_INPUTS, ...GEAR_FIELD_OUTPUTS,
   ...GEAR_HMI_PUSHBUTTONS, ...GEAR_HMI_SETPOINTS,
+  ...GEAR_CYCLE_INPUTS,
 ];
 
 export type GearPushButton = typeof GEAR_HMI_PUSHBUTTONS[number]["name"];
