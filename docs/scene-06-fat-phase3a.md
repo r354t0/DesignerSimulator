@@ -26,6 +26,6 @@ Validar la primera plantilla Ladder CCW de Gear Spray, cargada con **Cargar P01 
 - El proyecto no recrea las unidades ni los parámetros exactos de escalamiento del variador/instrumentos: usar las presiones ya escaladas del modelo.
 - La entrada física `_310_SQS_2561` se vincula con `DI_PDB`, acorde a la aclaración del autor. No utilizar `DI_PDB_2`.
 - La correspondencia entre `Run_Rly` y `ST_Run_Rly` es una decisión explícita pendiente de corroborar en FAT.
-- La plantilla tiene OR descompuestos en señales intermedias para reproducir la lógica de P02 con los rungs del motor actual.
+- La plantilla conserva cada ecuación de P02 en **un solo rung**, incluidos sus enclavamientos y contactos OR. No se crean rungs auxiliares para las solicitudes AUTO/MANUAL/MANT; el rung `ST_Run_Rly` utiliza tres vías OR que representan la expresión booleana del CCW.
 - **No** considerar aprobadas las alarmas, máquina de estados, control de bomba, dosificación ni enclavamientos de seguridad de P03–P07.
 - El respaldo de la programación anterior vive solo en memoria. Evitar recargar el navegador antes de restaurar.
