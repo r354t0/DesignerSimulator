@@ -427,14 +427,17 @@ export interface BatchMixerState {
   level: number;
   temperature: number;
   pulseCarry: [number,number,number];
+  /** Lifetime pulse totals for the digital flowmeter edge generator. */
   totalPulses: [number,number,number];
+  /** Pulses of the current/most recently completed batch only. */
+  batchPulses: [number,number,number];
 }
 /** Temperature of the incoming products and the empty vessel (°C). */
 export const BATCH_AMBIENT_TEMPERATURE=20;
 export const BATCH_MAX_TEMPERATURE=95;
 export const initialBatchState=():BatchMixerState=>({
   level:0,temperature:BATCH_AMBIENT_TEMPERATURE,
-  pulseCarry:[0,0,0],totalPulses:[0,0,0],
+  pulseCarry:[0,0,0],totalPulses:[0,0,0],batchPulses:[0,0,0],
 });
 /** The flowmeters emit 10 pulses per 1% of nominal tank capacity. */
 export const BATCH_VOLUME_PER_PULSE_PERCENT=0.1;
@@ -475,6 +478,23 @@ export function stepBatchPhysics(state:BatchMixerState,outputs:{
       total[i]++;
     }
   }
+  // Lifetime counts must never be reset here: App uses their differences
+  // to generate rising-edge DI_Flowmeter pulses for CTU/CTD. Maintain a
+  // separate display counter per batch, preserving the last completed mix
+  // during drainage and resetting only with the next refill from an empty
+  // vessel. Every nominal full batch contains at most 1000 inlet pulses.
+  const deltaPulses:[number,number,number]=[
+    total[0]-state.totalPulses[0],
+    total[1]-state.totalPulses[1],
+    total[2]-state.totalPulses[2],
+  ];
+  const hasPreviousBatch=state.batchPulses[0]+state.batchPulses[1]>0;
+  const freshBatch=state.level===0 &&
+    (deltaPulses[0]>0 || deltaPulses[1]>0) && hasPreviousBatch;
+  const batchPulses:[number,number,number]=freshBatch
+    ? [0,0,0] : [...state.batchPulses];
+  for(let i=0;i<3;i++)batchPulses[i]+=deltaPulses[i];
+
   // Simplified thermal model: as hot liquid leaves, the displayed vessel
   // temperature cools progressively toward ambient with the remaining volume.
   // The vessel reaches ambient exactly at 0%, ready for a fresh batch.
@@ -501,5 +521,6 @@ export function stepBatchPhysics(state:BatchMixerState,outputs:{
   }
   temperature=Math.max(BATCH_AMBIENT_TEMPERATURE,
     Math.min(BATCH_MAX_TEMPERATURE,temperature));
-  return {...state,level,temperature,pulseCarry:carry,totalPulses:total};
+  return {...state,level,temperature,pulseCarry:carry,totalPulses:total,
+    batchPulses};
 }
