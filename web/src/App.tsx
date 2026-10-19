@@ -38,6 +38,7 @@ import {
   createGearFatProject, GEAR_FAT_COMMANDS, clearGearFatCommands,
   type GearFatCommand,
 } from "./plc/gearSprayFatProgram";
+import {createGearPhase3AProject} from "./plc/gearSprayPhase3Program";
 import {
   initialBatchProject, createBatchSolution, prepareBatchTags,
   initialBatchState, stepBatchPhysics, batchDigitalSensors, resetBatchProgramState,
@@ -214,6 +215,8 @@ export default function App() {
   // the normal recommended-solution snapshots of other scenes.
   const [gearFatLoaded,setGearFatLoaded]=useState(false);
   const gearFatBackup=useRef<PracticeProject|null>(null);
+  const [gearPhase3Loaded,setGearPhase3Loaded]=useState(false);
+  const gearPhase3Backup=useRef<PracticeProject|null>(null);
   const [gearPhysical,setGearPhysical]=useState<GearPhysicalState>(initialGearPhysicalState);
   const gearPhysicalRef=useRef(gearPhysical);
   const changeGearPhysical=useCallback((operation:(state:GearPhysicalState)=>GearPhysicalState)=>{
@@ -813,7 +816,7 @@ export default function App() {
   }, [openEditorView]);
 
   const loadGearFat=useCallback(()=>{
-    if(activeControllerScene.current!=="gear"||gearFatLoaded)return;
+    if(activeControllerScene.current!=="gear"||gearFatLoaded||gearPhase3Loaded)return;
     if(scanRef.current.mode!=="stopped"){
       window.alert("Detén primero el PLC para cargar el Ladder temporal FAT.");
       return;
@@ -829,7 +832,7 @@ export default function App() {
     changeGearPhysical(state=>({...initialGearPhysicalState(),enabled:state.enabled}));
     setGearFatLoaded(true);
     openEditorView("practice");
-  },[gearFatLoaded,changeScan,changeGearPhysical,openEditorView]);
+  },[gearFatLoaded,gearPhase3Loaded,changeScan,changeGearPhysical,openEditorView]);
 
   const restoreGearFat=useCallback(()=>{
     if(activeControllerScene.current!=="gear"||!gearFatLoaded)return;
@@ -857,6 +860,42 @@ export default function App() {
     changeScan(state=>state.mode==="running"
       ?applySceneSensorBoolInput(state,tag,value):state);
   },[gearFatLoaded,changeScan]);
+
+  const loadGearPhase3=useCallback(()=>{
+    if(activeControllerScene.current!=="gear"||gearPhase3Loaded||gearFatLoaded)return;
+    if(scanRef.current.mode!=="stopped"){
+      window.alert("Detén primero el PLC antes de cargar P01 y P02.");return;
+    }
+    if(!window.confirm("Cargar la primera plantilla editable de Fase 3 " +
+      "(P01 mapeo de señales y P02 gestión de modos)? " +
+      "Se conservará una copia temporal de tu programa actual. " +
+      "P03–P07 aún no están implementadas."))return;
+    gearPhase3Backup.current=scanRef.current.project;
+    changeScan(state=>({
+      ...initialPracticeScanState(createGearPhase3AProject()),
+      scanPeriodMs:state.scanPeriodMs,
+    }));
+    setGearPhase3Loaded(true);
+    openEditorView("practice");
+  },[gearPhase3Loaded,gearFatLoaded,changeScan,openEditorView]);
+
+  const restoreGearPhase3=useCallback(()=>{
+    if(activeControllerScene.current!=="gear"||!gearPhase3Loaded)return;
+    if(scanRef.current.mode!=="stopped"){
+      window.alert("Detén el PLC antes de restaurar el programa anterior.");return;
+    }
+    if(!window.confirm("Restaurar el programa previo a la plantilla P01/P02? " +
+      "Los cambios realizados en esa plantilla serán descartados."))return;
+    const backup=gearPhase3Backup.current;
+    if(!backup)return;
+    changeScan(state=>({
+      ...initialPracticeScanState(backup),
+      scanPeriodMs:state.scanPeriodMs,
+    }));
+    gearPhase3Backup.current=null;
+    setGearPhase3Loaded(false);
+    openEditorView("practice");
+  },[gearPhase3Loaded,changeScan,openEditorView]);
 
   const loadBatchSolution=useCallback((exercise:BatchExercise)=>{
     if(activeControllerScene.current!=="batch")return;
@@ -1090,6 +1129,9 @@ export default function App() {
                     : simulationTab === "gear"
                       ? <GearSprayScene project={practice} mode={practiceMode}
                           fatLoaded={gearFatLoaded}
+                          phase3Loaded={gearPhase3Loaded}
+                          onLoadPhase3={loadGearPhase3}
+                          onRestorePhase3={restoreGearPhase3}
                           onLoadFat={loadGearFat}
                           onRestoreFat={restoreGearFat}
                           onFatCommand={setGearFatCommand}
@@ -1125,7 +1167,8 @@ export default function App() {
       setTrafficInput, resetTraffic, prepareTraffic, trafficSetupError,
       loadTrafficExample, batchState, batchExercise, batchSetupError,
       setBatchInput, setBatchMode, setBatchIntegers, resetBatch, prepareBatch, loadBatchSolution,
-      gearSetupError, gearPhysical, gearFatLoaded, loadGearFat, restoreGearFat,
+      gearSetupError, gearPhysical, gearFatLoaded, gearPhase3Loaded,
+      loadGearFat, restoreGearFat, loadGearPhase3, restoreGearPhase3,
       setGearFatCommand, setGearPhysicalConfig, resetGearPhysical,
       setGearPushButton, setGearDigitalInput, setGearNumber, prepareGear],
   );
