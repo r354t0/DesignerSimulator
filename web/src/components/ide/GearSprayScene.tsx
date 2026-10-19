@@ -3,7 +3,6 @@ import { AlertTriangle, CheckCircle2, CircleHelp, Gauge,
   Play, ShieldAlert, Wrench, RotateCcw, Settings2, Droplets } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
-import {GEAR_FAT_COMMANDS,type GearFatCommand} from "../../plc/gearSprayFatProgram";
 import {
   gearSprayIsActive, type GearPhysicalState,
 } from "../../plc/gearSprayPhysics";
@@ -20,13 +19,7 @@ import {
 interface Props {
   project: PracticeProject;
   mode: ScanMode;
-  fatLoaded:boolean;
-  phase3Loaded:boolean;
-  onLoadPhase3:()=>void;
-  onRestorePhase3:()=>void;
-  onLoadFat:()=>void;
-  onRestoreFat:()=>void;
-  onFatCommand:(tag:GearFatCommand,value:boolean)=>void;
+  onResetProgram:()=>void;
   physics:GearPhysicalState;
   onPhysicsChange:(patch:Partial<Pick<GearPhysicalState,
     "enabled"|"airSupply"|"drumPercent"|"pressureDecayFactor"|"airLoss"|"filterBlocked"|"doserBlocked">>)=>void;
@@ -366,8 +359,8 @@ function ProcessGraphic({project,physics}: {project:PracticeProject;physics:Gear
   </svg>;
 }
 
-function InfoModal({onClose,onOpenTags,phase3Loaded}:{
-  onClose:()=>void;onOpenTags:()=>void;phase3Loaded:boolean;
+function InfoModal({onClose,onOpenTags,onResetProgram}:{
+  onClose:()=>void;onOpenTags:()=>void;onResetProgram:()=>void;
 }){
   const headings:{title:string;content:readonly typeof GEAR_SCADA_TAGS[number][]}[]=[
     {title:"Entradas de campo",content:GEAR_FIELD_INPUTS},
@@ -394,9 +387,9 @@ function InfoModal({onClose,onOpenTags,phase3Loaded}:{
         La pantalla está conectada al motor de tags y MainRoutine de
         DesignerSimulator. Fase 2: modelo físico determinista opcional de
         presiones, depósito, pulsos y fallas de proceso.
-        {phase3Loaded?
-          " P01–P07 integrados como Ladder virtual, incluida la secuencia, alarmas, mantenimiento y diagnósticos. Falta FAT integral.":
-          " P01–P07 disponibles mediante la plantilla integral FAT."}
+        P01–P07 están cargados por defecto como Ladder virtual, incluida
+        la secuencia, las alarmas, el mantenimiento y los diagnósticos.
+        La validación FAT integral sigue pendiente.
       </p>
       <div className="mt-3 rounded border border-amber-700/70 bg-amber-950/40 p-3 text-xs text-amber-100">
         <strong>Asignación del dosificador:</strong> _310_SQS_2561 es la señal
@@ -422,10 +415,15 @@ function InfoModal({onClose,onOpenTags,phase3Loaded}:{
           </div>
         </section>)}
       </div>
-      <div className="mt-4 flex gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         <button type="button" onClick={()=>{onClose();onOpenTags();}}
           className="rounded border border-sky-600 px-3 py-2 text-xs text-sky-200 hover:bg-sky-900">
           Abrir Controller Tags
+        </button>
+        <button type="button" onClick={onResetProgram}
+          title="Restaurar P01–P07 y reiniciar tags, contadores y modelo físico"
+          className="flex items-center gap-2 rounded border border-amber-600 px-3 py-2 text-xs font-semibold text-amber-200 hover:bg-amber-950">
+          <RotateCcw size={14}/> Reiniciar programa
         </button>
       </div>
     </div>
@@ -436,12 +434,12 @@ function InfoModal({onClose,onOpenTags,phase3Loaded}:{
  * model publishes physical input measurements, never a PLC interlock or command.
  * The CCW application logic remains pending for phase 3.
  */
-export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3,
-  onRestorePhase3,onLoadFat,onRestoreFat,
-  onFatCommand,physics,onPhysicsChange,onPhysicsReset,
+export function GearSprayScene({project,mode,onResetProgram,
+  physics,onPhysicsChange,onPhysicsReset,
   setupError,onPushButton,onDigitalInput,onAnalogInput,onSetpoint,
   onPrepareTags,onOpenTags}:Props){
   const [openInfo,setOpenInfo]=useState(false);
+  const phase3Loaded=true; // Dedicated scene always has the P01–P07 controller
   const sceneRef=useRef<HTMLDivElement>(null);
   const v=(name:string)=>gearBool(project,name);
   const modeLabel=mode==="running"?"PLC RUN":
@@ -522,83 +520,18 @@ export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3
             el modelo publica presión, nivel y pulsos de dosificación en los tags
             de entrada del PLC; los setpoints siguen siendo numéricos.
           </p>
-          <div className="mb-3 rounded border border-amber-800/70 bg-[#271f1c] p-3">
-            <h4 className="mb-1 text-[11px] font-semibold text-amber-200">
-              Banco de pruebas FAT · Etapa B
-            </h4>
-            <p className="mb-2 text-[10px] leading-snug text-slate-300">
-              Plantilla Ladder temporal: tres rungs XIC–OTE independientes.
-              No sustituye las rutinas de control P01–P07. La carga y la
-              restauración solo están disponibles con el PLC detenido.
-            </p>
-            <div className="flex flex-wrap items-center gap-2">
-              {!fatLoaded?
-                <button type="button" disabled={mode!=="stopped"||phase3Loaded}
-                  onClick={onLoadFat}
-                  className="rounded border border-amber-600 px-3 py-1.5 text-[11px] font-semibold text-amber-100 hover:bg-amber-950 disabled:cursor-not-allowed disabled:opacity-40">
-                  Cargar Ladder temporal FAT
-                </button>:
-                <button type="button" disabled={mode!=="stopped"}
-                  onClick={onRestoreFat}
-                  className="rounded border border-slate-500 px-3 py-1.5 text-[11px] font-semibold text-slate-100 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40">
-                  Restaurar programa anterior
-                </button>}
-              <span className="text-[10px] text-slate-400">
-                {fatLoaded?"Plantilla FAT cargada":"Sin plantilla FAT"}
-              </span>
-            </div>
-            {fatLoaded&&<div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
-              {GEAR_FAT_COMMANDS.map(cmd=><label key={cmd.name}
-                className="flex min-w-0 cursor-pointer items-start gap-2 rounded border border-[#5b4a3e] bg-[#171d26] px-2 py-2">
-                <input type="checkbox" className="mt-0.5 accent-amber-500"
-                  checked={v(cmd.name)} disabled={mode!=="running"}
-                  onChange={e=>onFatCommand(cmd.name,e.target.checked)}/>
-                <span className="min-w-0 text-[10px] text-slate-200">
-                  <span className="block font-semibold">
-                    {cmd.name==="FAT_CMD_Pump"?"Bomba neumática":
-                      cmd.name==="FAT_CMD_Lubricant"?"Válvula de lubricante":
-                      "Aire de atomización"}
-                  </span>
-                  <span className="mt-1 block break-all font-mono text-amber-200">
-                    ({cmd.name})
-                  </span>
-                </span>
-              </label>)}
-            </div>}
-            {fatLoaded&&<p className="mt-2 text-[10px] text-amber-200">
-              Activa las salidas por separado en PLC RUN. Desmarca las
-              tres antes de detener el programa.
-            </p>}
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-[11px] font-semibold text-slate-200">Entradas analógicas</h4>
+            <label className="flex cursor-pointer items-center gap-2 text-[11px] text-sky-200">
+              <input type="checkbox" aria-label="Simulación física automática"
+                checked={physics.enabled}
+                onChange={e=>onPhysicsChange({enabled:e.target.checked})}
+                className="accent-sky-500"/>
+              Simulación física automática
+            </label>
           </div>
-          <div className="mb-3 rounded border border-sky-800/70 bg-[#102633] p-3">
-            <h4 className="text-[11px] font-semibold text-sky-200">
-              Fase 3 · P01–P07 sistema integrado
-            </h4>
-            <p className="my-2 text-[10px] leading-snug text-slate-300">
-              P01 entradas, P02 modos, P03 ciclos, P04 presión de bomba,
-              P05 alarmas, P06 mantenimiento/parada y P07 diagnósticos.
-              Adaptación virtual para FAT completo; no sustituye el comisionamiento real.
-            </p>
-            {phase3Loaded&&<p className="mb-2 text-[10px] text-amber-200">
-              Programa P01–P07 cargado. Verifica el interbloqueo de bomba,
-              las alarmas y la respuesta física antes de aprobar el FAT.
-            </p>}
-            {!phase3Loaded?
-              <button type="button" onClick={onLoadPhase3}
-                disabled={mode!=="stopped"||fatLoaded}
-                className="rounded border border-sky-600 px-3 py-1.5 text-[11px] font-semibold text-sky-100 hover:bg-sky-900 disabled:cursor-not-allowed disabled:opacity-40">
-                Cargar P01–P07 (FAT integrado)
-              </button>:
-              <button type="button" onClick={onRestorePhase3}
-                disabled={mode!=="stopped"}
-                className="rounded border border-slate-500 px-3 py-1.5 text-[11px] font-semibold text-slate-100 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40">
-                Restaurar programa anterior al FAT integrado
-              </button>}
-            {fatLoaded&&<span className="mt-2 block text-[10px] text-slate-400">
-              Restaura primero el programa anterior desde el banco FAT.
-            </span>}
-          </div>
-          <div className="mb-3 rounded border border-sky-900 bg-[#0c1d2a] p-3">
+          {physics.enabled ? (
+                      <div className="mb-3 rounded border border-sky-900 bg-[#0c1d2a] p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h4 className="text-[11px] font-semibold text-sky-200">
@@ -608,12 +541,7 @@ export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3
                   La física lee exclusivamente las salidas del PLC. Disponible en RUN.
                 </p>
               </div>
-              <label className="flex cursor-pointer items-center gap-2 text-[11px]">
-                <input type="checkbox" checked={physics.enabled}
-                  onChange={e=>onPhysicsChange({enabled:e.target.checked})}
-                  className="accent-sky-500"/>
-                Simulación física automática
-              </label>
+
             </div>
             {physics.enabled&&<>
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -694,8 +622,8 @@ export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3
               </p>
             </>}
           </div>
-          <h4 className="mb-2 text-[11px] font-semibold text-slate-200">Entradas analógicas</h4>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          ) : (
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {GEAR_FIELD_INPUTS.filter(x=>x.type==="REAL").map(input=>{
               const isAir=input.name==="_310_PI_2561";
               return <NumberSetting key={input.name} name={input.name}
@@ -708,6 +636,7 @@ export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3
                 onCommit={value=>onAnalogInput(input.name as GearAnalogInput,value)}/>;
             })}
           </div>
+          )}
           <h4 className="mb-2 mt-3 text-[11px] font-semibold text-slate-200">Setpoints de operación</h4>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {GEAR_HMI_SETPOINTS.map(sp=><NumberSetting key={sp.name}
@@ -842,6 +771,6 @@ export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3
       </aside>
     </div>
     {openInfo&&<InfoModal onClose={()=>setOpenInfo(false)}
-      phase3Loaded={phase3Loaded} onOpenTags={onOpenTags}/>}
+      onResetProgram={onResetProgram} onOpenTags={onOpenTags}/>} 
   </div>;
 }
