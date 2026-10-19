@@ -186,7 +186,7 @@ export function SortScene({
               )}
             </div>
           </section>
-          <section className="sort-panel min-w-0 rounded-lg border border-[#344c5e] p-3"
+          <section className="sort-panel scada-led-panel min-w-0 rounded-lg border border-[#344c5e] p-3"
             aria-labelledby="sort-signals-title">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
               <h3 id="sort-signals-title" className="text-xs font-semibold">
