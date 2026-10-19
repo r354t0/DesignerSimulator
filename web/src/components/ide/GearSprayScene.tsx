@@ -33,6 +33,10 @@ const surfaces = {
 /** Edición numérica y deslizante sincronizada. Los setpoints DINT no tienen
  * escalamiento de proceso publicado: su slider usa una ventana local ampliable,
  * pero el campo numérico conserva el rango permitido por el PLC. */
+/** Edición numérica sincronizada con el PLC: solo los valores analógicos con
+ * un máximo de escalamiento conocido muestran además barra deslizante.
+ * Los setpoints DINT se editan exclusivamente mediante número.
+ */
 function NumberSetting({label,name,value,onCommit,integer=false,caption,
   min=0,max,step}:{label:string;name:string;value:number;
   onCommit:(value:number)=>void;integer?:boolean;caption?:string;
@@ -40,16 +44,8 @@ function NumberSetting({label,name,value,onCommit,integer=false,caption,
 }){
   const [draft,setDraft]=useState(String(value));
   const [error,setError]=useState("");
-  const [windowMax,setWindowMax]=useState(()=>
-    Math.min(2147483647,Math.max(100,Math.ceil(Math.max(value,0)/100)*100)));
   useEffect(()=>setDraft(String(value)),[value]);
-  useEffect(()=>{
-    if(max===undefined&&value>windowMax)
-      setWindowMax(Math.min(2147483647,Math.ceil(value/100)*100));
-  },[max,value,windowMax]);
-  const sliderMax=max??windowMax;
-  const sliderStep=step??(integer?1:0.1);
-  const outOfRange=value<min||value>sliderMax;
+  const outOfRange=max!==undefined&&(value<min||value>max);
   const save=()=>{
     if(draft.trim()===""){setError("Introduce un valor.");setDraft(String(value));return;}
     const parsed=Number(draft);
@@ -71,24 +67,20 @@ function NumberSetting({label,name,value,onCommit,integer=false,caption,
       onKeyDown={e=>{if(e.key==="Enter")e.currentTarget.blur();}}
       className="w-full min-w-0 rounded border border-[#466075] bg-[#0c1d2a] px-2 py-1.5 text-xs text-slate-100 outline-none focus:border-sky-400"
       aria-label={label+" · valor numérico"}/>
-    <input type="range" min={min} max={sliderMax} step={sliderStep}
-      value={Math.min(sliderMax,Math.max(min,value))}
-      onChange={e=>{onCommit(Number(e.target.value));setError("");}}
-      className="mt-3 block h-2 w-full cursor-pointer accent-sky-500"
-      aria-label={label+" · barra deslizante"}/>
-    <div className="mt-1 flex items-center justify-between gap-1 text-[10px] tabular-nums text-slate-400">
-      <span>{min}</span><span>{sliderMax}</span>
-    </div>
-    {max===undefined&&<button type="button"
-      className="mt-1 text-[10px] text-sky-300 underline decoration-dotted hover:text-sky-100"
-      onClick={()=>setWindowMax(prev=>Math.min(2147483647,prev*2))}>
-      Ampliar escala del deslizador
-    </button>}
+    {max!==undefined&&<>
+      <input type="range" min={min} max={max} step={step??0.1}
+        value={Math.min(max,Math.max(min,value))}
+        onChange={e=>{onCommit(Number(e.target.value));setError("");}}
+        className="mt-3 block h-2 w-full cursor-pointer accent-sky-500"
+        aria-label={label+" · barra deslizante"}/>
+      <div className="mt-1 flex items-center justify-between gap-1 text-[10px] tabular-nums text-slate-400">
+        <span>{min}</span><span>{max}</span>
+      </div>
+    </>}
     {caption&&<span className="mt-1 block text-[10px] leading-snug text-slate-400">{caption}</span>}
-    {outOfRange&&max!==undefined&&
-      <span className="block text-[10px] text-amber-300">
-        Valor fuera del rango de referencia. Usa el campo numérico para pruebas de falla.
-      </span>}
+    {outOfRange&&<span className="block text-[10px] text-amber-300">
+      Valor fuera del rango de referencia. Usa el campo numérico para pruebas de falla.
+    </span>}
     {error&&<span role="alert" className="block text-[10px] text-amber-400">{error}</span>}
   </div>;
 }
@@ -477,6 +469,54 @@ export function GearSprayScene({project,mode,setupError,onPushButton,
             <div className="mt-1 text-xs font-semibold text-slate-100">{item.value}</div>
           </div>)}
         </div>
+        <section className="sort-panel rounded-lg border border-[#344c5e] p-3">
+          <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold">
+            <Gauge size={15}/> Instrumentación y setpoints
+          </h3>
+          <p className="mb-3 text-[10px] text-slate-400">
+            Las entradas analógicas admiten valor numérico o barra deslizante.
+            Los setpoints se editan únicamente con números.
+          </p>
+          <h4 className="mb-2 text-[11px] font-semibold text-slate-200">Entradas analógicas</h4>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {GEAR_FIELD_INPUTS.filter(x=>x.type==="REAL").map(input=>{
+              const isAir=input.name==="_310_PI_2561";
+              return <NumberSetting key={input.name} name={input.name}
+                label={isAir?"Presión de aire":"Presión de lubricante"}
+                min={0} max={isAir?148:1480} step={0.1}
+                caption={isAir?"Referencia original: 0–148":
+                  "Referencia original: 0–1480"}
+                value={gearNumber(project,input.name)}
+                onCommit={value=>onAnalogInput(input.name as GearAnalogInput,value)}/>;
+            })}
+          </div>
+          <h4 className="mb-2 mt-3 text-[11px] font-semibold text-slate-200">Setpoints de operación</h4>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {GEAR_HMI_SETPOINTS.map(sp=><NumberSetting key={sp.name}
+              name={sp.name} integer value={gearNumber(project,sp.name)}
+              label={sp.name==="TMR_Freq_SP"?"Frecuencia entre lubricaciones":
+                sp.name==="CNT_LubeFlo_SP"?"Pulsos por lubricación":
+                sp.name==="TMR_LubeFlo_SP"?"Tiempo máximo de lubricación":
+                "Duración de mantenimiento"}
+              caption={sp.description}
+              onCommit={value=>onSetpoint(sp.name as GearSetpoint,value)}/>)}
+          </div>
+          <div className="mt-3 space-y-2 border-t border-slate-700 pt-3">
+            <h4 className="text-[11px] font-semibold">Entradas digitales de campo</h4>
+            {GEAR_FIELD_INPUTS.filter(x=>x.type==="BOOL").map(x=>
+              <label key={x.name} className="flex cursor-pointer items-start gap-2 rounded border border-[#354d62] bg-[#0f2434] p-2 text-[11px]">
+                <input type="checkbox" checked={v(x.name)}
+                  onChange={event=>onDigitalInput(x.name as GearDigitalInput,event.target.checked)}
+                  className="mt-0.5 accent-sky-500"/>
+                <span className="min-w-0 break-words text-slate-200">
+                  {x.name==="_310_PLC104_YI_MillRun"?"Confirmación de molino en marcha":
+                    x.name==="_310_SQS_2561"?"Pulso del dosificador":
+                    "Sensor de nivel bajo de lubricante"}{" "}
+                  <span className="font-mono text-sky-300">({x.name})</span>
+                </span>
+              </label>)}
+          </div>
+        </section>
       </section>
       <aside className="scada-scene-sidebar min-w-0">
         <section className="sort-panel rounded-lg border border-[#344c5e] p-3">
@@ -502,54 +542,7 @@ export function GearSprayScene({project,mode,setupError,onPushButton,
             })}
           </div>
         </section>
-        <section className="sort-panel rounded-lg border border-[#344c5e] p-3">
-          <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold">
-            <Gauge size={15}/> Instrumentación y setpoints
-          </h3>
-          <p className="mb-3 text-[10px] text-slate-400">
-            Ingresa un número o mueve la barra. Presiones: rangos de escalamiento
-            del sistema original Cscape; falta confirmar la equivalencia en CCW.
-          </p>
-          <h4 className="mb-2 text-[11px] font-semibold text-slate-200">Entradas analógicas</h4>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {GEAR_FIELD_INPUTS.filter(x=>x.type==="REAL").map(input=>{
-              const isAir=input.name==="_310_PI_2561";
-              return <NumberSetting key={input.name} name={input.name}
-                label={isAir?"Presión de aire":"Presión de lubricante"}
-                min={0} max={isAir?148:1480} step={0.1}
-                caption={isAir?"Referencia original: 0–148":
-                  "Referencia original: 0–1480"}
-                value={gearNumber(project,input.name)}
-                onCommit={value=>onAnalogInput(input.name as GearAnalogInput,value)}/>;
-            })}
-          </div>
-          <h4 className="mb-2 mt-3 text-[11px] font-semibold text-slate-200">Setpoints de operación</h4>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-            {GEAR_HMI_SETPOINTS.map(sp=><NumberSetting key={sp.name}
-              name={sp.name} integer value={gearNumber(project,sp.name)}
-              label={sp.name==="TMR_Freq_SP"?"Frecuencia entre lubricaciones":
-                sp.name==="CNT_LubeFlo_SP"?"Pulsos por lubricación":
-                sp.name==="TMR_LubeFlo_SP"?"Tiempo máximo de lubricación":
-                "Duración de mantenimiento"}
-              caption="Deslizador con escala ampliable; el programa no define un máximo operativo para esta consigna."
-              onCommit={value=>onSetpoint(sp.name as GearSetpoint,value)}/>)}
-          </div>
-          <div className="mt-3 space-y-2 border-t border-slate-700 pt-3">
-            <h4 className="text-[11px] font-semibold">Entradas digitales de campo</h4>
-            {GEAR_FIELD_INPUTS.filter(x=>x.type==="BOOL").map(x=>
-              <label key={x.name} className="flex cursor-pointer items-start gap-2 rounded border border-[#354d62] bg-[#0f2434] p-2 text-[11px]">
-                <input type="checkbox" checked={v(x.name)}
-                  onChange={event=>onDigitalInput(x.name as GearDigitalInput,event.target.checked)}
-                  className="mt-0.5 accent-sky-500"/>
-                <span className="min-w-0 break-words text-slate-200">
-                  {x.name==="_310_PLC104_YI_MillRun"?"Confirmación de molino en marcha":
-                    x.name==="_310_SQS_2561"?"Pulso del dosificador":
-                    "Sensor de nivel bajo de lubricante"}{" "}
-                  <span className="font-mono text-sky-300">({x.name})</span>
-                </span>
-              </label>)}
-          </div>
-        </section>
+
         <section className="sort-panel scada-led-panel min-w-0 rounded-lg border border-[#344c5e] p-3">
           <h3 className="mb-3 text-xs font-semibold">Pilotos LED y equipos</h3>
           <div className="space-y-3">
