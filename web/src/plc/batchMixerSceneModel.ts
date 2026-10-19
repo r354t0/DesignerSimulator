@@ -22,8 +22,8 @@ export const BATCH_IO_TAGS: readonly BatchTagSpec[] = [
   { name: "DI_Flowmeter1", type: "BOOL", direction: "Entrada", description: "Pulsos línea de producto 1" },
   { name: "DI_Flowmeter2", type: "BOOL", direction: "Entrada", description: "Pulsos línea de producto 2" },
   { name: "DI_Flowmeter3", type: "BOOL", direction: "Entrada", description: "Pulsos de descarga" },
-  { name: "DI_HighLevel", type: "BOOL", direction: "Entrada", description: "Nivel alto, 100% del tanque" },
-  { name: "DI_LowLevel", type: "BOOL", direction: "Entrada", description: "Nivel bajo, tanque vacío" },
+  { name: "DI_HighLevel", type: "BOOL", direction: "Entrada", description: "Sensor alto: TRUE solo cuando el líquido lo cubre (100%)" },
+  { name: "DI_LowLevel", type: "BOOL", direction: "Entrada", description: "Sensor inferior: TRUE mientras está mojado; FALSE con tanque vacío (0%)" },
   { name: "DI_Thermostat", type: "BOOL", direction: "Entrada",
     description: "Termostato digital: temperatura física >= INT_TempSP" },
   { name: "INT_TempSP", type: "INT", direction: "Entrada", description: "Consigna de temperatura (°C, entero)" },
@@ -83,7 +83,7 @@ export const BATCH_EXERCISES: readonly {
     criteria: ["Selector A permite iniciar un lote, detenerlo y reanudarlo",
       "P1 aporta INT_RatioP1% y P2 aporta el resto hasta DI_HighLevel",
       "FULL se activa; Heater y Mixer trabajan hasta DI_Thermostat",
-      "Mixer continúa 4 s, luego P3 drena hasta DI_LowLevel",
+      "Mixer continúa 4 s, luego P3 drena hasta que DI_LowLevel se desactiva (tanque vacío)",
       "Otro START permite ejecutar un nuevo lote"] },
   { id: 5, title: "Lotes múltiples B",
     source: "Lab 02 · Ejercicio 2",
@@ -125,7 +125,7 @@ export function prepareBatchTags(project: PracticeProject): PracticeProject {
 export function initialBatchProject(): PracticeProject {
   let p=prepareBatchTags({...initialPracticeProject(),tags:[]});
   for (const [name,value] of [
-    ["DI_ModeA",true],["DI_LowLevel",true],["INT_TempSP",32],
+    ["DI_ModeA",true],["INT_TempSP",32],
     ["INT_RatioP1",40],["INT_BatchTarget",3],
   ] as const) p=setTagValue(p,name,value);
   return p;
@@ -196,15 +196,15 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
   const advanced=exercise>=4;
   const continuous=exercise===3 || exercise===5;
   const endCondition=advanced?X("DI_HighLevel"):C("GEQ","CNT_Volume.ACC",900);
-  const emptyCondition=advanced?X("DI_LowLevel"):C("LEQ","CNT_Volume.ACC",0);
+  const emptyCondition=advanced?N("DI_LowLevel"):C("LEQ","CNT_Volume.ACC",0);
 
   // Start/stop always affect actual outputs. Retained stage bits survive Stop.
   any("rung-1",[X("PB_Start"),X("ST_RunEnable")],
       [N("PB_Stop")],O("OTE","ST_RunEnable"));
   // A fresh START after a finished single batch clears the completion latch.
   if(!continuous&&exercise!==1)
-    rung("bm-rearm",[X("PB_Start"),X("DI_LowLevel"),O("OTU","ST_BatchDone")]);
-  const init=[X("PB_Start"),X("DI_LowLevel"),N("ST_Filling"),
+    rung("bm-rearm",[X("PB_Start"),N("DI_LowLevel"),O("OTU","ST_BatchDone")]);
+  const init=[X("PB_Start"),N("DI_LowLevel"),N("ST_Filling"),
     ...(exercise>=2?[N("ST_Mixing"),N("ST_Draining")]:[])];
   if(advanced) init.push(X(exercise===4?"DI_ModeA":"DI_ModeB"));
   if(exercise===2||exercise===4||exercise===5) init.push(N("ST_BatchDone"));
@@ -257,7 +257,7 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
     if(advanced) rung("bm-heater",[
       X("ST_RunEnable"),X("ST_Mixing"),N("DI_Thermostat"),O("OTE","DO_Heater")]);
     rung("bm-drain-pump",[X("ST_RunEnable"),X("ST_Draining"),
-      advanced?N("DI_LowLevel"):C("GRT","CNT_Volume.ACC",0),
+      advanced?X("DI_LowLevel"):C("GRT","CNT_Volume.ACC",0),
       O("OTE","DO_Pump3")]);
     if(!advanced)
       rung("bm-ctd-volume",[X("DI_Flowmeter3"),O("CTD","CNT_Volume")]);
@@ -295,7 +295,7 @@ export function resetBatchProgramState(project:PracticeProject):PracticeProject 
   return {...project,tags:project.tags.map(tag=>{
     if(tag.type==="BOOL"){
       if(tag.name.startsWith("DI_Mode"))return tag;
-      return {...tag,value:tag.name==="DI_LowLevel"};
+      return {...tag,value:false};
     }
     if(tag.type==="TIMER"&&typeof tag.value==="object")
       return {...tag,value:{...tag.value,ACC:0,EN:false,TT:false,DN:false}};
@@ -324,7 +324,8 @@ export const BATCH_FILL_90_PULSES=900;
 export const BATCH_PULSES_PER_SECOND=80;
 export function batchDigitalSensors(state: BatchMixerState,sp:number) {
   return {
-    DI_LowLevel: state.level<=0,
+    // TRUE means the low probe is touching liquid. At 0% it is dry.
+    DI_LowLevel: state.level>0,
     DI_HighLevel: state.level>=100,
     DI_Thermostat: state.temperature>=sp,
   };
