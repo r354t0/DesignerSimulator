@@ -44,18 +44,7 @@ export function evaluateGearSequence(
   const request=input.freqDone||!input.startupDone||input.extraPulse;
   let blockLatched=previous.blockLatched;
   let recoveryHold=previous.recoveryHold;
-  // In the unified P01–P07 Ladder, P03 executes before P06 writes
-  // DO_LS_Healthy. On the FIRST rising RUN scan the previous-mode
-  // DO_LS_Healthy can still be FALSE even though all safety permissives
-  // will be TRUE once P06 evaluates later in that very scan.
-  // Defer ONLY the missing-health latch for that one initial scan.
-  // No lubrication output is enabled while permissive is FALSE.
-  // An actual trip remains immediate, and persistent unhealthy status
-  // blocks on the next scan. A previously latched fault still needs RESET.
-  const firstRunScan=input.run&&previous.state===0&&!previous.blockLatched;
-  const pendingHealthy=firstRunScan&&!input.healthy&&!input.manual&&
-    !input.tripActive;
-  if(input.tripActive||(input.run&&!permissive&&!pendingHealthy)){
+  if(input.tripActive||(input.run&&!permissive)){
     blockLatched=true;
     recoveryHold=true;
   }else if(blockLatched&&input.resetPulse&&input.run&&permissive&&!input.tripActive){
