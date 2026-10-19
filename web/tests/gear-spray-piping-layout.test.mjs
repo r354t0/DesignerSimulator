@@ -11,7 +11,7 @@ test("Escena 06 conserva tuberías separadas para aire y grasa",()=>{
   assert.match(graphic,/pipe\("M43 286 H282", "air", pump\|\|air\)/);
   assert.match(graphic,/pipe\("M282 286 V124 H909 V475", "air", air\)/);
   assert.match(graphic,/pipe\("M282 286 H444 V370", "air", pump\)/);
-  assert.match(graphic,/pipe\("M383 427 V382 H722", "lube", grease&&pump\)/);
+  assert.match(graphic,/pipe\("M383 427 V382 H743", "lube", grease&&pump\)/);
   assert.match(graphic,/pipe\("M855 "\+y\+" H961","lube",grease&&pump\)/);
   assert.match(graphic,/pipe\("M909 "\+\(y-13\)\+" H961","air",air\)/);
   assert.match(graphic,/nozzleYs=\[246,290,334,378,422,466\]/);
