@@ -33,31 +33,48 @@ const gotoManualCycle=()=>{
   return p;
 };
 
-test("P03 has eleven ordered original CCW rungs and P01 low pressure is unmoved",()=>{
+test("P03 has ten source rungs after the two requested removals",()=>{
   const p=createGearPhase3Project();
   const ids=p.rungs.filter(r=>r.id.startsWith("gear-p03-r")).map(r=>r.id);
-  assert.deepEqual(ids,Array.from({length:11},(_,i)=>
-    "gear-p03-r"+String(i+1).padStart(2,"0")));
+  assert.deepEqual(ids,Array.from({length:10},(_,i)=>
+    "gear-p03-r"+String(i+2).padStart(2,"0")));
   assert.equal(p.rungs[4].id,"gear3a-p01-low");
-  assert.match(p.rungs.find(r=>r.id==="gear-p03-r01").comment,/P03/);
+  assert.equal(p.rungs[23].id,"gear-p03-r02");
+  assert.ok(!p.rungs.some(r=>r.id==="gear-p03-r01"||r.id==="gear3a-p01-pulse-rise"));
+  assert.match(p.rungs.find(r=>r.id==="gear-p03-r02").comment,/P03/);
   const fb=p.rungs.find(r=>r.id==="gear-p03-r05");
   assert.deepEqual(fb.instructions.map(i=>i.kind),["XIC","GEAR_SEQ"]);
   assert.equal(fb.instructions[1].tag,"ST_Cycle_Rly");
   for(const [id,kind,q] of [
-    ["gear-p03-r02","TON","TMR_Freq_Dn"],
-    ["gear-p03-r03","TON","TMR_Startup_Cycle_Dn"],
-    ["gear-p03-r04","CTU","CNT_Lubeflo_Dn"],
-    ["gear-p03-r08","TOF","TMR_Purge_Dn"],
+    ["gear-p03-r02","TON","TMR_Freq"],
+    ["gear-p03-r03","TON","TMR_Startup_Cycle"],
+    ["gear-p03-r04","CTU","CTN_Lubeflo"],
+    ["gear-p03-r08","TOF","TMR_Purge"],
   ]){
     const r=p.rungs.find(r=>r.id===id);
     const block=r.instructions.find(i=>i.kind===kind);
     assert.ok(block,id);
-    assert.equal(block.doneTag,q);
+    assert.equal(block.tag,q);
+    assert.equal(block.doneTag,undefined);
+    assert.equal(block.resetTag,undefined);
     assert.equal(r.instructions.filter(i=>i.kind===kind).length,1);
   }
-  assert.equal(p.rungs.find(r=>r.id==="gear-p03-r04")
-    .instructions.find(i=>i.kind==="CTU").resetTag,"CNT_Lubeflo_Rst");
-  for(const id of ["gear-p03-r06","gear-p03-r07","gear-p03-r11"]){
+  const ton=p.rungs.find(r=>r.id==="gear-p03-r02").instructions
+    .find(i=>i.kind==="TON");
+  assert.equal(ton.preset.tag,"TMR_Freq_SP");
+  const reset=p.rungs.find(r=>r.id==="gear-p03-r11");
+  assert.equal(reset.instructions.filter(i=>i.kind==="RES").length,1);
+  assert.equal(reset.instructions.find(i=>i.kind==="RES").tag,"CTN_Lubeflo");
+  assert.equal(reset.parallelBranches.length,1);
+  assert.ok(reset.instructions.some(i=>i.tag==="TMR_Purge.DN"&&i.kind==="XIO"));
+  assert.ok(p.rungs.find(r=>r.id==="gear-p03-r09")
+    .instructions.some(i=>i.tag==="TMR_Purge.DN"&&i.kind==="XIC"));
+  for(const orphan of [
+    "TMR_Freq_SP_Time","TMR_Freq_Dn","TMR_Startup_Cycle_Dn",
+    "CNT_Lubeflo_Rst","CNT_Lubeflo_Dn","TMR_Purge_Dn",
+    "PDB_RisingTrig","P01_PDB_EdgeMemory",
+  ])assert.ok(!p.tags.some(t=>t.name===orphan),orphan);
+  for(const id of ["gear-p03-r06","gear-p03-r07"]){
     const r=p.rungs.find(r=>r.id===id);
     assert.equal(r.parallelBranches.length,1,id);
     assert.equal(r.instructions.filter(i=>i.kind==="OTE").length,1,id);
@@ -89,16 +106,16 @@ test("P03 manual startup drives state 0 -> 10 -> 20 with a single executable FB 
 test("P03 counter reaches preset using DI_PDB pulses and same-rung CTU RESET/Q",()=>{
   let p=gotoManualCycle();
   assert.equal(gearNumber(p.project,"SM_Cycle_State"),20);
-  assert.equal(gearBool(p.project,"CNT_Lubeflo_Rst"),false);
+  assert.equal(timer(p,"CTN_Lubeflo").ACC,false);
   p=digital(p,"_310_SQS_2561",true);
   assert.equal(timer(p,"CTN_Lubeflo").ACC,1);
   p=digital(p,"_310_SQS_2561",false);
   p=digital(p,"_310_SQS_2561",true);
   assert.equal(timer(p,"CTN_Lubeflo").ACC,2);
-  assert.equal(gearBool(p.project,"CNT_Lubeflo_Dn"),true);
+  assert.equal(timer(p,"CTN_Lubeflo").DN,true);
   assert.equal(gearNumber(p.project,"SM_Cycle_State"),30);
   assert.equal(gearBool(p.project,"ST_Cycle_Rly"),false);
-  assert.equal(gearBool(p.project,"TMR_Purge_Dn"),true);
+  assert.equal(timer(p,"TMR_Purge").DN,true);
 });
 
 test("P03 TOF purges 30 seconds and clears counter at end of purge",()=>{
@@ -111,13 +128,13 @@ test("P03 TOF purges 30 seconds and clears counter at end of purge",()=>{
   p=digital(p,"_310_SQS_2561",true);
   p=digital(p,"_310_SQS_2561",false);
   assert.equal(gearNumber(p.project,"SM_Cycle_State"),30);
-  assert.equal(gearBool(p.project,"TMR_Purge_Dn"),true);
+  assert.equal(timer(p,"TMR_Purge").DN,true);
   p=scan(p,299);
-  assert.equal(gearBool(p.project,"TMR_Purge_Dn"),true);
+  assert.equal(timer(p,"TMR_Purge").DN,true);
   p=scan(p,3);
-  assert.equal(gearBool(p.project,"TMR_Purge_Dn"),false);
+  assert.equal(timer(p,"TMR_Purge").DN,false);
   assert.equal(gearNumber(p.project,"SM_Cycle_State"),10);
-  assert.equal(gearBool(p.project,"CNT_Lubeflo_Rst"),true);
+  assert.equal(timer(p,"CTN_Lubeflo").ACC,true);
   p=scan(p);
   assert.equal(timer(p,"CTN_Lubeflo").ACC,0);
 });
@@ -145,9 +162,9 @@ test("P03 STOP clears live cycle and Q signals, but does not erase block memory"
   p=stopPracticeScans(p);
   assert.equal(p.mode,"stopped");
   assert.equal(gearBool(p.project,"ST_Cycle_Rly"),false);
-  assert.equal(gearBool(p.project,"TMR_Freq_Dn"),false);
-  assert.equal(gearBool(p.project,"TMR_Startup_Cycle_Dn"),false);
-  assert.equal(gearBool(p.project,"TMR_Purge_Dn"),false);
+  assert.equal(timer(p,"TMR_Freq").DN,false);
+  assert.equal(timer(p,"TMR_Startup_Cycle").DN,false);
+  assert.equal(timer(p,"TMR_Purge").DN,false);
   assert.equal(gearBool(p.project,"DO_Lubecon_Sol"),false);
 });
 
@@ -158,7 +175,7 @@ test("P03 program stays visible inside native Ladder while P04-P07 remain unport
   assert.match(app,/createGearPhase3Project/);
   assert.match(scene,/Cargar P01 \+ P02 \+ P03 \(Fase 3B\)/);
   assert.match(editor,/FB_GearSpray_Sequence/);
-  assert.match(editor,/output.doneTag/);
-  assert.match(editor,/output.resetTag/);
+  assert.match(editor,/GEAR_SEQ/);
+  assert.ok(createGearPhase3Project().rungs.some(r=>r.id==="gear-p03-r11"&&r.instructions.some(i=>i.kind==="RES")));
   assert.match(scene,/P04–P07 y la lógica completa de alarmas todavía pendientes/);
 });
