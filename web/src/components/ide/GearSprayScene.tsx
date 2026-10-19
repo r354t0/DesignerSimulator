@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, CircleHelp, Gauge,
   Play, ShieldAlert, Wrench, RotateCcw, Settings2, Droplets } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
+import {GEAR_FAT_COMMANDS,type GearFatCommand} from "../../plc/gearSprayFatProgram";
 import {
   gearSprayIsActive, type GearPhysicalState,
 } from "../../plc/gearSprayPhysics";
@@ -19,6 +20,10 @@ import {
 interface Props {
   project: PracticeProject;
   mode: ScanMode;
+  fatLoaded:boolean;
+  onLoadFat:()=>void;
+  onRestoreFat:()=>void;
+  onFatCommand:(tag:GearFatCommand,value:boolean)=>void;
   physics:GearPhysicalState;
   onPhysicsChange:(patch:Partial<Pick<GearPhysicalState,
     "enabled"|"airSupply"|"drumPercent"|"airLoss"|"filterBlocked"|"doserBlocked">>)=>void;
@@ -426,7 +431,8 @@ function InfoModal({onClose,onOpenTags}:{
  * model publishes physical input measurements, never a PLC interlock or command.
  * The CCW application logic remains pending for phase 3.
  */
-export function GearSprayScene({project,mode,physics,onPhysicsChange,onPhysicsReset,
+export function GearSprayScene({project,mode,fatLoaded,onLoadFat,onRestoreFat,
+  onFatCommand,physics,onPhysicsChange,onPhysicsReset,
   setupError,onPushButton,onDigitalInput,onAnalogInput,onSetpoint,
   onPrepareTags,onOpenTags}:Props){
   const [openInfo,setOpenInfo]=useState(false);
@@ -506,6 +512,54 @@ export function GearSprayScene({project,mode,physics,onPhysicsChange,onPhysicsRe
             el modelo publica presión, nivel y pulsos de dosificación en los tags
             de entrada del PLC; los setpoints siguen siendo numéricos.
           </p>
+          <div className="mb-3 rounded border border-amber-800/70 bg-[#271f1c] p-3">
+            <h4 className="mb-1 text-[11px] font-semibold text-amber-200">
+              Banco de pruebas FAT · Etapa B
+            </h4>
+            <p className="mb-2 text-[10px] leading-snug text-slate-300">
+              Plantilla Ladder temporal: tres rungs XIC–OTE independientes.
+              No sustituye las rutinas de control P01–P07. La carga y la
+              restauración solo están disponibles con el PLC detenido.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              {!fatLoaded?
+                <button type="button" disabled={mode!=="stopped"}
+                  onClick={onLoadFat}
+                  className="rounded border border-amber-600 px-3 py-1.5 text-[11px] font-semibold text-amber-100 hover:bg-amber-950 disabled:cursor-not-allowed disabled:opacity-40">
+                  Cargar Ladder temporal FAT
+                </button>:
+                <button type="button" disabled={mode!=="stopped"}
+                  onClick={onRestoreFat}
+                  className="rounded border border-slate-500 px-3 py-1.5 text-[11px] font-semibold text-slate-100 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40">
+                  Restaurar programa anterior
+                </button>}
+              <span className="text-[10px] text-slate-400">
+                {fatLoaded?"Plantilla FAT cargada":"Sin plantilla FAT"}
+              </span>
+            </div>
+            {fatLoaded&&<div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {GEAR_FAT_COMMANDS.map(cmd=><label key={cmd.name}
+                className="flex min-w-0 cursor-pointer items-start gap-2 rounded border border-[#5b4a3e] bg-[#171d26] px-2 py-2">
+                <input type="checkbox" className="mt-0.5 accent-amber-500"
+                  checked={v(cmd.name)} disabled={mode!=="running"}
+                  onChange={e=>onFatCommand(cmd.name,e.target.checked)}/>
+                <span className="min-w-0 text-[10px] text-slate-200">
+                  <span className="block font-semibold">
+                    {cmd.name==="FAT_CMD_Pump"?"Bomba neumática":
+                      cmd.name==="FAT_CMD_Lubricant"?"Válvula de lubricante":
+                      "Aire de atomización"}
+                  </span>
+                  <span className="mt-1 block break-all font-mono text-amber-200">
+                    ({cmd.name})
+                  </span>
+                </span>
+              </label>)}
+            </div>}
+            {fatLoaded&&<p className="mt-2 text-[10px] text-amber-200">
+              Activa las salidas por separado en PLC RUN. Desmarca las
+              tres antes de detener el programa.
+            </p>}
+          </div>
           <div className="mb-3 rounded border border-sky-900 bg-[#0c1d2a] p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
