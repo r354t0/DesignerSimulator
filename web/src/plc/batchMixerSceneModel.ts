@@ -48,6 +48,8 @@ export const BATCH_INTERNAL_TAGS: readonly BatchTagSpec[] = [
   { name: "TMR_Mix8s", type: "TIMER", direction: "Interna", description: "Mezclado de 8 s, retentivo para pausa" },
   { name: "TMR_PostTemp4s", type: "TIMER", direction: "Interna", description: "Mezcla 4 s después del termostato" },
   { name: "CNT_Product1", type: "COUNTER", direction: "Interna", description: "Pulsos de P1 para porcentaje de mezcla" },
+  { name: "ST_P1PulseTarget", type: "INT", direction: "Interna",
+    description: "Objetivo P1 en pulsos: INT_RatioP1 × 10 (0,1 % por pulso)" },
   { name: "CNT_Lotes", type: "COUNTER", direction: "Interna", description: "Lotes terminados" },
 ];
 export const BATCH_EXERCISES: readonly {
@@ -61,7 +63,7 @@ export const BATCH_EXERCISES: readonly {
     source: "Lab 01 · Ejercicio 1",
     description: "Bomba P1 con pulsos de Flowmeter 1 y parada al 90%.",
     criteria: ["START energiza P1 y CTU cuenta los pulsos de FM1",
-      "Al llegar a 90 pulsos se apaga P1 y se enciende FULL",
+      "Al llegar a 900 pulsos (90 %) se apaga P1 y se enciende FULL",
       "STOP detiene inmediatamente el llenado"] },
   { id: 2, title: "Mezclado y vaciado",
     source: "Lab 01 · Ejercicio 2",
@@ -101,10 +103,10 @@ const additional: Record<BatchExercise, readonly string[]> = {
       "ST_ToMix","ST_ToDrain","ST_ToDone","CNT_Volume","TMR_Mix8s"],
   4: ["ST_RunEnable","ST_Filling","ST_Full","ST_Mixing","ST_Draining",
       "ST_ToMix","ST_ToDrain","ST_ToDone","ST_BatchDone",
-      "CNT_Product1","TMR_PostTemp4s"],
+      "CNT_Product1","ST_P1PulseTarget","TMR_PostTemp4s"],
   5: ["ST_RunEnable","ST_Filling","ST_Full","ST_Mixing","ST_Draining",
       "ST_ToMix","ST_ToDrain","ST_ToDone","ST_BatchDone",
-      "CNT_Product1","CNT_Lotes","TMR_PostTemp4s"],
+      "CNT_Product1","ST_P1PulseTarget","CNT_Lotes","TMR_PostTemp4s"],
 };
 export function batchSolutionTags(exercise: BatchExercise): BatchTagSpec[] {
   return BATCH_INTERNAL_TAGS.filter(tag => additional[exercise].includes(tag.name));
@@ -154,6 +156,11 @@ const C=(kind:"GEQ"|"GRT"|"LES"|"LEQ"|"EQU",a:string,b:string|number):Spec=>({
 const M=(dst:string,source:string):Spec=>({
   kind:"MOV",tag:dst,compareA:{mode:"tag",tag:source},
 });
+const scaleP1=():Spec=>({
+  kind:"MUL",tag:"ST_P1PulseTarget",
+  compareA:{mode:"tag",tag:"INT_RatioP1"},
+  compareB:{mode:"literal",value:10},
+});
 
 /** Creates real, editable rungs using the same instruction set as the IDE. */
 export function createBatchSolution(exercise: BatchExercise): PracticeProject {
@@ -166,7 +173,7 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
     p=createTag(p,tag.name,tag.description,tag.type);
   for(const tag of ["CNT_Volume","CNT_Product1","CNT_Lotes"]) {
     if(p.tags.some(t=>t.name===tag))
-      p=setTagValue(p,tag,tag==="CNT_Volume"?90:tag==="CNT_Product1"?100:9999,"PRE");
+      p=setTagValue(p,tag,tag==="CNT_Volume"?900:tag==="CNT_Product1"?1000:9999,"PRE");
   }
   for(const [name,ms] of [["TMR_Mix8s",8000],["TMR_PostTemp4s",4000]] as const) {
     if(p.tags.some(tag=>tag.name===name))p=setTagValue(p,name,ms,"PRE");
@@ -188,7 +195,7 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
   };
   const advanced=exercise>=4;
   const continuous=exercise===3 || exercise===5;
-  const endCondition=advanced?X("DI_HighLevel"):C("GEQ","CNT_Volume.ACC",90);
+  const endCondition=advanced?X("DI_HighLevel"):C("GEQ","CNT_Volume.ACC",900);
   const emptyCondition=advanced?X("DI_LowLevel"):C("LEQ","CNT_Volume.ACC",0);
 
   // Start/stop always affect actual outputs. Retained stage bits survive Stop.
@@ -203,13 +210,15 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
   if(exercise===2||exercise===4||exercise===5) init.push(N("ST_BatchDone"));
   rung("bm-start-fill",[...init,O("OTL","ST_Filling")]);
 
-  // Product line 1 is always counted from FM1 pulses; advanced percentage
-  // is selected by comparing CNT_Product1.ACC to INT_RatioP1 (one pulse=1%).
+  // FM1 produces one pulse per 0.1% of the tank. An INT HMI percentage
+  // becomes a pulse target through an editable Ladder MUL instruction.
+  // Example: 40% P1 = 400 pulses, remaining 60% P2 = 600 pulses.
   if(advanced) {
+    rung("bm-p1-pulse-target",[scaleP1()]);
     rung("bm-p1",[X("ST_RunEnable"),X("ST_Filling"),N("DI_HighLevel"),
-      C("LES","CNT_Product1.ACC","INT_RatioP1"),O("OTE","DO_Pump1")]);
+      C("LES","CNT_Product1.ACC","ST_P1PulseTarget"),O("OTE","DO_Pump1")]);
     rung("bm-p2",[X("ST_RunEnable"),X("ST_Filling"),N("DI_HighLevel"),
-      C("GEQ","CNT_Product1.ACC","INT_RatioP1"),O("OTE","DO_Pump2")]);
+      C("GEQ","CNT_Product1.ACC","ST_P1PulseTarget"),O("OTE","DO_Pump2")]);
     rung("bm-ctu-p1",[X("DI_Flowmeter1"),O("CTU","CNT_Product1")]);
   }else{
     rung("bm-p1",[X("ST_RunEnable"),X("ST_Filling"),N("ST_Full"),O("OTE","DO_Pump1")]);
@@ -306,7 +315,13 @@ export interface BatchMixerState {
 export const initialBatchState=():BatchMixerState=>({
   level:0,temperature:20,pulseCarry:[0,0,0],totalPulses:[0,0,0],
 });
-export const BATCH_PULSES_PER_SECOND=8;
+/** The flowmeters emit 10 pulses per 1% of nominal tank capacity. */
+export const BATCH_VOLUME_PER_PULSE_PERCENT=0.1;
+export const BATCH_PULSES_PER_PERCENT=10;
+export const BATCH_FULL_PULSES=1000;
+export const BATCH_FILL_90_PULSES=900;
+// Preserve the previous ~12.5s fill duration while providing 10x resolution.
+export const BATCH_PULSES_PER_SECOND=80;
 export function batchDigitalSensors(state: BatchMixerState,sp:number) {
   return {
     DI_LowLevel: state.level<=0,
@@ -331,7 +346,10 @@ export function stepBatchPhysics(state:BatchMixerState,outputs:{
       carry[i]-=1;
       if(i===2&&level<=0){carry[i]=0;break;}
       if(i!==2&&level>=100){carry[i]=0;break;}
-      level=Math.max(0,Math.min(100,level+(i===2?-1:1)));
+      // Quantize to 0.1% so High/Low level contacts never miss 100/0
+      // because of binary floating-point rounding.
+      level=Math.round(Math.max(0,Math.min(100,
+        level+(i===2?-1:1)*BATCH_VOLUME_PER_PULSE_PERCENT))*10)/10;
       total[i]++;
     }
   }
