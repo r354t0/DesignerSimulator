@@ -1,5 +1,5 @@
 # Escena 06 — Gear Spray / Lubricación de molino de bolas
-**Estado:** Fases 1–2 implementadas y **Fase 3B P01/P02/P03 cargable como Ladder**, con FB_GearSpray_Sequence ejecutable dentro del rung 5. P04–P07 pendientes; todavía no existe equivalencia funcional con el programa CCW completo.  
+**Estado actual:** Escena 06 con **P01–P07 integradas en una plantilla Ladder virtual**, con FB_GearSpray_Sequence ejecutable, bomba P04, alarmas P05, mantenimiento/parada P06 y HMI P07. FAT visual integrado y cotejo SAT/CCW aún pendientes; no es un programa de seguridad validado.  
 **Origen:** `PLC_107_Molino_Bolas_SM.rar`; rutinas P01–P07, `FB_GearSpray_Sequence`, `Maintance_Duration` y capacitación Gear Spray Cerro Corona.
 
 ## Objetivo y alcance
@@ -113,9 +113,9 @@ Mantener **separación estricta** entre:
 - Se añadió `web/src/plc/gearSprayPhase3Program.ts` con `createGearPhase3AProject()`: proyecto Ladder optativo e independiente de la plantilla FAT, que registra sus propios tags de proceso y rungs editables.
 - **P01**: copia de presiones de aire/lubricante (`MOV`), límites aire **>40**, lubricante alto **>1500** y bajo **<400** habilitado por marcha; entrada física de molino, proximidad y copia a `DI_PDB`, nivel bajo; puente entre variables internas de mando y salidas de campo.
 - **P02**: selección retenida AUTO/MANUAL/MANT y condición `ST_Run_Rly`; cada ecuación y cada enclavamiento están en **un único rung Ladder** con contactos y ramas OR reales, sin auxiliares que introduzcan dependencia entre scans. La expresión de marcha usa distribución booleana equivalente para representar tres caminos paralelos en un rung. El estado de marcha alimenta `_310_YI_LubricationSystemRunning`.
-- **Límite de la antigua plantilla Fase 3A:** implementaba P01/P02 solamente y se conserva para pruebas de regresión. La **plantilla cargable actual** incluye además P03; siguen pendientes P04–P07, incluidos el mando neumático real y las alarmas completas.
+- **Evolución de plantillas:** Fase 3A abarcaba P01/P02, Fase 3B añadió P03. La plantilla cargable **actual** incluye P01–P07 con P04–P07 en `gearSprayCompleteProgram.ts`; las suites históricas se conservan para regresión.
 - **Correspondencia que requiere FAT:** `Run_Rly` se alimenta de `ST_Run_Rly` como interpretación de implementación para la condición de baja presión de P01. No se asume equivalencia definitiva hasta la revisión funcional del usuario.
-- Se puede cargar con «Cargar P01 + P02 + P03 (Fase 3B)» solo en STOP, después de restaurar cualquier FAT temporal. Se conserva copia local del MainRoutine previo y hay botón de restauración. No recargar el navegador hasta guardar/restaurar: las copias residen en memoria.
+- Se puede cargar con «Cargar P01–P07 (FAT integrado)» solo en STOP, después de restaurar cualquier FAT temporal. Se conserva copia local del MainRoutine previo y hay botón de restauración. No recargar el navegador hasta guardar/restaurar: las copias residen en memoria.
 - Pruebas de compilación/escaneo en `web/tests/gear-spray-phase3a.test.mjs`.
 
 - **Comentarios de rung:** `PracticeRung.comment` es metadato editable en el editor (`+ Añadir comentario al rung`, multilinea, hasta 240 caracteres). El inicio de P01, P02 y el regreso al mapeo P01 están marcados. El comentario persiste con el rung al reordenarlo y **no cambia la firma de compilación ni reinicia RUN**.
@@ -125,7 +125,7 @@ Mantener **separación estricta** entre:
 - **Orden de evaluación:** el adaptador `Run_Rly ← ST_Run_Rly` queda al final del ensamblado P01/P02 y alimenta el valor observado por el rung 5 en el siguiente scan. Esta latencia deriva del orden secuencial de estas plantillas y se conserva deliberadamente hasta revisar el cableado CCW original.
 - **P03 — primera subetapa (modelo ST independiente):** `web/src/plc/gearSpraySequence.ts` implementa `FB_GearSpray_Sequence` como una **función pura por scan**, conservando los estados `0` inactivo, `10` espera, `20` lubricación, `30` purga y `90` bloqueo, los permisos, solicitud de ciclo, prioridad del trip, `BlockLatched`, `RecoveryHold` y criterio de rearme.
 - Se añadieron pruebas automatizadas en `web/tests/gear-spray-sequence.test.mjs` para arranque, solicitud por frecuencia/arranque, secuencia lubricación→purga, modo manual, trip, bloqueo retenido, reset y rearme.
-- **P03 implementado:** `GEAR_SEQ` está visible y ejecutable en el rung 5. Los temporizadores y contador se consultan por miembros nativos `.DN`; el contador se reinicia con `RES CTN_Lubeflo` en el rung 11. Falta aprobar el FAT visual y portar P04–P07.
+- **P03 implementado:** `GEAR_SEQ` está visible y ejecutable en el rung 5. Los temporizadores y contador se consultan por miembros nativos `.DN`; el contador se reinicia con `RES CTN_Lubeflo` en el rung 11. P04–P07 se añadieron en la plantilla integral; falta aprobar el FAT visual.
 - El documento CCW seleccionado es la versión de P03 con `FB_GearSpray_Sequence`, no el exportado antiguo sin UDFB que comparte nombre en la biblioteca.
 
 ## Revisión de limpieza — rungs editor 8 y 24
@@ -142,9 +142,19 @@ Mantener **separación estricta** entre:
 - R5 `XIC ST_Run_Rly → GEAR_SEQ`: UDFB `FB_GearSpray_Sequence` **ejecutable dentro de Ladder**. La memoria se guarda en `SM_Cycle_State`, `SM_Cycle_BlockLatched` y `SM_Cycle_RearmHold`; salidas `ST_Cycle_Rly`, `SM_Cycle_Blocked` y estado. Nunca se calcula la secuencia por separado desde React.
 - R6 OR en un rung: `(ST_Run_Rly AND ST_Cycle_Rly) OR PB_Lubpress_Release → DO_Lubecon_Sol`. R7: `ST_Run_Rly AND (ST_Cycle_Rly OR ST_Auto_Mode) → ST_Pump_Rly`. R8 `TOF TMR_Purge` de 30 s, su miembro `TMR_Purge.DN` se utiliza en R9 y R11. R9 `ST_Airsol_Rly`; R10 `Air_Sol`; R11 `(NOT TMR_Purge.DN) OR (NOT ST_Run_Rly) → RES CTN_Lubeflo`.
 - El mapeo existente de salida P01 hacia `_310_SV_2561` lee ahora `DO_Lubecon_Sol`, el nombre operativo generado por P03, sin mover el rung de mapeo. Su evaluación anterior en el orden de escaneo introduce una latencia de un scan para reflejar la salida en campo; revisar durante FAT.
-- **Provisional y visible:** `DO_LS_Healthy` comienza TRUE para permitir ensayar P03 **antes de portar P05**. No equivale a una verificación real de salud ni a una lógica de seguridad. `ST_General_Trip_Rly` puede inyectarse en Controller Tags para ensayos de bloqueo. P04 todavía debe traducir `ST_Pump_Rly` en el mando de la bomba `_310_SV_2560`.
+- **Contexto histórico Fase 3B:** `DO_LS_Healthy` se inicializaba TRUE cuando P05/P06 aún no se portaban; en la plantilla completa P06 gobierna la salida por su propia red. P04 escribe `DO_Pump_Sol` y la salida `_310_SV_2560` se mapea desde P01. El valor inicial de P03 se reemplaza durante los scans normales.
 - El SCADA muestra el estado de la máquina y el acumulado del contador. STOP desenergiza `ST_Cycle_Rly` y salidas Q no retentivas; PAUSE conserva los estados y detiene el tiempo simulado.
 - Pruebas `web/tests/gear-spray-phase3b-p03.test.mjs` validan el orden, compilación, ciclos, conteo, purga 30 s, bloqueo/rearme y STOP. El FAT visual sigue pendiente de aprobación.
+
+## Plantilla unificada P01–P07 — estado actual
+
+- Archivo: `web/src/plc/gearSprayCompleteProgram.ts`. La escena 06 lo carga desde `createGearCompleteProject()` con copia temporal reversible del proyecto anterior.
+- **P04:** cuatro rungs de control de presión de bomba con histéresis 800/1000, `ST_Pump_Sol_Rly` y salida `DO_Pump_Sol` hacia el mapeo de P01.
+- **P05:** alarmas por aire/flujo/presión/nivel, sirena y acuse, prioridad y trip general. Las referencias de completado se hacen a `TIMER.DN`; el `AFI` original se representa con `EQU 0,1`, expresión constante falsa que mantiene la presión alta deshabilitada. Rung de conversión TIME innecesario omitido.
+- **P06:** tiempo acumulado, contadores de mantenimiento y parada, permiso `ST_LS_Healthy_Rly`, avisos de parada. El `CTD CNT_Shutdown` usa el terminal `loadTag` para recargar PRE=20, con Q/DN al llegar a cero; los contadores ascendentes se reinician mediante RES nativa. Cálculo auxiliar de mantenimiento en ms ubicado antes de los timers.
+- **P07:** cálculos de tiempo restante y `Fault_Code`, con acceso nativo a los miembros `TIMER.ACC` y `COUNTER.ACC` en lugar de conversiones DINT/REAL redundantes. El SCADA muestra `Fault_Code` en diagnóstico.
+- **Premisas FAT:** al cargar se establecen setpoints de ensayo `TMR_Freq_SP=60000`, `CNT_LubeFlo_SP=5`, `TMR_LubeFlo_SP=10000`, `Maint_Duration_Min=30`. Requieren revisión para una instalación real. La lógica del motor ejecuta los rungs, no hay reglas de planta ocultas en React.
+- Ver protocolo único: `docs/scene-06-fat-integrado-p01-p07.md`; pruebas automáticas: `web/tests/gear-spray-complete-p04-p07.test.mjs`. No declaramos aprobado el FAT visual hasta la revisión consolidada del usuario.
 
 ## Implementación por entregables
 - **Fase 1:** SCADA industrial SVG y tags físicos/setpoints; animación física desacoplada, estructura de escena e información.
