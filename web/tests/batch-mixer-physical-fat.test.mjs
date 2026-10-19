@@ -92,7 +92,9 @@ test("integrated E5: two configured batches complete, then everything stops",()=
   assert.equal(sim.until(()=>batchCounter(sim.controller.project,"CNT_Lotes")>=2,2400),true);
   for(let i=0;i<3;i++)sim.step();
   assert.equal(batchCounter(sim.controller.project,"CNT_Lotes"),2);
-  assert.equal(batchInt(sim.controller.project,"INT_DisplayValue"),2);
+  // The requested 17-rung reference does not contain MOV INT_DisplayValue;
+  // the SCADA display reads the CNT_Lotes.ACC member directly.
+  assert.equal(batchCounter(sim.controller.project,"CNT_Lotes"),2);
   assert.equal(batchBool(sim.controller.project,"DO_Pump1"),false);
   assert.equal(batchBool(sim.controller.project,"DO_Pump2"),false);
   assert.equal(batchBool(sim.controller.project,"DO_Pump3"),false);
