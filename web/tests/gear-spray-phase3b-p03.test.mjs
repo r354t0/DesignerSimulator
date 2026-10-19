@@ -8,6 +8,7 @@ import {setTagValue} from "../src/plc/practiceDocument.ts";
 import {
   initialPracticeScanState,startPracticeScans,tickPracticeScan,
   applyMomentaryBoolInput,applySceneSensorBoolInput,stopPracticeScans,
+  changePracticeScanProject,
 } from "../src/plc/practiceScanCycle.ts";
 
 const read=p=>readFileSync(new URL(p,import.meta.url),"utf8");
@@ -102,6 +103,9 @@ test("P03 counter reaches preset using DI_PDB pulses and same-rung CTU RESET/Q",
 
 test("P03 TOF purges 30 seconds and clears counter at end of purge",()=>{
   let p=gotoManualCycle();
+  // The frequency timer would otherwise request the next cycle after 5 s.
+  // Isolate the 30 s TOF boundary from the next scheduled lubrication.
+  p=changePracticeScanProject(p,setTagValue(p.project,"TMR_Freq_SP",120000));
   p=digital(p,"_310_SQS_2561",true);
   p=digital(p,"_310_SQS_2561",false);
   p=digital(p,"_310_SQS_2561",true);
