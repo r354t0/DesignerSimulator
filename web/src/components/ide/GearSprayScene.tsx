@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AlertTriangle, BookOpen, CheckCircle2, CircleHelp, Gauge,
-  Play, ShieldAlert, Wrench, RotateCcw, Settings2, Droplets, Wind } from "lucide-react";
+  Play, ShieldAlert, Wrench, RotateCcw, Settings2, Droplets } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
 import { MomentaryPushButton } from "./MomentaryPushButton";
