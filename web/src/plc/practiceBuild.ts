@@ -34,12 +34,12 @@ export function getPracticeBuildSignature(project: PracticeProject): string {
     tags: project.tags.map(({ name, type, constant }) => ({ name, type, constant })),
     rungs: project.rungs.map((rung) => ({
       id: rung.id,
-      instructions: rung.instructions.map(({ id, kind, tag, preset, compareA, compareB, doneTag, resetTag }) =>
-        ({ id, kind, tag, preset, compareA, compareB, doneTag, resetTag })),
+      instructions: rung.instructions.map(({ id, kind, tag, preset, compareA, compareB, doneTag, resetTag, loadTag }) =>
+        ({ id, kind, tag, preset, compareA, compareB, doneTag, resetTag, loadTag })),
       emptyOutputBranches: rung.emptyOutputBranches ?? [],
       branches: (rung.parallelBranches ?? []).map(({ id, anchorId, endId, instructions }) => ({
-        id, anchorId, endId, instructions: instructions.map(({ id: instructionId, kind, tag, preset, compareA, compareB, doneTag, resetTag }) =>
-          ({ id: instructionId, kind, tag, preset, compareA, compareB, doneTag, resetTag })),
+        id, anchorId, endId, instructions: instructions.map(({ id: instructionId, kind, tag, preset, compareA, compareB, doneTag, resetTag, loadTag }) =>
+          ({ id: instructionId, kind, tag, preset, compareA, compareB, doneTag, resetTag, loadTag })),
       })),
     })),
   });
@@ -175,6 +175,11 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
       outputs.set("ST_Cycle_Rly",uses);
       return;
     }
+    if(instruction.loadTag &&
+      (instruction.kind!=="CTD"||tags.get(instruction.loadTag)?.type!=="BOOL"))
+      push("error","INVALID_CTD_LOAD",at+
+        ": LOAD del CTD requiere tag BOOL existente.",
+        rung.id,rungIndex,id,branchId);
     if(instruction.doneTag||instruction.resetTag){
       if(!["TON","TOF","RTO","CTU","CTD"].includes(instruction.kind))
         push("error","INVALID_BLOCK_PINS",at+
