@@ -332,7 +332,9 @@ export function BatchMixerScene({project,mode,state,selectedExercise,setupError,
               <span className="text-[10px] text-slate-300">DISPLAY</span>
               <span className="font-mono text-2xl font-bold tracking-[.2em] text-amber-300"
                 aria-label="INT_DisplayValue">
-                {String(batchInt(project,"INT_DisplayValue")).padStart(4,"0")}
+                {String(selectedExercise===5
+                  ? batchCounter(project,"CNT_Lotes")
+                  : batchInt(project,"INT_DisplayValue")).padStart(4,"0")}
               </span>
             </div>
             <div className="mt-2 text-[10px] text-slate-400">
