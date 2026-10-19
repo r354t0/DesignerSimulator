@@ -102,6 +102,8 @@ export interface PracticeInstruction {
   doneTag?: string;
   /** CTU reset terminal: BOOL input sampled in the SAME rung. */
   resetTag?: string;
+  /** CTD LOAD terminal: reload PRE when a BOOL tag is TRUE (source CCW semantics). */
+  loadTag?: string;
 }
 export const MAX_TIMER_PRESET = 2147483647;
 export function isValidTimerPreset(value: number): boolean {
