@@ -99,8 +99,8 @@ export function BatchMixerSceneInfoDialog({open,project,selectedExercise,onClose
             Modo A: un lote y nueva orden START después de vaciar. La relación
             se aplica al 100 % de capacidad: 1000 pulsos en total, 10 pulsos por cada 1 %.</p>}
           {exercise===5&&<p className="mt-2 text-[11px] text-slate-400">
-            Modo B: el contador CNT_Lotes se presenta en el display del SCADA
-            sin agregar una instrucción MOV a los 17 rungs de la solución.</p>}
+            Modo B: CNT_Lotes.ACC aparece en el indicador de lotes completados
+            del SCADA, sin agregar una instrucción MOV a los 17 rungs.</p>}
         </div>
       </section>
       <section aria-label="Solución Recomendada"
