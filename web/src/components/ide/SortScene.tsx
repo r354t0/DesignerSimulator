@@ -197,7 +197,7 @@ export function SortScene({
             <div className="space-y-3">
               <ScadaLedGroup kind="status">
                 <Pilot label="EN MARCHA" active={motor} color="green"/>
-                <Pilot label="DETENIDA" active={!motor} color="amber"/>
+                <Pilot label="IDLE" active={!motor} color="amber"/>
                 {resetAvailable && (
                   <>
                     <Pilot label="LOTE COMPLETO" active={lotComplete} color="amber"/>
