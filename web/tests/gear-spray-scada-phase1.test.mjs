@@ -141,7 +141,7 @@ test("App adds Gear Spray as independent programming scene and restores its scan
   const app=source("../src/App.tsx");
   assert.match(app,/type SimulationTab = [^;]*"gear"/);
   assert.match(app,/type ProgrammingScene = [^;]*"gear"/);
-  assert.match(app,/gear: initialPracticeScanState\(initialGearSprayProject\(\)\)/);
+  assert.match(app,/gear: initialPracticeScanState\(createGearCompleteProject\(\)\)/);
   assert.match(app,/<option value="gear">Gear Spray · Molino de bolas<\/option>/);
   assert.match(app,/<GearSprayScene project=\{practice\} mode=\{practiceMode\}/);
   assert.match(app,/prepareGearSprayTags\(state\.project\)/);
