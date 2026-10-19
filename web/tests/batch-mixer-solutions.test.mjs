@@ -59,12 +59,13 @@ test("five recommended solutions build independently and introduce only their ow
     assert.deepEqual(added.map(x=>x.name),batchSolutionTags(ex).map(x=>x.name));
     if(ex===1) assert.equal(p.rungs.length,6);
     else if(ex===2) assert.equal(p.rungs.length,12);
+    else if(ex===3) assert.equal(p.rungs.length,14);
     else assert.ok(p.rungs.length>=8);
     assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="CTU")));
-    if(ex===2) {
+    if(ex===2||ex===3) {
       assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="TON" && i.tag==="TMR_Mixing")));
       assert.equal(p.tags.find(t=>t.name==="TMR_Mixing").value.PRE,8000);
-    } else if(ex>2) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="RTO")));
+    } else if(ex>=4) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="RTO")));
     if(ex===2||ex===3) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="CTD")));
     if(ex>=4)assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="LES")));
     if(ex>=4){
@@ -72,7 +73,7 @@ test("five recommended solutions build independently and introduce only their ow
         i.tag==="ST_P1PulseTarget"&&i.compareB?.mode==="literal"&&i.compareB.value===10)));
       assert.equal(p.tags.find(t=>t.name==="ST_P1PulseTarget").type,"INT");
     }
-    if(ex>2) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="MOV")));
+    if(ex>=4) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="MOV")));
     const display=p.tags.find(t=>t.name==="INT_DisplayValue");
     assert.equal(display.type,"INT");
   }
@@ -232,23 +233,66 @@ test("lab 01 exercise 2: RTO mixes for eight seconds, CTD drains to zero",()=>{
   plc=press(plc,"PB_Start");
   assert.equal(output(plc,"DO_Pump1"),true);
 });
-test("lab 01 exercise 3: STOP freezes stage and RTO resumes; continuous auto cycles",()=>{
+test("Ejercicio 3: adds ONLY the two pictured RUN/IDLE rungs between E2 rungs 0 and 1",()=>{
+  const second=createBatchSolution(2);
+  const third=createBatchSolution(3);
+  assert.equal(second.rungs.length,12);
+  assert.equal(third.rungs.length,14);
+  const signature=rung=>({
+    instructions:rung.instructions.map(i=>[i.kind,i.tag,i.compareA,i.compareB]),
+    branches:(rung.parallelBranches??[]).map(branch=>
+      branch.instructions.map(i=>[i.kind,i.tag])),
+  });
+  assert.deepEqual(signature(third.rungs[0]),signature(second.rungs[0]));
+  for(let n=1;n<12;n++)
+    assert.deepEqual(signature(third.rungs[n+2]),signature(second.rungs[n]),
+      "exercise 3 rung "+(n+2)+" preserves exercise 2 rung "+n);
+  const idle=third.rungs[1];
+  assert.deepEqual(idle.instructions.map(i=>[i.kind,i.tag]),[
+    ["XIC","PB_Stop"],["XIO","PB_Start"],["OTE","DO_IdleLamp"],
+  ]);
+  assert.equal(idle.parallelBranches.length,1);
+  assert.equal(idle.parallelBranches[0].anchorId,idle.instructions[0].id);
+  assert.deepEqual(idle.parallelBranches[0].instructions.map(i=>[i.kind,i.tag]),
+    [["XIC","DO_IdleLamp"]]);
+  assert.deepEqual(third.rungs[2].instructions.map(i=>[i.kind,i.tag]),[
+    ["XIC","ST_RunEnable"],["OTE","DO_RunLamp"],
+  ]);
+  assert.deepEqual(batchSolutionTags(3).map(t=>t.name),
+    ["ST_RunEnable","ST_Filling","ST_Full","ST_Draining","CNT_Volume","TMR_Mixing"]);
+  assert.equal(third.tags.find(t=>t.name==="TMR_Mixing").value.PRE,8000);
+  assert.equal(buildPracticeProject(third).success,true);
+});
+test("Ejercicio 3: STOP seals IDLE, START clears IDLE and enables RUN",()=>{
+  let plc=startPracticeScans(setScanPeriod(
+    initialPracticeScanState(createBatchSolution(3)),500));
+  plc=press(plc,"PB_Stop");
+  assert.equal(output(plc,"DO_IdleLamp"),true);
+  assert.equal(output(plc,"DO_RunLamp"),false);
+  plc=tickPracticeScan(plc);
+  assert.equal(output(plc,"DO_IdleLamp"),true,"IDLE stays latched after STOP releases");
+  plc=press(plc,"PB_Start");
+  assert.equal(output(plc,"DO_IdleLamp"),false,"START unlatches IDLE");
+  assert.equal(output(plc,"DO_RunLamp"),true);
+  assert.equal(output(plc,"DO_Pump1"),true);
+  plc=press(plc,"PB_Stop");
+  assert.equal(output(plc,"DO_IdleLamp"),true);
+  assert.equal(output(plc,"DO_RunLamp"),false);
+  assert.equal(output(plc,"DO_Pump1"),false);
+});
+test("Ejercicio 3: existing E2 TON and CTD remain unchanged through the cycle",()=>{
   let plc=started(3);
   for(let i=0;i<900;i++)plc=pulse(plc,"DI_Flowmeter1");
-  for(let i=0;i<7;i++)plc=tickPracticeScan(plc);
-  const elapsed=plc.project.tags.find(t=>t.name==="TMR_Mix8s").value.ACC;
-  assert.ok(elapsed>0);
-  plc=press(plc,"PB_Stop");
-  assert.equal(output(plc,"DO_Mixer"),false);
-  for(let i=0;i<8;i++)plc=tickPracticeScan(plc);
-  assert.equal(plc.project.tags.find(t=>t.name==="TMR_Mix8s").value.ACC,elapsed);
-  plc=press(plc,"PB_Start");
+  assert.equal(count(plc,"CNT_Volume"),900);
   assert.equal(output(plc,"DO_Mixer"),true);
-  for(let i=0;i<9;i++)plc=tickPracticeScan(plc);
+  for(let i=0;i<16;i++)plc=tickPracticeScan(plc);
+  assert.equal(output(plc,"DO_Mixer"),false);
   assert.equal(output(plc,"DO_Pump3"),true);
   for(let i=0;i<900;i++)plc=pulse(plc,"DI_Flowmeter3");
-  assert.equal(output(plc,"DO_Pump1"),true);
-  assert.equal(output(plc,"DO_RunLamp"),true);
+  assert.equal(count(plc,"CNT_Volume"),0);
+  assert.equal(output(plc,"DO_Pump3"),false);
+  assert.equal(output(plc,"DO_RunLamp"),true,
+    "RUN pilot is tied to ST_RunEnable, as pictured");
 });
 test("advanced exercise 4: integer ratio controls P1/P2, DI thermostat triggers 4 seconds",()=>{
   let plc=started(4);
