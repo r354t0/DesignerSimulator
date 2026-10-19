@@ -100,8 +100,8 @@ const additional: Record<BatchExercise, readonly string[]> = {
   1: ["ST_RunEnable","ST_Filling","ST_Full","CNT_Volume"],
   2: ["ST_RunEnable","ST_Filling","ST_Full","ST_Draining",
       "CNT_Volume","TMR_Mixing"],
-  3: ["ST_RunEnable","ST_Filling","ST_Full","ST_Mixing","ST_Draining",
-      "ST_ToMix","ST_ToDrain","ST_ToDone","CNT_Volume","TMR_Mix8s"],
+  3: ["ST_RunEnable","ST_Filling","ST_Full","ST_Draining",
+      "CNT_Volume","TMR_Mixing"],
   4: ["ST_RunEnable","ST_Filling","ST_Full","ST_Mixing","ST_Draining",
       "ST_ToMix","ST_ToDrain","ST_ToDone","ST_BatchDone",
       "CNT_Product1","ST_P1PulseTarget","TMR_PostTemp4s"],
@@ -115,7 +115,7 @@ export function batchSolutionTags(exercise: BatchExercise): BatchTagSpec[] {
 /** The information table for Lab 01 mirrors the tags that actually occur
  * in the recommended rungs (including SCADA I/O and internal declarations).
  * Timer/counter member references are listed under their parent tag. */
-export function batchSolutionUsedTags(exercise: 1 | 2): BatchTagSpec[] {
+export function batchSolutionUsedTags(exercise: 1 | 2 | 3): BatchTagSpec[] {
   const solution=createBatchSolution(exercise);
   const used=new Set<string>();
   const include=(operand?:string)=>{
@@ -218,14 +218,25 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
       p=addParallelContact(p,id,id0,ins(choice),undefined,lane.id);
     }
   };
-  // LAB 01 · Exercises 1 and 2: same six-rung filling solution.
-  // Exercise 2 appends only the six additional rungs shown by the user.
-  // No extra RUN/IDLE/display outputs or hidden process states.
-  if (exercise===1 || exercise===2) {
+  // LAB 01 · Progressive reference solutions:
+  // E1 = 6 rungs; E2 = the same 6 + 6 (TON, mixer, drain);
+  // E3 = E2 with exactly two pilot rungs inserted after R0.
+  // No hidden process states or extra output/display rungs.
+  if (exercise===1 || exercise===2 || exercise===3) {
     // R0: (PB_Start OR ST_RunEnable) AND NOT PB_Stop -> ST_RunEnable.
     any("rung-1",[X("PB_Start"),X("ST_RunEnable")],
       [N("PB_Stop")],O("OTE","ST_RunEnable"));
-    // R1: START with run permission latches filling.
+    if(exercise===3){
+      // R1: (PB_Stop OR DO_IdleLamp) AND NOT PB_Start -> IDLE.
+      // The IDE output OTE seals in the idle pilot until START is pressed.
+      any("bm-idle-lamp",[X("PB_Stop"),X("DO_IdleLamp")],
+        [N("PB_Start")],O("OTE","DO_IdleLamp"));
+      // R2: ST_RunEnable energizes the RUN pilot.
+      rung("bm-run-lamp",[
+        X("ST_RunEnable"),O("OTE","DO_RunLamp"),
+      ]);
+    }
+    // E1/E2 R1; E3 R3: START with run permission latches filling.
     rung("bm-start-fill",[
       X("ST_RunEnable"),X("PB_Start"),O("OTL","ST_Filling"),
     ]);
@@ -250,8 +261,8 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
     rung("bm-full-lamp",[
       X("ST_RunEnable"),X("ST_Full"),O("OTE","DO_FullLamp"),
     ]);
-    if(exercise===2){
-      // R6: TON begins while the FULL latch and RUN are TRUE.
+    if(exercise===2 || exercise===3){
+      // E2 R6 / E3 R8: TON begins while FULL and RUN are TRUE.
       rung("bm-mixing-timer",[
         X("ST_RunEnable"),X("ST_Full"),O("TON","TMR_Mixing"),
       ]);
@@ -284,7 +295,7 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
   }
 
   const advanced=exercise>=4;
-  const continuous=exercise===3 || exercise===5;
+  const continuous=exercise===5;
   const endCondition=advanced?X("DI_HighLevel"):C("GEQ","CNT_Volume.ACC",900);
   const emptyCondition=advanced?N("DI_LowLevel"):C("LEQ","CNT_Volume.ACC",0);
 
@@ -358,8 +369,6 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
       rung("bm-batch-complete",[X("ST_ToDone"),
         C("GEQ","CNT_Lotes.ACC","INT_BatchTarget"),O("OTL","ST_BatchDone")]);
       rung("bm-clear-p1",[X("ST_ToDone"),O("RES","CNT_Product1")]);
-    }else if(exercise===3) {
-      rung("bm-next-fill",[X("ST_ToDone"),X("ST_RunEnable"),O("OTL","ST_Filling")]);
     }else{
       rung("bm-batch-complete",[X("ST_ToDone"),O("OTL","ST_BatchDone")]);
       if(advanced)rung("bm-clear-p1",[X("ST_ToDone"),O("RES","CNT_Product1")]);
