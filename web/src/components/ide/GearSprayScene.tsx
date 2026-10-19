@@ -214,13 +214,14 @@ function ProcessGraphic({project}: {project:PracticeProject}){
       fill="#334155" textAnchor="middle">BOMBA NEUMÁTICA</text>
 
     {/* Equipos montados sobre la tubería de grasa, sin juntas ficticias. */}
-    <rect x="510" y="428" width="49" height="34" rx="6"
+    {/* Filtro compacto para liberar espacio respecto al transmisor PI-2560. */}
+    <rect x="492" y="432" width="32" height="26" rx="4"
       fill="#fff" stroke="#64748b" strokeWidth="2.5"/>
-    <path d="M517 457 L552 433 M517 446 L536 433 M535 457 L552 445"
-      stroke="#94a3b8" strokeWidth="3"/>
-    <text x="535" y="417" fontSize="10.5" fontWeight="750" fill="#334155"
+    <path d="M497 454 L518 435 M497 443 L505 435 M510 454 L520 445"
+      stroke="#94a3b8" strokeWidth="2.4"/>
+    <text x="508" y="418" fontSize="10.5" fontWeight="750" fill="#334155"
       textAnchor="middle">FILTRO</text>
-    {solenoid(612,445,"SV-2561",grease,"lube")}
+    {solenoid(665,445,"SV-2561",grease,"lube")}
 
     {/* PI-2560: presión de lubricante en la toma entre el FILTRO y SV-2561.
         Derivación vertical conectada al mismo tramo continuo de grasa. */}
@@ -229,12 +230,12 @@ function ProcessGraphic({project}: {project:PracticeProject}){
     <circle cx="575" cy="402" r="14" fill="#ffedd5"
       stroke="#d97706" strokeWidth="3"/>
     <path d="M575 402 L583 396" stroke="#92400e" strokeWidth="2.5"/>
-    <text x="520" y="337" fontSize="11.5" fontWeight="750" fill="#334155">
+    <text x="575" y="337" textAnchor="middle" fontSize="11.5" fontWeight="750" fill="#334155">
       PI-2560 · GRASA
     </text>
-    <rect x="517" y="345" width="121" height="34" rx="5"
+    <rect x="518" y="345" width="114" height="34" rx="5"
       fill="#ffedd5" stroke="#d97706" strokeWidth="1.5"/>
-    <text x="577" y="367" textAnchor="middle" fontSize="17" fontWeight="750"
+    <text x="575" y="367" textAnchor="middle" fontSize="17" fontWeight="750"
       fill="#92400e">{gearNumber(project,"_310_PI_2560").toFixed(1)}</text>
 
     {/* Sensor de proximidad colocado encima del bloque. */}
