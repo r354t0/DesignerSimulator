@@ -474,7 +474,11 @@ export function stopAfterSeriesLogicEdit(
 ): PracticeProject {
   const outputs = new Set(
     [...previous.rungs, ...next.rungs].flatMap((rung) =>
-      rung.instructions.filter((item) => item.kind === "OTE").map((item) => item.tag)),
+      rung.instructions.flatMap((item) =>
+        item.kind==="OTE"||item.kind==="GEAR_SEQ"?
+          [item.tag]:
+          (item.kind==="TON"||item.kind==="TOF")&&item.doneTag?
+            [item.doneTag]:[])),
   );
   const stopped = resetNonretentiveTimers(next);
   if (!stopped.tags.some((tag) =>
@@ -490,7 +494,11 @@ export function stopAfterSeriesLogicEdit(
 /** Stop drives the simulated OTE-written outputs low, without touching inputs. */
 export function stopSeriesScan(project: PracticeProject): PracticeProject {
   const targets = new Set(project.rungs.flatMap((rung) =>
-    rung.instructions.filter((instruction) => instruction.kind === "OTE").map((item) => item.tag)));
+    rung.instructions.flatMap((item)=>
+      item.kind==="OTE"||item.kind==="GEAR_SEQ"?
+        [item.tag]:
+        (item.kind==="TON"||item.kind==="TOF")&&item.doneTag?
+          [item.doneTag]:[])));
   const stopped = resetNonretentiveTimers(project);
   if (!stopped.tags.some((tag) => targets.has(tag.name) && tag.value !== false)) return stopped;
   return { ...stopped, tags: stopped.tags.map((tag): PracticeTag =>
