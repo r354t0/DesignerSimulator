@@ -60,20 +60,23 @@ test("five recommended solutions build independently and introduce only their ow
     if(ex===1) assert.equal(p.rungs.length,6);
     else if(ex===2) assert.equal(p.rungs.length,12);
     else if(ex===3) assert.equal(p.rungs.length,14);
-    else assert.ok(p.rungs.length>=8);
+    else assert.equal(p.rungs.length,ex===4?16:17);
     assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="CTU")));
     if(ex===2||ex===3) {
       assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="TON" && i.tag==="TMR_Mixing")));
       assert.equal(p.tags.find(t=>t.name==="TMR_Mixing").value.PRE,8000);
-    } else if(ex>=4) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="RTO")));
+    } else if(ex>=4) {
+      assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="TON"&&i.tag==="TMR_Mixing")));
+      assert.equal(p.tags.find(t=>t.name==="TMR_Mixing").value.PRE,4000);
+    }
     if(ex===2||ex===3) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="CTD")));
-    if(ex>=4)assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="LES")));
+    if(ex>=4)assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="MUL")));
     if(ex>=4){
       assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="MUL"&&
-        i.tag==="ST_P1PulseTarget"&&i.compareB?.mode==="literal"&&i.compareB.value===10)));
-      assert.equal(p.tags.find(t=>t.name==="ST_P1PulseTarget").type,"INT");
+        i.tag==="INT_PresetP1"&&i.compareB?.mode==="literal"&&i.compareB.value===10)));
+      assert.equal(p.tags.find(t=>t.name==="INT_PresetP1").type,"INT");
     }
-    if(ex>=4) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="MOV")));
+    if(ex>=4) assert.equal(p.rungs.some(r=>r.instructions.some(i=>i.kind==="MOV")),false);
     const display=p.tags.find(t=>t.name==="INT_DisplayValue");
     assert.equal(display.type,"INT");
   }
@@ -294,10 +297,11 @@ test("Ejercicio 3: existing E2 TON and CTD remain unchanged through the cycle",(
   assert.equal(output(plc,"DO_RunLamp"),true,
     "RUN pilot is tied to ST_RunEnable, as pictured");
 });
-test("advanced exercise 4: integer ratio controls P1/P2, DI thermostat triggers 4 seconds",()=>{
+test("advanced E4: pumps, thermostat DI and the 4000ms TON follow screenshot",()=>{
   let plc=started(4);
+  assert.equal(output(plc,"DO_Pump1"),true);
   for(let i=0;i<400;i++)plc=pulse(plc,"DI_Flowmeter1");
-  assert.equal(count(plc,"CNT_Product1"),400);
+  assert.equal(count(plc,"CNT_Volume"),400);
   assert.equal(output(plc,"DO_Pump1"),false);
   assert.equal(output(plc,"DO_Pump2"),true);
   plc=setBOOL(plc,"DI_HighLevel",true);
@@ -307,18 +311,17 @@ test("advanced exercise 4: integer ratio controls P1/P2, DI thermostat triggers 
   plc=setBOOL(plc,"DI_Thermostat",true);
   assert.equal(output(plc,"DO_Heater"),false);
   for(let i=0;i<8;i++)plc=tickPracticeScan(plc);
-  assert.equal(output(plc,"DO_Pump3"),true);
   assert.equal(output(plc,"DO_Mixer"),false);
-  plc=setBOOL(plc,"DI_HighLevel",false);
+  assert.equal(output(plc,"DO_Pump3"),true);
   plc=setBOOL(plc,"DI_LowLevel",false);
   assert.equal(output(plc,"DO_Pump3"),false);
-  assert.equal(batchBool(plc.project,"ST_BatchDone"),true);
+  assert.equal(batchBool(plc.project,"ST_Draining"),false);
 });
-test("advanced exercise 5: mode B runs batches up to INT target and display increments",()=>{
+test("advanced E5: Mode B counts lots via ST_BatchComplete and CTU",()=>{
   let plc=started(5,p=>setTagValue(p,"INT_BatchTarget",2));
   assert.equal(batchBool(plc.project,"DI_ModeB"),true);
   for(let lot=1;lot<=2;lot++){
-    for(let i=0;i<400;i++)plc=pulse(plc,"DI_Flowmeter1");
+    if(lot===1)for(let i=0;i<400;i++)plc=pulse(plc,"DI_Flowmeter1");
     assert.equal(output(plc,"DO_Pump2"),true);
     plc=setBOOL(plc,"DI_HighLevel",true);
     plc=setBOOL(plc,"DI_Thermostat",true);
@@ -327,18 +330,14 @@ test("advanced exercise 5: mode B runs batches up to INT target and display incr
     plc=setBOOL(plc,"DI_HighLevel",false);
     plc=setBOOL(plc,"DI_LowLevel",false);
     assert.equal(count(plc,"CNT_Lotes"),lot);
-    assert.equal(batchInt(plc.project,"INT_DisplayValue"),lot);
     if(lot===1){
-      // The fill coil precedes the completed-lot transition; it turns on
-      // at the following PLC scan, as expected for a top-to-bottom Ladder.
       plc=tickPracticeScan(plc);
-      assert.equal(output(plc,"DO_Pump1"),true);
+      assert.equal(batchBool(plc.project,"ST_Filling"),true);
       plc=setBOOL(plc,"DI_LowLevel",true);
       plc=setBOOL(plc,"DI_Thermostat",false);
     }else{
-      assert.equal(output(plc,"DO_Pump1"),false);
-      assert.equal(output(plc,"DO_Pump2"),false);
       assert.equal(output(plc,"DO_Pump3"),false);
+      assert.equal(plc.project.tags.find(t=>t.name==="CNT_Lotes").value.DN,true);
     }
   }
 });
