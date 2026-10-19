@@ -103,10 +103,10 @@ test("P03 manual startup drives state 0 -> 10 -> 20 with a single executable FB 
   assert.equal(gearBool(p.project,"_310_SV_2560"),false);
 });
 
-test("P03 counter reaches preset using DI_PDB pulses and same-rung CTU RESET/Q",()=>{
+test("P03 counter counts DI_PDB, exposes CTN_Lubeflo.DN and resets via RES",()=>{
   let p=gotoManualCycle();
   assert.equal(gearNumber(p.project,"SM_Cycle_State"),20);
-  assert.equal(timer(p,"CTN_Lubeflo").ACC,false);
+  assert.equal(timer(p,"CTN_Lubeflo").ACC,0);
   p=digital(p,"_310_SQS_2561",true);
   assert.equal(timer(p,"CTN_Lubeflo").ACC,1);
   p=digital(p,"_310_SQS_2561",false);
@@ -134,7 +134,7 @@ test("P03 TOF purges 30 seconds and clears counter at end of purge",()=>{
   p=scan(p,3);
   assert.equal(timer(p,"TMR_Purge").DN,false);
   assert.equal(gearNumber(p.project,"SM_Cycle_State"),10);
-  assert.equal(timer(p,"CTN_Lubeflo").ACC,true);
+  assert.equal(timer(p,"CTN_Lubeflo").ACC,0);
   p=scan(p);
   assert.equal(timer(p,"CTN_Lubeflo").ACC,0);
 });
