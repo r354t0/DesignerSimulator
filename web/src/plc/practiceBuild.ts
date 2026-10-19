@@ -249,14 +249,14 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
           push("error", "UNKNOWN_TIMER_PRESET_TAG",
             at + ": no existe la variable PRE «" + source.tag + "».",
             rung.id, rungIndex, id, branchId);
-        } else if (reference.type !== "DINT") {
+        } else if (reference.type !== "DINT" && reference.type !== "INT") {
           push("error", "INCOMPATIBLE_TIMER_PRESET_TAG",
-            at + ": PRE debe referenciar un DINT, no " + reference.type + ".",
+            at + ": PRE debe referenciar un INT o DINT, no " + reference.type + ".",
             rung.id, rungIndex, id, branchId);
         } else if (typeof reference.value !== "number" ||
           !isValidTimerPreset(reference.value)) {
           push("error", "INVALID_TIMER_PRESET",
-            at + ": el DINT usado como PRE requiere un entero no negativo en ms.",
+            at + ": la variable INT/DINT usada como PRE requiere un entero no negativo en ms.",
             rung.id, rungIndex, id, branchId);
         }
       } else {
@@ -278,14 +278,14 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
           push("error", "UNKNOWN_COUNTER_PRESET_TAG",
             at + ": no existe la variable PRE «" + source.tag + "».",
             rung.id, rungIndex, id, branchId);
-        } else if (reference.type !== "DINT") {
+        } else if (reference.type !== "DINT" && reference.type !== "INT") {
           push("error", "INCOMPATIBLE_COUNTER_PRESET_TAG",
-            at + ": PRE del contador debe referenciar un DINT.",
+            at + ": PRE del contador debe referenciar un INT o DINT.",
             rung.id, rungIndex, id, branchId);
         } else if (typeof reference.value !== "number" ||
           !isValidCounterPreset(reference.value)) {
           push("error", "INVALID_COUNTER_PRESET",
-            at + ": PRE DINT del contador tiene valor inválido.",
+            at + ": PRE INT/DINT del contador tiene valor inválido.",
             rung.id, rungIndex, id, branchId);
         }
       } else {
