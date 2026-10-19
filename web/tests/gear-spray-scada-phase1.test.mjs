@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   GEAR_FIELD_INPUTS, GEAR_FIELD_OUTPUTS, GEAR_HMI_PUSHBUTTONS,
-  GEAR_HMI_SETPOINTS, GEAR_SCADA_TAGS,
+  GEAR_HMI_SETPOINTS, GEAR_SCADA_TAGS, GEAR_CYCLE_INPUTS,
   initialGearSprayProject, prepareGearSprayTags,
   gearBool, gearNumber, writeGearScadaInput,
 } from "../src/plc/gearSpraySceneModel.ts";
@@ -36,8 +36,10 @@ test("Gear Spray phase 1 registers exactly the P01 physical CCW I/O and HMI valu
     "TMR_Freq_SP","CNT_LubeFlo_SP","TMR_LubeFlo_SP",
     "Maint_Duration_Min",
   ]);
-  assert.equal(GEAR_SCADA_TAGS.length,21);
-  assert.equal(new Set(GEAR_SCADA_TAGS.map(t=>t.name)).size,21);
+  assert.equal(GEAR_SCADA_TAGS.length,22);
+  assert.equal(new Set(GEAR_SCADA_TAGS.map(t=>t.name)).size,22);
+  assert.deepEqual(GEAR_CYCLE_INPUTS.map(t=>t.name),["DI_PDB"]);
+  assert.ok(!GEAR_SCADA_TAGS.some(t=>t.name==="DI_PDB_2"));
   assert.ok(GEAR_HMI_SETPOINTS.every(t=>t.type==="DINT"));
   assert.ok(GEAR_FIELD_INPUTS.slice(0,2).every(t=>t.type==="REAL"));
   const p=initialGearSprayProject();
@@ -102,7 +104,7 @@ test("Gear Spray operator inputs use shared Ladder scan mechanics, not an indepe
   assert.equal(plc.mode,"stopped");
 });
 
-test("Scene 6 UI includes industrial process and all three LED categories",()=>{
+test("Scene 6 UI shows process and only nonredundant LED groups",()=>{
   const scene=source("../src/components/ide/GearSprayScene.tsx");
   const labels=[
     "TAMBOR","BOMBA NEUMÁTICA","FILTRO","BLOQUE DOSIFICADOR",
@@ -111,9 +113,14 @@ test("Scene 6 UI includes industrial process and all three LED categories",()=>{
   ];
   for(const label of labels) assert.ok(scene.includes(label),"missing "+label);
   const status=scene.indexOf('<ScadaLedGroup kind="status">');
-  const inputs=scene.indexOf('<ScadaLedGroup kind="inputs">');
   const outputs=scene.indexOf('<ScadaLedGroup kind="outputs">');
-  assert.ok(status>=0&&inputs>status&&outputs>inputs);
+  assert.ok(status>=0&&outputs>status);
+  assert.doesNotMatch(scene,/<ScadaLedGroup kind="inputs">/);
+  const led=scene.slice(scene.indexOf("Pilotos LED y equipos"),
+    scene.indexOf("Alarmas y diagnóstico"));
+  assert.doesNotMatch(led,/_310_SV_256[013]/);
+  assert.doesNotMatch(led,/_310_PLC104_YI_MillRun/);
+  assert.doesNotMatch(scene,/Programa y referencias/);
   assert.match(scene,/scada-scene-workspace/);
   assert.match(scene,/scada-process-panel/);
   assert.match(scene,/scada-scene-sidebar/);
@@ -139,18 +146,21 @@ test("App adds Gear Spray as independent programming scene and restores its scan
   assert.match(app,/<GearSprayScene project=\{practice\} mode=\{practiceMode\}/);
   assert.match(app,/prepareGearSprayTags\(state\.project\)/);
   assert.match(app,/changeScan\(state=>applyMomentaryBoolInput\(state,tag,value,true\)\)/);
-  assert.match(app,/changeScan\(state=>applySceneSensorBoolInput\(state,tag,value\)\)/);
+  assert.match(app,/const sampled=applySceneSensorBoolInput\(state,tag,value\)/);
+  assert.match(app,/applySceneSensorBoolInput\(sampled,"DI_PDB",value\)/);
   assert.match(app,/writeGearScadaInput\(state\.project,tag,value\)/);
   const tags=source("../src/components/ide/ControllerTags.tsx");
   assert.match(tags,/activeScene === "gear" \? "MainRoutine · Gear Spray"/);
 });
 
-test("Source distinctions from CCW have not been silently reconciled",()=>{
+test("DI_PDB reemplaza el alias temporal y conserva el vínculo con el sensor físico",()=>{
   const model=source("../src/plc/gearSpraySceneModel.ts");
   const scene=source("../src/components/ide/GearSprayScene.tsx");
+  assert.match(model,/GEAR_DOSER_PULSE_TAG="DI_PDB"/);
   assert.match(model,/_310_SQS_2561/);
-  assert.match(scene,/P01 copia _310_SQS_2561/);
-  assert.match(scene,/a DI_PDB_2, pero P03 cuenta DI_PDB/);
+  assert.doesNotMatch(model,/DI_PDB_2/);
+  assert.match(scene,/alimenta DI_PDB/);
+  assert.match(scene,/Pulso del dosificador \(DI_PDB\)/);
   assert.match(scene,/AFI para la alarma de alta presión/);
   assert.match(scene,/Referencia original: 0–1480/);
   assert.match(scene,/max=\{isAir\?148:1480\}/);
