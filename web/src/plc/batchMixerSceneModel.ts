@@ -38,7 +38,6 @@ export const BATCH_IO_TAGS: readonly BatchTagSpec[] = [
   { name: "DO_RunLamp", type: "BOOL", direction: "Salida", description: "Piloto RUN" },
   { name: "DO_IdleLamp", type: "BOOL", direction: "Salida", description: "Piloto IDLE" },
   { name: "DO_FullLamp", type: "BOOL", direction: "Salida", description: "Piloto FULL" },
-  { name: "INT_DisplayValue", type: "INT", direction: "Salida", description: "Indicador decimal nativo del HMI" },
 ];
 export const BATCH_INTERNAL_TAGS: readonly BatchTagSpec[] = [
   ...["ST_RunEnable","ST_Filling","ST_Full","ST_Mixing","ST_Draining",
@@ -418,7 +417,6 @@ export function resetBatchProgramState(project:PracticeProject):PracticeProject 
       return {...tag,value:{...tag.value,ACC:0,EN:false,TT:false,DN:false}};
     if(tag.type==="COUNTER"&&typeof tag.value==="object")
       return {...tag,value:{...tag.value,ACC:0,CU:false,CD:false,DN:false,OV:false,UN:false}};
-    if(tag.name==="INT_DisplayValue")return {...tag,value:0};
     return tag;
   })};
 }
