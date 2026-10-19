@@ -14,7 +14,7 @@ Mantener **separación estricta** entre:
 - **Vista de proceso** (izquierda, hasta 50 % del ancho al maximizar): dibujo SVG vectorial sobre fondo blanco, basado en “Esquema del proceso” de la capacitación. Dos circuitos diferenciados, **aire comprimido** y **lubricante**, además de señales eléctricas.
 - Equipos: tambor, bomba neumática, filtro/aislamiento de aire, válvula de aire de bomba, regulador y manómetros, filtro de grasa, transmisor de presión, válvula de grasa, bloque dosificador, detector/proximidad, válvula de aire de atomización, colector, boquillas sobre corona/piñón del molino.
 - **Tablero de mando** (derecha): modos AUTO/MANUAL/MANT, impulso extra, RESET/acuse, liberación de presión; simulación de señal de marcha del molino; campos de configuración únicamente para setpoints permitidos por el programa.
-- **Pilotos LED**: agrupar **Estado del sistema**, **Entradas** y **Salidas**, conforme a las escenas 1–5.
+- **Pilotos LED**: mostrar únicamente el estado del sistema y la salida de alarma audible, con descripción y tag en renglones separados. Las entradas digitales se accionan en Instrumentación y las tres electroválvulas se observan en el diagrama del proceso. Se retiró el panel «Programa y referencias».
 - **Diagnóstico**: presión de aire y lubricante, pulsos de medición, cuenta/temporizadores, estado 0/10/20/30/90, alarmas y código de falla. Incluir controles de fallas simuladas (aire insuficiente, filtro o dosificador bloqueado, nivel bajo, fallos de presión) claramente etiquetados como **simulación**.
 - El SCADA responde a mosaicos y conserva las reglas Maximize tabset.
 
@@ -24,7 +24,7 @@ Mantener **separación estricta** entre:
 | AI simulada | `_310_PI_2561` | `AI_AirPressure_Scaled`: presión de aire |
 | AI simulada | `_310_PI_2560` | `AI_LubePressure_Scaled`: presión de lubricante |
 | DI física | `_310_PLC104_YI_MillRun` | `DI_Mill_Run`: molino en marcha |
-| DI física | `_310_SQS_2561` | `DI_PDB_2`: sensor de dosificación / proximidad |
+| DI física | `_310_SQS_2561` | `DI_PDB`: pulso de dosificador físico hacia el conteo del ciclo |
 | DI física | `_310_LSL` | `DI_Low_Level`: bajo nivel (verificar polaridad) |
 | DO física | `_310_SV_2560` | `DO_Pump_Sol`: bomba neumática |
 | DO física | `_310_SV_2563` | `DO_Air_Sol`: aire de atomización |
@@ -33,7 +33,7 @@ Mantener **separación estricta** entre:
 | DO física | `_310_YI_SystemHealthy` | `DO_LS_Healthy`: healthy |
 | DO física | `_310_YI_LubricationSystemRunning` | `DO_LS_Running_Output`: running |
 
-**Pendiente de correspondencia:** P03 cuenta `DI_PDB`, pero P01 mapea la entrada física a `DI_PDB_2`. El programa original incluye **ambos** tags. No renombrarlos ni asumir equivalencia: exponer su estado y hacer que el usuario/una configuración confirmada defina la conexión. En el primer prototipo se puede ofrecer un puente **opcional y explícito** para ensayos.
+**Aclaración del autor del programa:** `DI_PDB` es la señal operativa del contador del dosificador y `_310_SQS_2561` es su entrada física. La segunda variable creada únicamente para ensayos no debe utilizarse. El simulador mantiene una copia síncrona de SQS a `DI_PDB` durante la Fase 2; el portado posterior de P01 debe respetar esta asignación.
 
 ## Operación HMI y setpoints
 - Pulsadores existentes del proyecto: `PB_Auto`, `PB_Manual`, `PB_Maint`, `PB_Extra`, `PB_Reset`, `PB_Lubpress_Release`. Otros tags HMI del proyecto: `PB_Set`, `PB_View`, `PB_CloseMenu`: no descartarlos en la lista de tags; incorporar si se simulan las funciones de menú.
@@ -43,7 +43,7 @@ Mantener **separación estricta** entre:
 ## Estructura interna y diagnósticos
 **Modos y marcha:** `ST_Auto_Mode`, `ST_Man_Mode`, `ST_Maint_Mode`, `ST_Run_Rly`, `ST_Auto_Selected`.  
 **Ciclo:** `ST_Cycle_Rly`, `ST_Pump_Rly`, `ST_Airsol_Rly`, `ST_Pump_Sol_Rly`, `SM_Cycle_State`, `SM_Cycle_Blocked`, `SM_Cycle_RearmHold`.  
-**Flujo:** `DI_PDB`, `DI_PDB_2`, `CNT_Lubeflo_Dn`, `CNT_Lubeflo_Rst`, `CNT_LubeFlo_SP`.  
+**Flujo:** `DI_PDB`, `CNT_Lubeflo_Dn`, `CNT_Lubeflo_Rst`, `CNT_LubeFlo_SP`.  
 **Presiones:** `AI_AirPressure_Scaled`, `AI_LubePressure_Scaled`, `ST_AirPress_In`, `ST_LubePress_800`, `ST_LubePress_1000`, `ST_LubePress_Lo`, `ST_LubePress_Hi`.  
 **Alarmas:** `ALM_AirFail_Rly`, `ALM_LoFlo_Rly`, `ALM_LoPress_Rly`, `ALM_HiPress_Rly`, `ALM_LoLevel_Rly`, `WARN_PreShutdown`, `Fault_Code`.  
 **Salidas:** todas las `DO_` mapeadas, con sus señales físicas `_310_`.
@@ -75,7 +75,7 @@ Mantener **separación estricta** entre:
 6. Conectar 100% de los estados mostrados por SCADA a los tags del controlador o a variables físicas claramente diferenciadas.
 
 ## Pruebas FAT antes de declarar equivalencia
-- IO: tags `_310_` → aliases → salidas; verificar polaridad y `DI_PDB` vs `DI_PDB_2`.
+- IO: tags `_310_` → señales de ciclo → salidas; verificar que `_310_SQS_2561` se copie a `DI_PDB` y comprobar la polaridad de LSL.
 - Modo AUTO con molino ON; MANUAL con molino OFF; mantenimiento con molino ON; cambio de modo incompatible.
 - Secuencia: 0 → 10 → 20 → 30 → 10, con pulsos medidos, tiempo de purga y ciclo extra.
 - P04: hysteresis 800/1000 con respuesta del solenoide de bomba y presión virtual.
@@ -97,9 +97,9 @@ Mantener **separación estricta** entre:
 
 ## Fase 2 — simulación física determinista (implementada)
 - Módulo `web/src/plc/gearSprayPhysics.ts`: modelo de **planta**, no lógica PLC. Recibe exclusivamente las salidas reales `_310_SV_2560` (bomba), `_310_SV_2561` (lubricante) y `_310_SV_2563` (aire atomizador). El estado es independiente del programa y de otras escenas.
-- `App.tsx` integra un paso físico fijo de 50 ms **solo en RUN** con la escena 06 activa; STOP/PAUSE y el cambio de escena congelan el proceso. Inyecta las señales de presión `_310_PI_2561` y `_310_PI_2560` y las digitales `_310_SQS_2561` y `_310_LSL` al motor Ladder, con bordes de sensor evaluados sin avanzar temporizadores.
+- `App.tsx` integra un paso físico fijo de 50 ms **solo en RUN** con la escena 06 activa; STOP/PAUSE y el cambio de escena congelan el proceso. Inyecta las presiones `_310_PI_2561`, `_310_PI_2560` y las señales digitales `_310_SQS_2561`, `DI_PDB` y `_310_LSL` al motor Ladder, con bordes de sensor evaluados sin avanzar temporizadores.
 - Modelo intencionalmente **didáctico**, no calibrado: suministro de aire ajustable, presión de lubricante con llenado/descarga por bomba, descenso del nivel de tambor, pulsos a intervalos de 500 ms cuando la válvula de lubricante está abierta y existe presión suficiente, y fallas de pérdida de aire, filtro obstruido o dosificador atascado.
-- El sensor `_310_LSL` se asume **TRUE para nivel bajo** al 10 % o menos; su polaridad debe corroborarse. El contador de pulsos del modelo no crea el alias `DI_PDB`: se conserva la diferencia `_310_SQS_2561 → DI_PDB_2` frente a lo que cuenta P03.
+- El sensor `_310_LSL` se asume **TRUE para nivel bajo** al 10 % o menos; su polaridad debe corroborarse. El alias operativo `DI_PDB` está registrado y recibe los mismos pulsos que `_310_SQS_2561`, tanto manualmente como con el modelo físico activo.
 - **Compatibilidad con fase 1**: modelo físico desactivado inicialmente; el operador conserva las entradas manuales numéricas/slider y las casillas. Al activar la física, las entradas de presión, SQS y LSL se vuelven de solo lectura y la configuración del ambiente/fallas se realiza en el panel bajo la vista de proceso. `_310_PLC104_YI_MillRun` continúa siendo una entrada externa operable.
 - Las salidas **nunca** se generan mediante simulación: requieren una MainRoutine válida que las active. Sin P01–P07 portadas, la fase 2 permite FAT de la planta frente a programas Ladder desarrollados en DesignerSimulator, pero **no** declara equivalencia con CCW.
 - Las pruebas de `web/tests/gear-spray-phase2-physics.test.mjs` cubren determinismo, presión, pulsos, nivel y fallas.
@@ -113,9 +113,9 @@ Mantener **separación estricta** entre:
 > Criterio de aceptación: **la lógica, no el SVG, controla las salidas**; los sensores responden a la física simulada; las discrepancias se reportan antes de proclamar equivalencia con CCW.
 
 ## Registro de implementación — Fase 1
-- `web/src/plc/gearSpraySceneModel.ts`: 21 tags iniciales, exactamente 5 entradas físicas P01, 6 salidas, 6 PB y 4 consignas HMI. El proyecto comienza con MainRoutine vacío; no hereda tags del demo.
+- `web/src/plc/gearSpraySceneModel.ts`: 22 tags iniciales: 5 entradas físicas, 6 salidas, 6 PB, 4 consignas HMI y el alias de conteo `DI_PDB`. El proyecto comienza con MainRoutine vacío; no hereda tags del demo.
 - `web/src/components/ide/GearSprayScene.tsx`: esquema SVG industrial, tarjetas de instrumentación y control de entradas manuales; grupos LED Estado / Entradas / Salidas; diálogo de información.
 - `web/src/App.tsx`: nueva opción `gear`, sesión Ladder independiente, lectura/escritura a través del motor compartido, manteniendo las salidas de campo exclusivamente bajo el control de la lógica programada.
 - `web/src/components/ide/ControllerTags.tsx`: alcance independiente de Gear Spray.
 - `web/tests/gear-spray-scada-phase1.test.mjs`: FAT de inventario, comandos, bloqueo de escritura de salidas, independencia de sesión, referencias originales y aviso explícito de limitaciones.
-- **Limitaciones intencionales:** no se ejecutan aún P01–P07 ni la UDFB; la presión y DI se ingresan manualmente (sin modelo físico); la salida de programa por defecto es FALSE porque MainRoutine aún está vacío. No anunciar pruebas de secuencia, presión, flujo ni alarmas como aprobadas hasta fases siguientes.
+- **Limitaciones intencionales:** no se ejecutan aún P01–P07 ni la UDFB. Las presiones y entradas pueden ingresarse manualmente o mediante el modelo físico opcional. La salida de programa por defecto es FALSE porque MainRoutine aún está vacío. No declarar equivalencia con CCW antes de portar su lógica y realizar FAT.
