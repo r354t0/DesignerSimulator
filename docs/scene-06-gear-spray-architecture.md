@@ -84,6 +84,15 @@ Mantener **separación estricta** entre:
 - Rendimiento: distintas frecuencias de scan, PAUSE/STOP, reset, persistencia por escena, modo Maximize tabset con proceso al 50% y grupos LED.
 - Conservar capturas de resultados y registrar diferencias entre emulación y proyecto CCW.
 
+## Escalamiento de entradas — referencia original
+- El documento original `Gear Spary Bolas.pdf` (Cscape, rungs 99–100) muestra:
+  - Presión de aire: señal de entrada **6400–32000** escalada a **0–148**.
+  - Presión de lubricante: señal de entrada **6900–32000** escalada a **0–1480**.
+- El PDF CCW `P01_Mapping.pdf` solo copia `_310_PI_2561` a `AI_AirPressure_Scaled` y `_310_PI_2560` a `AI_LubePressure_Scaled`, sin mostrar los parámetros del escalamiento previo. Los deslizadores de escena 06 usan **rangos del Cscape original como referencia**, pendientes de validar en el proyecto CCW. No se presume una unidad física confirmada.
+- La lógica CCW evalúa presión alta de lubricante en `>1500`, fuera de la referencia de 1480: **discrepancia que requiere validación**. Por eso el campo numérico permite valores fuera del rango del deslizador para inyección de fallas en pruebas FAT, con aviso visual.
+- Los cuatro setpoints son `DINT` sin máximos operativos verificados. Sus deslizadores utilizan una ventana de navegación local ampliable; el campo numérico conserva validación `0..2147483647`. No representar esa ventana como escalamiento del programa.
+- Etiquetas en pantalla: nombre descriptivo arriba y tag real abajo; las DI mantienen checkbox y agregan descripción seguida del tag entre paréntesis.
+
 ## Implementación por entregables
 - **Fase 1:** SCADA industrial SVG y tags físicos/setpoints; animación física desacoplada, estructura de escena e información.
 - **Fase 2:** física determinista (presión de aire/lubricante, dosificador, depósito, molino, inyección de fallas) conectada a E/S.
