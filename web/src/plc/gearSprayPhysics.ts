@@ -6,6 +6,9 @@
 export const GEAR_AIR_MAX=148;
 export const GEAR_LUBE_MAX=1480;
 export const GEAR_LOW_DRUM_PERCENT=10;
+/** Multiplier applied only to declining pressure, not to pressure buildup. */
+export const GEAR_PRESSURE_DECAY_MIN=0.25;
+export const GEAR_PRESSURE_DECAY_MAX=4;
 export const GEAR_PULSE_PERIOD_MS=500;
 export const GEAR_PULSE_HIGH_MS=100;
 
@@ -13,6 +16,7 @@ export interface GearPhysicalState {
   enabled:boolean;
   airSupply:number;
   drumPercent:number;
+  pressureDecayFactor:number;
   airPressure:number;
   lubePressure:number;
   doserPhaseMs:number;
@@ -31,7 +35,7 @@ export interface GearPhysicalOutputs {
 
 export function initialGearPhysicalState():GearPhysicalState {
   return {
-    enabled:false, airSupply:100, drumPercent:100,
+    enabled:false, airSupply:100, drumPercent:100,pressureDecayFactor:1,
     airPressure:0, lubePressure:0, doserPhaseMs:0, pulseHigh:false,
     totalPulses:0, airLoss:false, filterBlocked:false, doserBlocked:false,
   };
@@ -43,12 +47,15 @@ const approach=(v:number,target:number,limitDelta:number)=>
 
 export function configureGearPhysical(
   state:GearPhysicalState,config:Partial<Pick<GearPhysicalState,
-    "enabled"|"airSupply"|"drumPercent"|"airLoss"|"filterBlocked"|"doserBlocked">>,
+    "enabled"|"airSupply"|"drumPercent"|"pressureDecayFactor"|"airLoss"|"filterBlocked"|"doserBlocked">>,
 ):GearPhysicalState {
   return {...state,
     ...config,
     airSupply:round1(limit(config.airSupply??state.airSupply,0,GEAR_AIR_MAX)),
     drumPercent:round1(limit(config.drumPercent??state.drumPercent,0,100)),
+    pressureDecayFactor:Math.round(100*limit(
+      config.pressureDecayFactor??state.pressureDecayFactor,
+      GEAR_PRESSURE_DECAY_MIN,GEAR_PRESSURE_DECAY_MAX))/100,
   };
 }
 
@@ -59,15 +66,19 @@ export function stepGearPhysical(
   const ms=Math.min(200,elapsedMs);
   const dt=ms/1000;
   const airTarget=state.airLoss?0:state.airSupply;
+  const airDelta=(airTarget<state.airPressure?
+    80*state.pressureDecayFactor:80)*dt;
   const airPressure=round1(limit(
-    approach(state.airPressure,airTarget,80*dt),0,GEAR_AIR_MAX));
+    approach(state.airPressure,airTarget,airDelta),0,GEAR_AIR_MAX));
   const canPump=outputs.pumpSolenoid && airPressure>40 &&
     state.drumPercent>0&&!state.filterBlocked;
   // Pump builds pressure downstream of the filter and the pressure tap is
   // upstream of SV-2561. Discharging through SV-2561 lowers equilibrium.
   const target=canPump?(outputs.lubricantSolenoid?820:1050):0;
+  const lubeDelta=(target<state.lubePressure?
+    190*state.pressureDecayFactor:canPump?300:190)*dt;
   const lubePressure=round1(limit(
-    approach(state.lubePressure,target,(canPump?300:190)*dt),0,GEAR_LUBE_MAX));
+    approach(state.lubePressure,target,lubeDelta),0,GEAR_LUBE_MAX));
   // Dosification is physical flow, not a software-controlled cycle.
   const canDose=outputs.lubricantSolenoid &&
     state.drumPercent>0 && lubePressure>=400 && !state.filterBlocked &&
