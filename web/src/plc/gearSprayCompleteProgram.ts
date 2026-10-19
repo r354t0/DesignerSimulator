@@ -264,6 +264,10 @@ export function createGearCompleteProject():PracticeProject {
   }
 
   // -------------------- P06: 12 source rungs --------------------------
+  // The original Maintance_Duration helper executes before the P06 timers.
+  add("p06",0,[math("MUL","Maint_Duration_Min",60000,
+    "Maint_Duration_ms")],
+    "P06 — duración mantenimiento: minutos a ms (programa auxiliar CCW)");
   logic("p06",1,[x("ST_Run_Rly"),n("TMR_OneMinCnt.DN")],
     ton("TMR_OneMinCnt",60000),
     "P06 — SHUTDOWN / MAINTENANCE | Inicio");
@@ -279,10 +283,6 @@ export function createGearCompleteProject():PracticeProject {
   ]}],res("CTN_MaintMode"));
   logic("p06",6,[x("ST_Run_Rly"),x("CTN_MaintMode.DN")],
     o("ST_Maint_Cnt_Trip"));
-  // Original Maintance_Duration program maps minutes -> milliseconds.
-  add("p06",0,[math("MUL","Maint_Duration_Min",60000,
-    "Maint_Duration_ms")],
-    "P06 — duración mantenimiento: minutos a ms (programa auxiliar CCW)");
   logic("p06",7,[x("DI_Mill_Run"),x("ST_Maint_Mode")],
     ton("TMR_Maint","Maint_Duration_ms"));
   logic("p06",8,[
