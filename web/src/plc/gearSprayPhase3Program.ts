@@ -95,6 +95,16 @@ export function createGearPhase3AProject():PracticeProject {
           p=addParallelContact(p,id,anchor,{id:nextId(),...spec},
             Number.MAX_SAFE_INTEGER,branch.id);
       }
+      // Each lane must rejoin AFTER the last upper-path contact.
+      // A new lane defaults to anchor-only and would otherwise create a
+      // different end index, breaking the rung in the runtime.
+      const tail=p.rungs.find(r=>r.id===id)!.parallelBranches!
+        .find(b=>b.anchorId===anchor)!.endId;
+      if(!tail)throw new Error("OR sin extremo superior: "+id);
+      p={...p,rungs:p.rungs.map(r=>r.id!==id?r:{
+        ...r,parallelBranches:r.parallelBranches?.map(b=>
+          b.anchorId===anchor?{...b,endId:tail}:b),
+      })};
     }
   }
 
