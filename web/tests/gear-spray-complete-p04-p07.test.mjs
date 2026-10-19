@@ -55,6 +55,25 @@ test("P01–P07 template builds with all original source sections and mappings",
   assert.equal(p.tags.find(t=>t.name==="Maint_Duration_ms")?.type,"DINT");
 });
 
+test("AUTO startup with healthy P06 and zero active alarms must never latch state 90",()=>{
+  let p=run();
+  assert.equal(gearBool(p.project,"ST_General_Trip_Rly"),false);
+  assert.equal(gearBool(p.project,"DO_LS_Healthy"),false,
+    "P06 output is cold until AUTO/MANT is selected");
+  p=field(p,"_310_PLC104_YI_MillRun",true);
+  p=btn(p,"PB_Auto");
+  p=tick(p,4);
+  assert.equal(gearBool(p.project,"ST_Auto_Mode"),true);
+  assert.equal(gearBool(p.project,"ST_Run_Rly"),true);
+  assert.equal(gearBool(p.project,"DO_LS_Healthy"),true);
+  assert.equal(gearBool(p.project,"ST_General_Trip_Rly"),false);
+  for(const name of ["TMR_AirFail","TMR_LoFlo","TMR_LubePress_Lo","TMR_LubePress_Hi"])
+    assert.equal(val(p,name).DN,false,name);
+  assert.equal(gearBool(p.project,"SM_Cycle_BlockLatched"),false,
+    "A stale DO_LS_Healthy must not latch BLOCK on the AUTO rising scan");
+  assert.notEqual(gearNumber(p.project,"SM_Cycle_State"),90);
+});
+
 test("P04 pump switches ON under 800 and OFF above 1000 with native hysteresis",()=>{
   let p=manual();
   p=field(p,"_310_PI_2560",500);p=tick(p,4);
