@@ -59,7 +59,7 @@ test("all batch solutions and resets agree that DI_LowLevel TRUE means wet",()=>
         "start when empty via XIO lower probe");
     }
     if(exercise>1){
-      const rearm=solution.rungs.find(r=>r.id==="bm-drained");
+      const rearm=solution.rungs.find(r=>r.id==="bm-stop-drain");
       if(exercise>=4){
         assert.ok(rearm.instructions.some(i=>i.kind==="XIO"&&i.tag==="DI_LowLevel"),
           "finish discharge when sensor becomes dry");
