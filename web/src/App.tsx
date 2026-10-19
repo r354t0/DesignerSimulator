@@ -109,6 +109,9 @@ function scanDemo(previous: DemoMachineState, elapsedMs: number): DemoMachineSta
 
 export default function App() {
   const [model] = useState(() => Model.fromJson(layoutConfig));
+  // FlexLayout may maximize any tabset. Apply the 50/50 SCADA split only
+  // while the simulation tabset itself is maximized, not MainRoutine.
+  const [simulationMaximized, setSimulationMaximized] = useState(false);
   const [organizerOpen, setOrganizerOpen] = useState(true);
   const [editorView, setEditorView] = useState<EditorView>("practice");
   const [instruction, setInstruction] = useState<Instruction>("XIC");
@@ -927,6 +930,8 @@ export default function App() {
   );
 
   const syncTabSelection = useCallback((updatedModel: Model) => {
+    const maximized = updatedModel.getMaximizedTabset();
+    setSimulationMaximized(maximized?.getSelectedNode()?.getId() === "simulation");
     const activeTabset = updatedModel.getNodeById("workspace-editor");
     if (!activeTabset || activeTabset.getType() !== "tabset") return;
     const selectedId = (activeTabset as TabSetNode).getSelectedNode()?.getId();
@@ -980,7 +985,9 @@ export default function App() {
             <ControllerOrganizer view={editorView} onSelectView={openEditorView} onHide={() => setOrganizerOpen(false)} />
           </aside>
         )}
-        <main className="relative min-w-0 flex-1" aria-label="Área de trabajo acoplable">
+        <main className={"relative min-w-0 flex-1" +
+          (simulationMaximized ? " scada-tabset-maximized" : "")}
+          aria-label="Área de trabajo acoplable">
           <Layout model={model} factory={factory} onModelChange={syncTabSelection} />
         </main>
       </div>
