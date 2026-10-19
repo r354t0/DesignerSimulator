@@ -26,7 +26,7 @@ import { TrafficScene } from "./components/ide/TrafficScene";
 import { BatchMixerScene } from "./components/ide/BatchMixerScene";
 import { GearSprayScene } from "./components/ide/GearSprayScene";
 import {
-  initialGearSprayProject, prepareGearSprayTags, writeGearScadaInput,
+  prepareGearSprayTags, writeGearScadaInput,
   type GearPushButton, type GearDigitalInput, type GearAnalogInput,
   type GearSetpoint,
 } from "./plc/gearSpraySceneModel";
@@ -34,10 +34,6 @@ import {
   initialGearPhysicalState, configureGearPhysical, stepGearPhysical,
   gearPhysicalSensors, type GearPhysicalState,
 } from "./plc/gearSprayPhysics";
-import {
-  createGearFatProject, GEAR_FAT_COMMANDS, clearGearFatCommands,
-  type GearFatCommand,
-} from "./plc/gearSprayFatProgram";
 import {createGearCompleteProject} from "./plc/gearSprayCompleteProgram";
 import {
   initialBatchProject, createBatchSolution, prepareBatchTags,
@@ -140,7 +136,7 @@ export default function App() {
     tank: initialPracticeScanState(initialTankProject()),
     traffic: initialPracticeScanState(initialTrafficProject()),
     batch: initialPracticeScanState(initialBatchProject()),
-    gear: initialPracticeScanState(initialGearSprayProject()),
+    gear: initialPracticeScanState(createGearCompleteProject()),
   });
   const activeControllerScene = useRef<ProgrammingScene>("conveyor");
   // Each scene keeps the learner's program immediately before inserting
@@ -211,12 +207,6 @@ export default function App() {
   }, []);
 
   const [gearSetupError, setGearSetupError] = useState<string | null>(null);
-  // FAT template is optional and reversible; snapshot is independent from
-  // the normal recommended-solution snapshots of other scenes.
-  const [gearFatLoaded,setGearFatLoaded]=useState(false);
-  const gearFatBackup=useRef<PracticeProject|null>(null);
-  const [gearPhase3Loaded,setGearPhase3Loaded]=useState(false);
-  const gearPhase3Backup=useRef<PracticeProject|null>(null);
   const [gearPhysical,setGearPhysical]=useState<GearPhysicalState>(initialGearPhysicalState);
   const gearPhysicalRef=useRef(gearPhysical);
   const changeGearPhysical=useCallback((operation:(state:GearPhysicalState)=>GearPhysicalState)=>{
@@ -238,31 +228,12 @@ export default function App() {
     }
   },[]);
 
-  const stopSceneController=useCallback((state:PracticeScanState,scene:ProgrammingScene)=>{
-    const stopped=stopPracticeScans(state);
-    if(scene!=="gear"||!gearFatLoaded)return stopped;
-    const project=clearGearFatCommands(stopped.project);
-    return project===stopped.project?stopped:{...stopped,project};
-  },[gearFatLoaded]);
-
-  // A structural edit can also take the controller to STOP without pressing
-  // the toolbar STOP button. Disarm any held FAT commands in that case too.
-  useEffect(()=>{
-    if(practiceMode!=="stopped"||activeControllerScene.current!=="gear"||
-      !gearFatLoaded)return;
-    changeScan(state=>{
-      if(state.mode!=="stopped")return state;
-      const project=clearGearFatCommands(state.project);
-      return project===state.project?state:{...state,project};
-    });
-  },[practiceMode,simulationTab,gearFatLoaded,changeScan]);
-
   const chooseSimulationTab = useCallback((next: SimulationTab) => {
     if (next === simulationTab) return;
     if (next === "motor") {
       // The standalone demo is not connected to MainRoutine. Pause this
       // programming scene safely so it cannot run unseen in the background.
-      changeScan(state=>stopSceneController(state,activeControllerScene.current));
+      changeScan(stopPracticeScans);
       setSimulationTab(next);
       return;
     }
@@ -271,13 +242,13 @@ export default function App() {
         const previous = activeControllerScene.current;
         // Switching stops the previous controller, but saves its Ladder,
         // counters, and customized tags for when the user returns.
-        sceneSessions.current[previous] = stopSceneController(current,previous);
+        sceneSessions.current[previous] = stopPracticeScans(current);
         activeControllerScene.current = next;
-        return stopSceneController(sceneSessions.current[next],next);
+        return stopPracticeScans(sceneSessions.current[next]);
       });
     }
     setSimulationTab(next);
-  }, [simulationTab, changeScan,stopSceneController]);
+  }, [simulationTab, changeScan]);
   const [conveyorTagSetupError, setConveyorTagSetupError] = useState<string | null>(null);
   const [conveyor, setConveyor] = useState<ConveyorState>(initialConveyorState);
   const conveyorRef = useRef(conveyor);
@@ -773,8 +744,7 @@ export default function App() {
   const startPractice = useCallback(() =>
     changeScan(startPracticeScans), [changeScan]);
   const stopPractice = useCallback(() =>
-    changeScan(state=>stopSceneController(state,activeControllerScene.current)),
-    [changeScan,stopSceneController]);
+    changeScan(stopPracticeScans),[changeScan]);
   const pausePractice = useCallback(() =>
     changeScan(pausePracticeScans), [changeScan]);
   const resumePractice = useCallback(() =>
@@ -815,87 +785,22 @@ export default function App() {
     openEditorView("practice");
   }, [openEditorView]);
 
-  const loadGearFat=useCallback(()=>{
-    if(activeControllerScene.current!=="gear"||gearFatLoaded||gearPhase3Loaded)return;
-    if(scanRef.current.mode!=="stopped"){
-      window.alert("Detén primero el PLC para cargar el Ladder temporal FAT.");
-      return;
-    }
-    if(!window.confirm("Cargar los tres rungs temporales del FAT Gear Spray? " +
-      "Se guardará una copia de tu programa actual para poder restaurarlo. " +
-      "La plantilla NO contiene la filosofía P01–P07."))return;
-    gearFatBackup.current=scanRef.current.project;
-    changeScan(state=>({
-      ...initialPracticeScanState(createGearFatProject()),
-      scanPeriodMs:state.scanPeriodMs,
-    }));
-    changeGearPhysical(state=>({...initialGearPhysicalState(),enabled:state.enabled}));
-    setGearFatLoaded(true);
-    openEditorView("practice");
-  },[gearFatLoaded,gearPhase3Loaded,changeScan,changeGearPhysical,openEditorView]);
-
-  const restoreGearFat=useCallback(()=>{
-    if(activeControllerScene.current!=="gear"||!gearFatLoaded)return;
-    if(scanRef.current.mode!=="stopped"){
-      window.alert("Detén primero el PLC para restaurar el programa anterior.");
-      return;
-    }
-    if(!window.confirm("Restaurar el programa previo al FAT? " +
-      "Los cambios hechos en la plantilla temporal serán descartados."))return;
-    const backup=gearFatBackup.current;
-    if(!backup)return;
-    changeScan(state=>({
-      ...initialPracticeScanState(backup),
-      scanPeriodMs:state.scanPeriodMs,
-    }));
-    changeGearPhysical(state=>({...initialGearPhysicalState(),enabled:state.enabled}));
-    gearFatBackup.current=null;
-    setGearFatLoaded(false);
-    openEditorView("practice");
-  },[gearFatLoaded,changeScan,changeGearPhysical,openEditorView]);
-
-  const setGearFatCommand=useCallback((tag:GearFatCommand,value:boolean)=>{
-    if(activeControllerScene.current!=="gear"||!gearFatLoaded)return;
-    if(!GEAR_FAT_COMMANDS.some(c=>c.name===tag))return;
-    changeScan(state=>state.mode==="running"
-      ?applySceneSensorBoolInput(state,tag,value):state);
-  },[gearFatLoaded,changeScan]);
-
-  const loadGearPhase3=useCallback(()=>{
-    if(activeControllerScene.current!=="gear"||gearPhase3Loaded||gearFatLoaded)return;
-    if(scanRef.current.mode!=="stopped"){
-      window.alert("Detén primero el PLC antes de cargar P01 y P02.");return;
-    }
-    if(!window.confirm("Cargar plantilla completa P01–P07 con el motor Ladder, " +
-      "incluidas bomba, alarmas, mantenimiento y HMI? " +
-      "Se conservará una copia temporal de tu programa actual. " +
-      "Se cargará un modelo de ensayo y se respaldará el proyecto anterior."))return;
-    gearPhase3Backup.current=scanRef.current.project;
+  // Dedicated program: reinitialize both the controller and its plant model.
+  const resetGearProgram=useCallback(()=>{
+    if(activeControllerScene.current!=="gear")return;
+    if(!window.confirm(
+      "¿Reiniciar Gear Spray al programa original P01–P07? "+
+      "Se detendrá el PLC y se perderán los cambios del Ladder, tags, "+
+      "alarmas, contadores y modelo físico de esta escena."
+    ))return;
     changeScan(state=>({
       ...initialPracticeScanState(createGearCompleteProject()),
       scanPeriodMs:state.scanPeriodMs,
     }));
-    setGearPhase3Loaded(true);
+    changeGearPhysical(()=>initialGearPhysicalState());
+    setGearSetupError(null);
     openEditorView("practice");
-  },[gearPhase3Loaded,gearFatLoaded,changeScan,openEditorView]);
-
-  const restoreGearPhase3=useCallback(()=>{
-    if(activeControllerScene.current!=="gear"||!gearPhase3Loaded)return;
-    if(scanRef.current.mode!=="stopped"){
-      window.alert("Detén el PLC antes de restaurar el programa anterior.");return;
-    }
-    if(!window.confirm("Restaurar el programa previo a la plantilla P01/P02? " +
-      "Los cambios realizados en esa plantilla serán descartados."))return;
-    const backup=gearPhase3Backup.current;
-    if(!backup)return;
-    changeScan(state=>({
-      ...initialPracticeScanState(backup),
-      scanPeriodMs:state.scanPeriodMs,
-    }));
-    gearPhase3Backup.current=null;
-    setGearPhase3Loaded(false);
-    openEditorView("practice");
-  },[gearPhase3Loaded,changeScan,openEditorView]);
+  },[changeScan,changeGearPhysical,openEditorView]);
 
   const loadBatchSolution=useCallback((exercise:BatchExercise)=>{
     if(activeControllerScene.current!=="batch")return;
@@ -990,7 +895,7 @@ export default function App() {
       : scene === "sorting" ? initialSortProject()
       : scene === "tank" ? initialTankProject()
       : scene === "traffic" ? initialTrafficProject()
-      : scene === "gear" ? initialGearSprayProject() : initialBatchProject();
+      : scene === "gear" ? createGearCompleteProject() : initialBatchProject();
     changeScan(state => ({
       ...initialPracticeScanState(saved ?? initial),
       scanPeriodMs: state.scanPeriodMs,
@@ -1128,13 +1033,7 @@ export default function App() {
                           onResetSolution={() => resetRecommendedSolution("batch")}/>
                     : simulationTab === "gear"
                       ? <GearSprayScene project={practice} mode={practiceMode}
-                          fatLoaded={gearFatLoaded}
-                          phase3Loaded={gearPhase3Loaded}
-                          onLoadPhase3={loadGearPhase3}
-                          onRestorePhase3={restoreGearPhase3}
-                          onLoadFat={loadGearFat}
-                          onRestoreFat={restoreGearFat}
-                          onFatCommand={setGearFatCommand}
+                          onResetProgram={resetGearProgram}
                           physics={gearPhysical}
                           onPhysicsChange={setGearPhysicalConfig}
                           onPhysicsReset={resetGearPhysical}
@@ -1167,9 +1066,8 @@ export default function App() {
       setTrafficInput, resetTraffic, prepareTraffic, trafficSetupError,
       loadTrafficExample, batchState, batchExercise, batchSetupError,
       setBatchInput, setBatchMode, setBatchIntegers, resetBatch, prepareBatch, loadBatchSolution,
-      gearSetupError, gearPhysical, gearFatLoaded, gearPhase3Loaded,
-      loadGearFat, restoreGearFat, loadGearPhase3, restoreGearPhase3,
-      setGearFatCommand, setGearPhysicalConfig, resetGearPhysical,
+      gearSetupError, gearPhysical, resetGearProgram,
+      setGearPhysicalConfig, resetGearPhysical,
       setGearPushButton, setGearDigitalInput, setGearNumber, prepareGear],
   );
 
