@@ -127,7 +127,7 @@ test("Scene 6 UI includes industrial process and all three LED categories",()=>{
   for(const name of physicalOutputTags)assert.ok(scene.includes(name),"output "+name+" not wired");
   assert.doesNotMatch(scene,/stepGearPhysics|runGearUdfb|GearSpraySimulationEngine/);
   assert.match(scene,/pendientes de portar/);
-  assert.match(scene,/sin física automática en fase 1/);
+  assert.match(scene,/Física opcional simplificada para FAT/);
 });
 
 test("App adds Gear Spray as independent programming scene and restores its scan state",()=>{
