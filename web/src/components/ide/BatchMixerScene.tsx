@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Beaker, CircleHelp, Gauge, Play, Square, RotateCcw, Thermometer } from "lucide-react";
+import { Beaker, CircleHelp, Gauge, Play, Square, RotateCcw, Thermometer, Activity, RadioTower, Cog } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
 import {
@@ -213,7 +213,7 @@ export function BatchMixerScene({project,mode,state,selectedExercise,setupError,
     tag.name===spec.name&&tag.type===spec.type));
   const source=selectedExercise?BATCH_EXERCISES.find(x=>x.id===selectedExercise):null;
   return <section aria-label="SCADA Batch Mixer"
-    className="sort-scada-shell scada-control-shell flex h-full min-h-0 flex-col overflow-y-auto text-slate-100">
+    className="sort-scada-shell batch-scada-shell scada-control-shell flex h-full min-h-0 flex-col overflow-y-auto text-slate-100">
     <div className="flex min-h-0 flex-1 flex-col gap-3 p-3">
       <header className="sort-panel flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[#344c5e] p-3">
         <div className="flex items-center gap-2">
@@ -244,15 +244,19 @@ export function BatchMixerScene({project,mode,state,selectedExercise,setupError,
           <div className="mt-3 grid grid-cols-2 gap-2 text-center text-xs sm:grid-cols-4">
             {[
               ["Nivel",state.level+" %"],["Temperatura",state.temperature.toFixed(1)+" °C"],
-              ["P1 / P2",state.totalPulses[0]+" / "+state.totalPulses[1]],
-              ["Descarga",String(state.totalPulses[2])],
+              ["P1 / P2",state.batchPulses[0]+" / "+state.batchPulses[1]],
+              ["Descarga",String(state.batchPulses[2])],
             ].map(([name,value])=><div key={name}
               className="rounded border border-[#344c5e] bg-[#0d1e2b] p-2">
               <div className="text-[10px] text-slate-400">{name}</div>
               <div className="mt-1 font-mono font-bold text-sky-200">{value}</div>
             </div>)}
           </div>
-          <p className="mt-2 text-[10px] text-slate-300">Caudalímetros FM1 / FM2 / FM3: 1 pulso = 0,1 % del tanque (1000 pulsos = 100 %).</p>
+          <p className="mt-2 text-[10px] text-slate-300">
+            Caudalímetros FM1 / FM2 / FM3: 1 pulso = 0,1 % del tanque
+            (1000 pulsos = 100 %). Los indicadores P1/P2 y Descarga
+            corresponden al lote actual, no al acumulado histórico.
+          </p>
         </section>
         <aside className="scada-scene-sidebar" aria-label="Controles e indicadores del SCADA">
           <div className="scada-dashboard-grid grid gap-3">
@@ -283,20 +287,48 @@ export function BatchMixerScene({project,mode,state,selectedExercise,setupError,
                 <RotateCcw size={13}/> Reiniciar proceso
               </button>
             </section>
-            <section className="sort-panel min-w-0 rounded-lg border border-[#344c5e] p-3">
-              <h3 className="mb-2 text-xs font-semibold">Pilotos LED y equipos</h3>
-              <div className="scada-pilot-grid grid grid-cols-2 gap-2">
-                <Indicator name="RUN" active={bool("DO_RunLamp")}/>
-                <Indicator name="IDLE" active={bool("DO_IdleLamp")} tone="amber"/>
-                <Indicator name="FULL" active={bool("DO_FullLamp")} tone="blue"/>
-                <Indicator name="PUMP 1" active={p1}/>
-                <Indicator name="PUMP 2" active={p2}/>
-                <Indicator name="PUMP 3" active={p3}/>
-                <Indicator name="MIXER" active={mix}/>
-                <Indicator name="HEATER" active={heat} tone="amber"/>
-                <Indicator name="HI-LEVEL" active={batchBool(project,"DI_HighLevel")} tone="amber"/>
-                <Indicator name="LO-LEVEL" active={batchBool(project,"DI_LowLevel")} tone="blue"/>
-                <Indicator name="THERMOSTAT" active={batchBool(project,"DI_Thermostat")}/>
+            <section className="sort-panel min-w-0 rounded-lg border border-[#344c5e] p-3"
+              aria-label="Pilotos LED y equipos">
+              <h3 className="mb-3 text-xs font-semibold">Pilotos LED y equipos</h3>
+              <div className="space-y-3">
+                <section aria-label="Estado del sistema" className="rounded-md border border-[#344c5e] bg-[#142637] p-2.5">
+                  <h4 className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-sky-200">
+                    <Activity size={14}/> Estado del sistema
+                  </h4>
+                  <div className="batch-led-group grid grid-cols-2 gap-2">
+                    <Indicator name="RUN" active={bool("DO_RunLamp")}/>
+                    <Indicator name="IDLE" active={bool("DO_IdleLamp")} tone="amber"/>
+                    <Indicator name="FULL" active={bool("DO_FullLamp")} tone="blue"/>
+                  </div>
+                </section>
+                <section aria-label="Entradas digitales" className="rounded-md border border-[#344c5e] bg-[#142637] p-2.5">
+                  <h4 className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-sky-200">
+                    <RadioTower size={14}/> Entradas digitales
+                  </h4>
+                  <div className="batch-led-group grid grid-cols-2 gap-2">
+                    <Indicator name="FM-1" active={batchBool(project,"DI_Flowmeter1")}/>
+                    <Indicator name="FM-2" active={batchBool(project,"DI_Flowmeter2")}/>
+                    <Indicator name="FM-3" active={batchBool(project,"DI_Flowmeter3")}/>
+                    <Indicator name="HI-LEVEL" active={batchBool(project,"DI_HighLevel")} tone="amber"/>
+                    <Indicator name="LO-LEVEL" active={batchBool(project,"DI_LowLevel")} tone="blue"/>
+                    <Indicator name="THERMOSTAT" active={batchBool(project,"DI_Thermostat")}/>
+                    <Indicator name="MODO A" active={batchBool(project,"DI_ModeA")} tone="blue"/>
+                    <Indicator name="MODO B" active={batchBool(project,"DI_ModeB")} tone="blue"/>
+                    <Indicator name="MODO C" active={batchBool(project,"DI_ModeC")} tone="blue"/>
+                  </div>
+                </section>
+                <section aria-label="Salidas digitales" className="rounded-md border border-[#344c5e] bg-[#142637] p-2.5">
+                  <h4 className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold text-sky-200">
+                    <Cog size={14}/> Salidas digitales
+                  </h4>
+                  <div className="batch-led-group grid grid-cols-2 gap-2">
+                    <Indicator name="PUMP 1" active={p1}/>
+                    <Indicator name="PUMP 2" active={p2}/>
+                    <Indicator name="PUMP 3" active={p3}/>
+                    <Indicator name="MIXER" active={mix}/>
+                    <Indicator name="HEATER" active={heat} tone="amber"/>
+                  </div>
+                </section>
               </div>
             </section>
           </div>
@@ -328,15 +360,6 @@ export function BatchMixerScene({project,mode,state,selectedExercise,setupError,
               ENTER · Aplicar valores INT
             </button>
             {error&&<p role="alert" className="mt-2 text-[11px] text-amber-300">{error}</p>}
-            <div className="mt-3 flex items-center justify-between rounded border border-[#3b5267] bg-[#081923] p-2">
-              <span className="text-[10px] text-slate-300">DISPLAY</span>
-              <span className="font-mono text-2xl font-bold tracking-[.2em] text-amber-300"
-                aria-label="INT_DisplayValue">
-                {String(selectedExercise===5
-                  ? batchCounter(project,"CNT_Lotes")
-                  : batchInt(project,"INT_DisplayValue")).padStart(4,"0")}
-              </span>
-            </div>
             <div className="mt-2 text-[10px] text-slate-400">
               Lotes completados: {batchCounter(project,"CNT_Lotes")}
               {" · "}Temperatura SP: {tempSP} °C
