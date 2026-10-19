@@ -16,7 +16,7 @@ export interface TimerPresetAnchor {
 
 /**
  * Studio-style PRE operand editor: clicking the PRE value reveals a nearby,
- * immediately editable field and the available DINT tags, without a modal.
+ * immediately editable field and the available INT/DINT tags, without a modal.
  */
 export function TimerPresetEditor({
   instruction, tags, anchor, onSave, onClose,
@@ -43,11 +43,11 @@ export function TimerPresetEditor({
   const dirtyRef = useRef(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const dintTags = useMemo(() => getAssignablePresetTags(tags, kind), [tags, kind]);
+  const presetTags = useMemo(() => getAssignablePresetTags(tags, kind), [tags, kind]);
   const shown = searching
-    ? dintTags.filter((tag) =>
+    ? presetTags.filter((tag) =>
       tag.name.toLowerCase().includes(draft.trim().toLowerCase()))
-    : dintTags;
+    : presetTags;
 
   const apply = (value: string) => {
     const result = parsePresetInput(value, tags, kind);
@@ -144,7 +144,7 @@ export function TimerPresetEditor({
         ref={inputRef}
         type="text"
         role="combobox"
-        aria-label={"Valor PRE en " + unit + " o variable DINT"}
+        aria-label={"Valor PRE en " + unit + " o variable INT/DINT"}
         aria-autocomplete="list"
         aria-expanded={true}
         autoComplete="off"
@@ -161,10 +161,10 @@ export function TimerPresetEditor({
         className="mt-2 w-full rounded border border-slate-300 px-2 py-1.5 font-mono text-sm outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-100"
       />
       <div className="mt-2 flex items-center justify-between text-[11px] text-slate-600">
-        <strong>Variables DINT disponibles</strong>
+        <strong>Variables INT y DINT disponibles</strong>
         <span>{shown.length}</span>
       </div>
-      <div role="listbox" aria-label="Variables DINT para PRE"
+      <div role="listbox" aria-label="Variables INT y DINT para PRE"
         className="mt-1 max-h-[160px] overflow-y-auto rounded border border-slate-200">
         {shown.length ? shown.map((tag, index) => (
           <button
@@ -187,7 +187,7 @@ export function TimerPresetEditor({
           </button>
         )) : (
           <p className="p-3 text-xs text-slate-500">
-            {dintTags.length ? "No hay DINT que coincidan." : "No hay DINT válidos. Puedes escribir un número."}
+            {presetTags.length ? "No hay INT/DINT que coincidan." : "No hay INT/DINT válidos. Puedes escribir un número."}
           </p>
         )}
       </div>
@@ -198,7 +198,7 @@ export function TimerPresetEditor({
       </button>
       {error && <p role="alert" className="mt-2 text-xs text-red-700">{error}</p>}
       <p className="mt-2 text-[11px] leading-4 text-slate-500">
-        Número o variable DINT · Enter o clic fuera: asignar · Esc: cancelar.
+        Número o variable INT/DINT · Enter o clic fuera: asignar · Esc: cancelar.
       </p>
     </div>, document.body,
   );
