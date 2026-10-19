@@ -6,6 +6,7 @@ import {
 import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
 import { MomentaryPushButton } from "./MomentaryPushButton";
+import { ScadaLedGroup } from "./ScadaLedGroup";
 import { SortProcessGraphic } from "./SortProcessGraphic";
 import { SortSceneInfoDialog } from "./SortSceneInfoDialog";
 import {
@@ -193,18 +194,31 @@ export function SortScene({
               </h3>
               <span className="font-mono text-[10px] text-slate-400">ESTADOS EN VIVO</span>
             </div>
-            <div className="scada-pilot-grid grid grid-cols-2 gap-2">
-              <Pilot label="MOTOR" active={motor} color="green"/>
-              <Pilot label="DESVIADOR B" active={divert} color="amber"/>
-              <Pilot label="TIPO B" active={detection} color="blue"/>
-              <Pilot label="SALIDA A" active={state.sensorExitA} color="green"/>
-              <Pilot label="SALIDA B" active={state.sensorExitB} color="amber"/>
-              {resetAvailable && (
-                <>
-                  <Pilot label="LOTE COMPLETO" active={lotComplete} color="amber"/>
-                  <Pilot label="LÍNEAS LIBRES" active={state.lineClear} color="green"/>
-                </>
-              )}
+            <div className="space-y-3">
+              <ScadaLedGroup kind="status">
+                <Pilot label="EN MARCHA" active={motor} color="green"/>
+                <Pilot label="DETENIDA" active={!motor} color="amber"/>
+                {resetAvailable && (
+                  <>
+                    <Pilot label="LOTE COMPLETO" active={lotComplete} color="amber"/>
+                    <Pilot label="LÍNEAS LIBRES" active={state.lineClear} color="green"/>
+                  </>
+                )}
+              </ScadaLedGroup>
+              <ScadaLedGroup kind="inputs">
+                <Pilot label="PB START" active={start} color="blue"/>
+                <Pilot label="PB STOP" active={stop} color="blue"/>
+                {resetAvailable && (
+                  <Pilot label="PB RESET" active={reset} color="blue"/>
+                )}
+                <Pilot label="TIPO B" active={detection} color="blue"/>
+                <Pilot label="SALIDA A" active={state.sensorExitA} color="green"/>
+                <Pilot label="SALIDA B" active={state.sensorExitB} color="amber"/>
+              </ScadaLedGroup>
+              <ScadaLedGroup kind="outputs">
+                <Pilot label="MOTOR" active={motor} color="green"/>
+                <Pilot label="DESVIADOR B" active={divert} color="amber"/>
+              </ScadaLedGroup>
             </div>
             {resetAvailable && (
               <div className="mt-3 border-t border-[#334a5e] pt-3">
