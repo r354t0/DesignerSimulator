@@ -1,5 +1,5 @@
 # Escena 06 — Gear Spray / Lubricación de molino de bolas
-**Estado:** Fase 1 implementada en la rama `feature/ide-workspace-v1`. SCADA y E/S conectadas al motor existente; física y lógica CCW todavía pendientes.  
+**Estado:** Fases 1 y 2 (modelo físico opcional) implementadas en la rama `feature/ide-workspace-v1`. SCADA y sensores físicos conectados al motor existente; lógica original P01–P07 y UDFB pendientes de portar.  
 **Origen:** `PLC_107_Molino_Bolas_SM.rar`; rutinas P01–P07, `FB_GearSpray_Sequence`, `Maintance_Duration` y capacitación Gear Spray Cerro Corona.
 
 ## Objetivo y alcance
@@ -94,6 +94,15 @@ Mantener **separación estricta** entre:
 - Etiquetas en pantalla: nombre descriptivo arriba y tag real abajo; las DI mantienen checkbox y agregan descripción seguida del tag entre paréntesis.
 
 - **Disposición de escena 06:** el panel completo «Instrumentación y setpoints» aparece bajo «Vista de proceso» y sus tarjetas de diagnóstico, en la columna izquierda. El panel derecho mantiene mandos, pilotos y alarmas.
+
+## Fase 2 — simulación física determinista (implementada)
+- Módulo `web/src/plc/gearSprayPhysics.ts`: modelo de **planta**, no lógica PLC. Recibe exclusivamente las salidas reales `_310_SV_2560` (bomba), `_310_SV_2561` (lubricante) y `_310_SV_2563` (aire atomizador). El estado es independiente del programa y de otras escenas.
+- `App.tsx` integra un paso físico fijo de 50 ms **solo en RUN** con la escena 06 activa; STOP/PAUSE y el cambio de escena congelan el proceso. Inyecta las señales de presión `_310_PI_2561` y `_310_PI_2560` y las digitales `_310_SQS_2561` y `_310_LSL` al motor Ladder, con bordes de sensor evaluados sin avanzar temporizadores.
+- Modelo intencionalmente **didáctico**, no calibrado: suministro de aire ajustable, presión de lubricante con llenado/descarga por bomba, descenso del nivel de tambor, pulsos a intervalos de 500 ms cuando la válvula de lubricante está abierta y existe presión suficiente, y fallas de pérdida de aire, filtro obstruido o dosificador atascado.
+- El sensor `_310_LSL` se asume **TRUE para nivel bajo** al 10 % o menos; su polaridad debe corroborarse. El contador de pulsos del modelo no crea el alias `DI_PDB`: se conserva la diferencia `_310_SQS_2561 → DI_PDB_2` frente a lo que cuenta P03.
+- **Compatibilidad con fase 1**: modelo físico desactivado inicialmente; el operador conserva las entradas manuales numéricas/slider y las casillas. Al activar la física, las entradas de presión, SQS y LSL se vuelven de solo lectura y la configuración del ambiente/fallas se realiza en el panel bajo la vista de proceso. `_310_PLC104_YI_MillRun` continúa siendo una entrada externa operable.
+- Las salidas **nunca** se generan mediante simulación: requieren una MainRoutine válida que las active. Sin P01–P07 portadas, la fase 2 permite FAT de la planta frente a programas Ladder desarrollados en DesignerSimulator, pero **no** declara equivalencia con CCW.
+- Las pruebas de `web/tests/gear-spray-phase2-physics.test.mjs` cubren determinismo, presión, pulsos, nivel y fallas.
 
 ## Implementación por entregables
 - **Fase 1:** SCADA industrial SVG y tags físicos/setpoints; animación física desacoplada, estructura de escena e información.
