@@ -12,7 +12,7 @@ export const isCompareKind = (kind: string): kind is CompareKind =>
   (COMPARE_KINDS as readonly string[]).includes(kind);
 /** Structural OR junction; neither an operand nor an actuator. */
 export const OR_JUNCTION_KIND = "OR_JUNCTION" as const;
-export type EditableKind = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" | "TON" | "TOF" | "RTO" | "CTU" | "CTD" | "RES" | CompareKind | MathKind | typeof OR_JUNCTION_KIND;
+export type EditableKind = "XIC" | "XIO" | "OTE" | "OTL" | "OTU" | "ONS" | "TON" | "TOF" | "RTO" | "CTU" | "CTD" | "RES" | "GEAR_SEQ" | CompareKind | MathKind | typeof OR_JUNCTION_KIND;
 export type TimerKind = "TON" | "TOF" | "RTO" | "RES";
 export const isTimerKind = (kind: EditableKind): kind is TimerKind =>
   (["TON", "TOF", "RTO", "RES"] as readonly string[]).includes(kind);
@@ -21,9 +21,9 @@ export const isCounterKind = (kind: EditableKind): kind is CounterKind =>
   kind === "CTU" || kind === "CTD";
 export const isTimerMemberOperand = (tag: string) =>
   /^[A-Za-z_][A-Za-z0-9_]*\.(EN|TT|DN)$/.test(tag);
-export type OutputKind = "OTE" | "OTL" | "OTU" | TimerKind | CounterKind | MathKind;
+export type OutputKind = "OTE" | "OTL" | "OTU" | "GEAR_SEQ" | TimerKind | CounterKind | MathKind;
 export type ContactKind = "XIC" | "XIO" | "ONS" | CompareKind | typeof OR_JUNCTION_KIND;
-export const OUTPUT_KINDS: readonly OutputKind[] = ["OTE", "OTL", "OTU", "TON", "TOF", "RTO", "CTU", "CTD", "RES", ...MATH_KINDS];
+export const OUTPUT_KINDS: readonly OutputKind[] = ["OTE", "OTL", "OTU", "TON", "TOF", "RTO", "CTU", "CTD", "RES", "GEAR_SEQ", ...MATH_KINDS];
 export const CONTACT_KINDS: readonly ContactKind[] = ["XIC", "XIO", "ONS", ...COMPARE_KINDS, OR_JUNCTION_KIND];
 export const isOutputKind = (kind: EditableKind): kind is OutputKind =>
   (OUTPUT_KINDS as readonly string[]).includes(kind);
@@ -98,6 +98,10 @@ export interface PracticeInstruction {
   preset?: TimerPresetSource;
   compareA?: ComparisonOperand;
   compareB?: ComparisonOperand;
+  /** Q of a timer/counter, wired within the SAME source rung. */
+  doneTag?: string;
+  /** CTU reset terminal: BOOL input sampled in the SAME rung. */
+  resetTag?: string;
 }
 export const MAX_TIMER_PRESET = 2147483647;
 export function isValidTimerPreset(value: number): boolean {
