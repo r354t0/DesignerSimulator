@@ -50,8 +50,14 @@ test("all batch solutions and resets agree that DI_LowLevel TRUE means wet",()=>
     assert.equal(built.success,true,
       "exercise "+exercise+" "+JSON.stringify(built.diagnostics));
     const start=solution.rungs.find(r=>r.id==="bm-start-fill");
-    assert.ok(start.instructions.some(i=>i.kind==="XIO"&&i.tag==="DI_LowLevel"),
-      "start when empty via XIO lower probe");
+    if(exercise===1){
+      assert.deepEqual(start.instructions.map(i=>[i.kind,i.tag]),[
+        ["XIC","ST_RunEnable"],["XIC","PB_Start"],["OTL","ST_Filling"],
+      ],"exercise 1 matches the screenshot without extra lower-level contact");
+    }else{
+      assert.ok(start.instructions.some(i=>i.kind==="XIO"&&i.tag==="DI_LowLevel"),
+        "start when empty via XIO lower probe");
+    }
     if(exercise>1){
       const rearm=solution.rungs.find(r=>r.id==="bm-drained");
       if(exercise>=4){
