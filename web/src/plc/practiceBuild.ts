@@ -34,12 +34,12 @@ export function getPracticeBuildSignature(project: PracticeProject): string {
     tags: project.tags.map(({ name, type, constant }) => ({ name, type, constant })),
     rungs: project.rungs.map((rung) => ({
       id: rung.id,
-      instructions: rung.instructions.map(({ id, kind, tag, preset, compareA, compareB }) =>
-        ({ id, kind, tag, preset, compareA, compareB })),
+      instructions: rung.instructions.map(({ id, kind, tag, preset, compareA, compareB, doneTag, resetTag }) =>
+        ({ id, kind, tag, preset, compareA, compareB, doneTag, resetTag })),
       emptyOutputBranches: rung.emptyOutputBranches ?? [],
       branches: (rung.parallelBranches ?? []).map(({ id, anchorId, endId, instructions }) => ({
-        id, anchorId, endId, instructions: instructions.map(({ id: instructionId, kind, tag, preset, compareA, compareB }) =>
-          ({ id: instructionId, kind, tag, preset, compareA, compareB })),
+        id, anchorId, endId, instructions: instructions.map(({ id: instructionId, kind, tag, preset, compareA, compareB, doneTag, resetTag }) =>
+          ({ id: instructionId, kind, tag, preset, compareA, compareB, doneTag, resetTag })),
       })),
     })),
   });
@@ -110,7 +110,7 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
     }
     seenInstructions.add(id);
 
-    if (!["XIC", "XIO", "OTE", "OTL", "OTU", "ONS", "TON", "TOF", "RTO", "CTU", "CTD", "RES", "EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ", "MOV", "ADD", "SUB", "MUL", "DIV", OR_JUNCTION_KIND].includes(instruction.kind as EditableKind)) {
+    if (!["XIC", "XIO", "OTE", "OTL", "OTU", "ONS", "TON", "TOF", "RTO", "CTU", "CTD", "RES", "EQU", "NEQ", "LES", "LEQ", "GRT", "GEQ", "MOV", "ADD", "SUB", "MUL", "DIV", "GEAR_SEQ", OR_JUNCTION_KIND].includes(instruction.kind as EditableKind)) {
       push("error", "UNSUPPORTED_INSTRUCTION",
         at + ": instrucción " + instruction.kind + " no admitida por el motor actual.",
         rung.id, rungIndex, id, branchId);
@@ -150,6 +150,44 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
           rung.id, rungIndex, id, branchId);
       }
       return;
+    }
+    if (instruction.kind==="GEAR_SEQ"){
+      if(instruction.tag!=="ST_Cycle_Rly"){
+        push("error","INVALID_GEAR_SEQUENCE",at+
+          ": GEAR_SEQ debe escribir ST_Cycle_Rly.",rung.id,rungIndex,id,branchId);
+      }
+      for(const [name,type] of [
+        ["ST_Cycle_Rly","BOOL"],["SM_Cycle_State","DINT"],
+        ["SM_Cycle_Blocked","BOOL"],["SM_Cycle_RearmHold","BOOL"],
+        ["SM_Cycle_BlockLatched","BOOL"],
+        ["ST_Run_Rly","BOOL"],["DO_LS_Healthy","BOOL"],
+        ["ST_Man_Mode","BOOL"],["TMR_Freq_Dn","BOOL"],
+        ["TMR_Startup_Cycle_Dn","BOOL"],["PB_Extra","BOOL"],
+        ["CNT_Lubeflo_Dn","BOOL"],["TMR_Purge_Dn","BOOL"],
+        ["PB_Reset","BOOL"],["ST_General_Trip_Rly","BOOL"],
+      ] as const){
+        if(tags.get(name)?.type!==type)
+          push("error","GEAR_SEQ_REQUIRED_TAG",at+
+            ": GEAR_SEQ requiere "+name+" ("+type+").",rung.id,rungIndex,id,branchId);
+      }
+      const uses=outputs.get("ST_Cycle_Rly")??[];
+      uses.push({rung:rungIndex,kind:instruction.kind});
+      outputs.set("ST_Cycle_Rly",uses);
+      return;
+    }
+    if(instruction.doneTag||instruction.resetTag){
+      if(!["TON","TOF","RTO","CTU","CTD"].includes(instruction.kind))
+        push("error","INVALID_BLOCK_PINS",at+
+          ": Q/RESET solo aplica a TON, TOF, RTO o contadores.",
+          rung.id,rungIndex,id,branchId);
+      if(instruction.doneTag&&tags.get(instruction.doneTag)?.type!=="BOOL")
+        push("error","INVALID_DONE_TAG",at+
+          ": salida Q requiere un tag BOOL existente.",rung.id,rungIndex,id,branchId);
+      if(instruction.resetTag&&
+          (!isCounterKind(instruction.kind)||tags.get(instruction.resetTag)?.type!=="BOOL"))
+        push("error","INVALID_RESET_TAG",at+
+          ": RESET del contador requiere un tag BOOL existente.",
+          rung.id,rungIndex,id,branchId);
     }
     if (isMathKind(instruction.kind)) {
       if (instruction.preset) {
