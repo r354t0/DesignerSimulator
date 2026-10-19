@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowRight, CarFront, CircleAlert, CircleHelp, Gauge, Pause, Play, RotateCcw, ScanLine, Users } from "lucide-react";
 import { MomentaryPushButton } from "./MomentaryPushButton";
+import { ScadaLedGroup } from "./ScadaLedGroup";
 import { TrafficSceneInfoDialog } from "./TrafficSceneInfoDialog";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
@@ -218,18 +219,32 @@ export function TrafficScene({project,mode,state,onInputChange,onAddVehicle,onRe
           <section className="sort-panel min-w-0 rounded-lg border border-[#344c5e] p-3"
             aria-label="Pilotos LED y tráfico">
             <h3 className="mb-2 text-xs font-semibold">Pilotos LED y tráfico</h3>
-            <div className="scada-pilot-grid grid grid-cols-2 gap-2">
-              <Led label="VERDE N-S" tone="green" lit={nsG}/>
-              <Led label="AMARILLO N-S" tone="amber" lit={nsY}/>
-              <Led label="ROJO N-S" tone="red" lit={nsR}/>
-              <Led label="VERDE E-O" tone="green" lit={ewG}/>
-              <Led label="AMARILLO E-O" tone="amber" lit={ewY}/>
-              <Led label="ROJO E-O" tone="red" lit={ewR}/>
-              <Led label="CRUCE PEATONAL" tone="green" lit={walk}/>
-              <Led label="SOLICITUD PENDIENTE" tone="blue" lit={pending}/>
-              <Led label="DEMANDA N-S" tone="amber" lit={trafficWaiting(state,"NS")}/>
-              <Led label="DEMANDA E-O" tone="amber" lit={trafficWaiting(state,"EW")}/>
-              <Led label="FALLO / CONFLICTO" tone="red" lit={fault}/>
+            <div className="space-y-3">
+              <ScadaLedGroup kind="status">
+                <Led label="RUN" lit={b("ST_RunEnable")}/>
+                <Led label="IDLE" tone="amber" lit={!b("ST_RunEnable")}/>
+                <Led label="SOLICITUD PENDIENTE" tone="blue" lit={pending}/>
+                <Led label="FALLO / CONFLICTO" tone="red" lit={fault}/>
+              </ScadaLedGroup>
+              <ScadaLedGroup kind="inputs">
+                <Led label="PB START" tone="blue" lit={readTrafficBool(project,"PB_Start")}/>
+                <Led label="PB STOP" tone="blue" lit={readTrafficBool(project,"PB_Stop")}/>
+                <Led label="PB RESET" tone="blue" lit={readTrafficBool(project,"PB_Reset")}/>
+                <Led label="PB PEATÓN" tone="blue" lit={readTrafficBool(project,"PB_Pedestrian")}/>
+                <Led label="DEMANDA N-S" tone="amber" lit={trafficWaiting(state,"NS")}/>
+                <Led label="DEMANDA E-O" tone="amber" lit={trafficWaiting(state,"EW")}/>
+                <Led label="PASO N-S" tone="blue" lit={readTrafficBool(project,"DI_NSExit")}/>
+                <Led label="PASO E-O" tone="blue" lit={readTrafficBool(project,"DI_EWExit")}/>
+              </ScadaLedGroup>
+              <ScadaLedGroup kind="outputs">
+                <Led label="VERDE N-S" tone="green" lit={nsG}/>
+                <Led label="AMARILLO N-S" tone="amber" lit={nsY}/>
+                <Led label="ROJO N-S" tone="red" lit={nsR}/>
+                <Led label="VERDE E-O" tone="green" lit={ewG}/>
+                <Led label="AMARILLO E-O" tone="amber" lit={ewY}/>
+                <Led label="ROJO E-O" tone="red" lit={ewR}/>
+                <Led label="CRUCE PEATONAL" tone="green" lit={walk}/>
+              </ScadaLedGroup>
             </div>
             <div className="mt-3 grid grid-cols-2 gap-2 border-t border-[#344c5e] pt-2 text-center">
               <div><span className="text-[10px] text-slate-400">Vehículos N-S</span>
