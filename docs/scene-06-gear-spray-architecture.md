@@ -112,11 +112,13 @@ Mantener **separación estricta** entre:
 ## Inicio Fase 3A — P01 y P02 en Ladder editable
 - Se añadió `web/src/plc/gearSprayPhase3Program.ts` con `createGearPhase3AProject()`: proyecto Ladder optativo e independiente de la plantilla FAT, que registra sus propios tags de proceso y rungs editables.
 - **P01**: copia de presiones de aire/lubricante (`MOV`), límites aire **>40**, lubricante alto **>1500** y bajo **<400** habilitado por marcha; entrada física de molino, proximidad, copia a `DI_PDB` y memoria de flanco (`ONS`), nivel bajo; puente entre variables internas de mando y salidas de campo.
-- **P02**: selección retenida AUTO/MANUAL/MANT y condición `ST_Run_Rly`; se preserva la lógica de condiciones del PDF CCW con uniones OR explícitas descompuestas en rungs auxiliares. El estado de marcha alimenta el piloto `_310_YI_LubricationSystemRunning`.
+- **P02**: selección retenida AUTO/MANUAL/MANT y condición `ST_Run_Rly`; cada ecuación y cada enclavamiento están en **un único rung Ladder** con contactos y ramas OR reales, sin auxiliares que introduzcan dependencia entre scans. La expresión de marcha usa distribución booleana equivalente para representar tres caminos paralelos en un rung. El estado de marcha alimenta `_310_YI_LubricationSystemRunning`.
 - **Límite deliberado:** P03–P07, secuencia UDFB, control automático de bomba, dosificación y alarmas **todavía no están portados**. En esta plantilla, las tres electroválvulas y la sirena siguen desenergizadas. No interpretar los modos AUTO/MANUAL/MANT como un sistema de lubricación funcional completo.
 - **Correspondencia que requiere FAT:** `Run_Rly` se alimenta de `ST_Run_Rly` como interpretación de implementación para la condición de baja presión de P01. No se asume equivalencia definitiva hasta la revisión funcional del usuario.
 - Se puede cargar con «Cargar P01 + P02 (Fase 3A)» solo en STOP, después de restaurar cualquier FAT temporal. Se conserva copia local del MainRoutine previo y hay botón «Restaurar programa anterior a Fase 3A». No recargar el navegador hasta guardar o restaurar: ambas copias residen en memoria.
 - Pruebas de compilación/escaneo en `web/tests/gear-spray-phase3a.test.mjs`.
+
+- **Comentarios de rung:** `PracticeRung.comment` es metadato editable en el editor (`+ Añadir comentario al rung`, multilinea, hasta 240 caracteres). El inicio de P01, P02 y el regreso al mapeo P01 están marcados. El comentario persiste con el rung al reordenarlo y **no cambia la firma de compilación ni reinicia RUN**.
 
 ## Implementación por entregables
 - **Fase 1:** SCADA industrial SVG y tags físicos/setpoints; animación física desacoplada, estructura de escena e información.
