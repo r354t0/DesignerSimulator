@@ -361,13 +361,13 @@ function ProcessGraphic({project,physics}: {project:PracticeProject;physics:Gear
       MOLINO {mill?"RUN":"STOP"}
     </text>
     <text x="25" y="679" fontSize="11" fill="#64748b">
-      Visualización CCW · Física opcional simplificada para FAT · P01–P07 aún pendientes de portar
+      Visualización CCW · Física FAT · Fase 3A P01/P02 disponible; P03–P07 pendientes
     </text>
   </svg>;
 }
 
-function InfoModal({onClose,onOpenTags}:{
-  onClose:()=>void;onOpenTags:()=>void;
+function InfoModal({onClose,onOpenTags,phase3Loaded}:{
+  onClose:()=>void;onOpenTags:()=>void;phase3Loaded:boolean;
 }){
   const headings:{title:string;content:readonly typeof GEAR_SCADA_TAGS[number][]}[]=[
     {title:"Entradas de campo",content:GEAR_FIELD_INPUTS},
@@ -789,7 +789,8 @@ export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3
           </h3>
           <div className="mb-2 rounded border border-amber-700/60 bg-amber-950/40 p-2 text-[11px] text-amber-200">
             <AlertTriangle size={13} className="mr-1 inline"/>
-            P01–P07 y FB_GearSpray_Sequence pendientes de portar.
+            {phase3Loaded?"P01 y P02 incorporadas al Ladder. P03–P07 y FB_GearSpray_Sequence pendientes de portar.":
+              "P01–P07 y FB_GearSpray_Sequence pendientes de portar."}
             Las alarmas y secuencias CCW aún no se calculan automáticamente.
           </div>
           <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-200">
@@ -807,6 +808,7 @@ export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3
         </section>
       </aside>
     </div>
-    {openInfo&&<InfoModal onClose={()=>setOpenInfo(false)} onOpenTags={onOpenTags}/>}
+    {openInfo&&<InfoModal onClose={()=>setOpenInfo(false)}
+      phase3Loaded={phase3Loaded} onOpenTags={onOpenTags}/>}
   </div>;
 }
