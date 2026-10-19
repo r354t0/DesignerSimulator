@@ -79,17 +79,12 @@ test("FAT actuators drive the plant and DI_PDB follows SQS sensor",()=>{
   assert.equal(s.DI_PDB,s._310_SQS_2561);
 });
 
-test("Scene 06 offers explicit load, restore and RUN-only FAT controls",()=>{
+test("Scene 06 hides temporary FAT loader and runs the canonical project by default",()=>{
   const app=source("../src/App.tsx");
   const scene=source("../src/components/ide/GearSprayScene.tsx");
-  assert.match(app,/gearFatBackup.current=scanRef.current.project/);
-  assert.match(app,/createGearFatProject/);
-  assert.match(app,/gearFatBackup.current=null/);
-  assert.match(app,/applySceneSensorBoolInput\(state,tag,value\)/);
-  assert.match(app,/state.mode==="running"/);
-  assert.match(scene,/Cargar Ladder temporal FAT/);
-  assert.match(scene,/Restaurar programa anterior/);
-  assert.match(scene,/Banco de pruebas FAT · Etapa B/);
-  assert.match(scene,/checked=\{v\(cmd.name\)\} disabled=\{mode!=="running"\}/);
-  assert.match(scene,/onFatCommand\(cmd.name,e.target.checked\)/);
+  assert.match(app,/gear: initialPracticeScanState\(createGearCompleteProject\(\)\)/);
+  assert.doesNotMatch(scene,/Banco de pruebas FAT · Etapa B/);
+  assert.doesNotMatch(scene,/Cargar Ladder temporal FAT/);
+  assert.doesNotMatch(scene,/Cargar P01–P07 \(FAT integrado\)/);
+  assert.match(scene,/Simulación física automática/);
 });
