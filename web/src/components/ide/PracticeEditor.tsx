@@ -4,7 +4,7 @@ import { AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Eye, EyeOff, Hamme
 import { Coil, ResetCoil, Contact, TimerBlock, CounterBlock, ComparisonBlock, MathOutputBlock, LadderRails, Wire, type Instruction } from "./LadderSymbols";
 import { CompareOperandEditor, type CompareOperandAnchor } from "./CompareOperandEditor";
 import { numericOperandLabel, setComparisonOperand } from "../../plc/practiceCompare";
-import { setMathSource } from "../../plc/practiceMath";
+import { setMathSource, setMathDestination } from "../../plc/practiceMath";
 import type { NumericOperand } from "../../plc/practiceDocument";
 import { InstructionPalette } from "./InstructionPalette";
 import { PracticeTagSelector, type TagSelectorMode, type TagSelectorState } from "./PracticeTagSelector";
@@ -419,7 +419,9 @@ export function PracticeEditor({
     if (!tagSelector) return;
     const location = findInstruction(project, tagSelector.instructionId);
     if (!location) { setTagSelector(null); return; }
-    const done = update(() => changeInstructionTag(project, tagSelector.instructionId, tag));
+    const done = update(() => isMathKind(location.instruction.kind)
+      ? setMathDestination(project, tagSelector.instructionId, tag)
+      : changeInstructionTag(project, tagSelector.instructionId, tag));
     if (done) {
       setSelected(tagSelector.instructionId);
       setTagSelector(null);
@@ -429,7 +431,10 @@ export function PracticeEditor({
   const editSelectedTag = (draft: string): string | null => {
     if (!tagSelector) return "No se encontró la instrucción seleccionada.";
     try {
-      const next = changeInstructionTag(project, tagSelector.instructionId, draft);
+      const found = findInstruction(project, tagSelector.instructionId);
+      const next = found && isMathKind(found.instruction.kind) && draft.trim()
+        ? setMathDestination(project, tagSelector.instructionId, draft.trim())
+        : changeInstructionTag(project, tagSelector.instructionId, draft);
       onChange(next);
       setError("");
       setSelected(tagSelector.instructionId);
@@ -1378,8 +1383,8 @@ export function PracticeEditor({
                           return <button key={"math-" + output.id + "-" + side} type="button"
                             aria-label={"Editar " + (side === "Dest" ? "Dest" : "Source " + side) +
                               " de " + output.kind}
-                            title={side === "Dest" ? "Elegir destino numérico INT/DINT/REAL" :
-                              "Escribir número o elegir variable numérica"}
+                            title={side === "Dest" ? "Dest: INT, DINT o REAL, independientemente de Source A y B" :
+                              "Source: número o variable INT, DINT o REAL"}
                             className="absolute z-30 cursor-text rounded border border-transparent bg-transparent hover:border-sky-500 hover:bg-sky-100/25 focus-visible:outline-2 focus-visible:outline-sky-500"
                             style={{ left: coilX - 112, top: centerY + offsetY,
                               width: 125, height: 16 }}
