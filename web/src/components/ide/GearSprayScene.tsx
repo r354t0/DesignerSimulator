@@ -3,6 +3,9 @@ import { AlertTriangle, BookOpen, CheckCircle2, CircleHelp, Gauge,
   Play, ShieldAlert, Wrench, RotateCcw, Settings2, Droplets } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
+import {
+  gearSprayIsActive, type GearPhysicalState,
+} from "../../plc/gearSprayPhysics";
 import { MomentaryPushButton } from "./MomentaryPushButton";
 import { ScadaLedGroup } from "./ScadaLedGroup";
 import {
@@ -16,6 +19,10 @@ import {
 interface Props {
   project: PracticeProject;
   mode: ScanMode;
+  physics:GearPhysicalState;
+  onPhysicsChange:(patch:Partial<Pick<GearPhysicalState,
+    "enabled"|"airSupply"|"drumPercent"|"airLoss"|"filterBlocked"|"doserBlocked">>)=>void;
+  onPhysicsReset:()=>void;
   setupError: string | null;
   onPushButton: (tag: GearPushButton, value: boolean) => void;
   onDigitalInput: (tag: GearDigitalInput, value: boolean) => void;
@@ -30,17 +37,14 @@ const surfaces = {
   lube:"#b45309", steel:"#334155",
 };
 
-/** Edición numérica y deslizante sincronizada. Los setpoints DINT no tienen
- * escalamiento de proceso publicado: su slider usa una ventana local ampliable,
- * pero el campo numérico conserva el rango permitido por el PLC. */
 /** Edición numérica sincronizada con el PLC: solo los valores analógicos con
  * un máximo de escalamiento conocido muestran además barra deslizante.
  * Los setpoints DINT se editan exclusivamente mediante número.
  */
 function NumberSetting({label,name,value,onCommit,integer=false,caption,
-  min=0,max,step}:{label:string;name:string;value:number;
+  min=0,max,step,disabled=false}:{label:string;name:string;value:number;
   onCommit:(value:number)=>void;integer?:boolean;caption?:string;
-  min?:number;max?:number;step?:number;
+  min?:number;max?:number;step?:number;disabled?:boolean;
 }){
   const [draft,setDraft]=useState(String(value));
   const [error,setError]=useState("");
@@ -61,14 +65,14 @@ function NumberSetting({label,name,value,onCommit,integer=false,caption,
       <span className="block text-[11px] font-semibold text-slate-100">{label}</span>
       <span className="mb-2 block break-all font-mono text-[10px] text-sky-300">{name}</span>
     </label>
-    <input id={"gear-value-"+name} type="number" min={min}
+    <input id={"gear-value-"+name} type="number" min={min} disabled={disabled}
       step={integer?"1":"any"} value={draft}
       onChange={e=>setDraft(e.target.value)} onBlur={save}
       onKeyDown={e=>{if(e.key==="Enter")e.currentTarget.blur();}}
       className="w-full min-w-0 rounded border border-[#466075] bg-[#0c1d2a] px-2 py-1.5 text-xs text-slate-100 outline-none focus:border-sky-400"
       aria-label={label+" · valor numérico"}/>
     {max!==undefined&&<>
-      <input type="range" min={min} max={max} step={step??0.1}
+      <input type="range" min={min} max={max} step={step??0.1} disabled={disabled}
         value={Math.min(max,Math.max(min,value))}
         onChange={e=>{onCommit(Number(e.target.value));setError("");}}
         className="mt-3 block h-2 w-full cursor-pointer accent-sky-500"
@@ -78,6 +82,9 @@ function NumberSetting({label,name,value,onCommit,integer=false,caption,
       </div>
     </>}
     {caption&&<span className="mt-1 block text-[10px] leading-snug text-slate-400">{caption}</span>}
+    {disabled&&<span className="mt-1 block text-[10px] text-sky-300">
+      Señal generada automáticamente por la física del proceso.
+    </span>}
     {outOfRange&&<span className="block text-[10px] text-amber-300">
       Valor fuera del rango de referencia. Usa el campo numérico para pruebas de falla.
     </span>}
@@ -104,7 +111,7 @@ function Pilot({label,active,tone="green"}:{
  * (azul) y lubricante presurizada (acero/ámbar). El SCADA únicamente lee tags PLC.
  * Los cruces sin unión entre redes se muestran con un puente blanco.
  */
-function ProcessGraphic({project}: {project:PracticeProject}){
+function ProcessGraphic({project,physics}: {project:PracticeProject;physics:GearPhysicalState}){
   const v=(name:string)=>gearBool(project,name);
   const pump=v("_310_SV_2560");
   const air=v("_310_SV_2563");
@@ -112,7 +119,10 @@ function ProcessGraphic({project}: {project:PracticeProject}){
   const mill=v("_310_PLC104_YI_MillRun");
   const dosing=v("_310_SQS_2561");
   const low=v("_310_LSL");
-  const atomizing=air&&grease;
+  const atomizing=physics.enabled?
+    gearSprayIsActive(physics,{pumpSolenoid:pump,
+      lubricantSolenoid:grease,atomizationSolenoid:air}):
+    air&&grease;
   const nozzleYs=[326,366,406,446,486,526];
 
   // Cada red tiene un trazo continuo: los ramales se unen con tees,
@@ -213,6 +223,9 @@ function ProcessGraphic({project}: {project:PracticeProject}){
     </text>
     <rect x="208" y="483" width="103" height="109" rx="9"
       fill="#334155" stroke="#0f172a" strokeWidth="3"/>
+    {physics.enabled&&<rect x="213" y={588-physics.drumPercent*0.98}
+      width="93" height={physics.drumPercent*0.98} rx="3"
+      fill="#b6842b" opacity=".8"/>}
     <ellipse cx="259" cy="483" rx="51" ry="11"
       fill="#64748b" stroke="#0f172a" strokeWidth="2"/>
     <path d="M208 521 H311 M208 555 H311" stroke="#94a3b8" strokeWidth="3"/>
@@ -220,6 +233,8 @@ function ProcessGraphic({project}: {project:PracticeProject}){
       textAnchor="middle">TAMBOR</text>
     <text x="259" y="547" fontSize="10" fill="#e2e8f0"
       textAnchor="middle">310-LU-003-HE</text>
+    {physics.enabled&&<text x="259" y="570" fontSize="11" fontWeight="700"
+      fill="#fff" textAnchor="middle">{physics.drumPercent.toFixed(1)}%</text>}
     <circle cx="331" cy="537" r="9" fill={low?"#ef4444":"#34d399"}
       stroke="#0f172a" strokeWidth="2"/>
     <text x="348" y="541" fontSize="10.5" fontWeight="650"
@@ -403,8 +418,9 @@ function InfoModal({onClose,onOpenTags}:{
 /** Phase 1: industrial presentation + manual field stimuli ONLY.
  * This component has NO independent PLC sequence, interlocking or physics.
  */
-export function GearSprayScene({project,mode,setupError,onPushButton,
-  onDigitalInput,onAnalogInput,onSetpoint,onPrepareTags,onOpenTags}:Props){
+export function GearSprayScene({project,mode,physics,onPhysicsChange,onPhysicsReset,
+  setupError,onPushButton,onDigitalInput,onAnalogInput,onSetpoint,
+  onPrepareTags,onOpenTags}:Props){
   const [openInfo,setOpenInfo]=useState(false);
   const sceneRef=useRef<HTMLDivElement>(null);
   const v=(name:string)=>gearBool(project,name);
@@ -444,7 +460,7 @@ export function GearSprayScene({project,mode,setupError,onPushButton,
           {modeLabel}
         </span>
         <span className="rounded border border-amber-700 bg-amber-950/60 px-2 py-1 text-[10px] text-amber-200">
-          Fase 1 · SCADA + E/S
+          {physics.enabled?"Fase 2 · Física activa":"Fase 2 · Física manual"}
         </span>
         <button type="button" onClick={()=>setOpenInfo(true)}
           className="flex items-center gap-1 rounded border border-slate-600 px-2 py-1.5 text-[11px] hover:bg-slate-700">
@@ -460,7 +476,7 @@ export function GearSprayScene({project,mode,setupError,onPushButton,
       <section className="scada-process-panel min-w-0">
         <h3 className="mb-2 text-xs font-semibold">Vista de proceso</h3>
         <div className="overflow-x-auto rounded-lg bg-white">
-          <ProcessGraphic project={project}/>
+          <ProcessGraphic project={project} physics={physics}/>
         </div>
         <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
           {diagnostics.map(item=><div key={item.label}
@@ -474,9 +490,81 @@ export function GearSprayScene({project,mode,setupError,onPushButton,
             <Gauge size={15}/> Instrumentación y setpoints
           </h3>
           <p className="mb-3 text-[10px] text-slate-400">
-            Las entradas analógicas admiten valor numérico o barra deslizante.
-            Los setpoints se editan únicamente con números.
+            En modo manual puedes inyectar presiones y señales. En modo físico,
+            el modelo publica presión, nivel y pulsos de dosificación en los tags
+            de entrada del PLC; los setpoints siguen siendo numéricos.
           </p>
+          <div className="mb-3 rounded border border-sky-900 bg-[#0c1d2a] p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h4 className="text-[11px] font-semibold text-sky-200">
+                  Modelo físico · Fase 2
+                </h4>
+                <p className="mt-1 text-[10px] text-slate-400">
+                  La física lee exclusivamente las salidas del PLC. Disponible en RUN.
+                </p>
+              </div>
+              <label className="flex cursor-pointer items-center gap-2 text-[11px]">
+                <input type="checkbox" checked={physics.enabled}
+                  onChange={e=>onPhysicsChange({enabled:e.target.checked})}
+                  className="accent-sky-500"/>
+                Simulación física automática
+              </label>
+            </div>
+            {physics.enabled&&<>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block min-w-0 text-[11px] text-slate-200">
+                  Aire disponible en la acometida
+                  <div className="mt-1 flex items-center gap-2">
+                    <input type="range" min={0} max={148} step={1}
+                      value={physics.airSupply}
+                      onChange={e=>onPhysicsChange({airSupply:Number(e.target.value)})}
+                      className="min-w-0 flex-1 accent-sky-500"
+                      aria-label="Presión disponible de aire"/>
+                    <span className="w-9 text-right tabular-nums">{physics.airSupply}</span>
+                  </div>
+                </label>
+                <label className="block min-w-0 text-[11px] text-slate-200">
+                  Lubricante disponible en el tambor
+                  <div className="mt-1 flex items-center gap-2">
+                    <input type="range" min={0} max={100} step={1}
+                      value={physics.drumPercent}
+                      onChange={e=>onPhysicsChange({drumPercent:Number(e.target.value)})}
+                      className="min-w-0 flex-1 accent-amber-500"
+                      aria-label="Nivel del tambor de lubricante"/>
+                    <span className="w-12 text-right tabular-nums">{physics.drumPercent.toFixed(1)}%</span>
+                  </div>
+                </label>
+              </div>
+              <p className="mb-2 mt-3 text-[10px] font-semibold text-slate-300">
+                Inyección de fallas físicas
+              </p>
+              <div className="grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-3">
+                {([
+                  ["airLoss","Pérdida de aire"],
+                  ["filterBlocked","Filtro obstruido"],
+                  ["doserBlocked","Dosificador atascado"],
+                ] as const).map(([key,label])=><label key={key}
+                  className="flex cursor-pointer items-start gap-2 rounded bg-[#172e3f] p-2">
+                  <input type="checkbox" checked={physics[key]}
+                    onChange={e=>onPhysicsChange({[key]:e.target.checked})}
+                    className="mt-0.5 accent-red-400"/>
+                  <span>{label}</span>
+                </label>)}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-200">
+                <span>Pulsos dosificador: <strong className="tabular-nums text-sky-200">{physics.totalPulses}</strong></span>
+                <button type="button" onClick={onPhysicsReset}
+                  className="rounded border border-slate-500 px-2 py-1 text-slate-200 hover:bg-slate-700">
+                  Restablecer física
+                </button>
+              </div>
+              <p className="mt-2 text-[10px] text-amber-200">
+                Modelo simplificado para FAT, no calibrado. Polaridad de LSL y
+                equivalencia DI_PDB/DI_PDB_2 pendientes de confirmar en CCW.
+              </p>
+            </>}
+          </div>
           <h4 className="mb-2 text-[11px] font-semibold text-slate-200">Entradas analógicas</h4>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {GEAR_FIELD_INPUTS.filter(x=>x.type==="REAL").map(input=>{
@@ -484,6 +572,7 @@ export function GearSprayScene({project,mode,setupError,onPushButton,
               return <NumberSetting key={input.name} name={input.name}
                 label={isAir?"Presión de aire":"Presión de lubricante"}
                 min={0} max={isAir?148:1480} step={0.1}
+                disabled={physics.enabled}
                 caption={isAir?"Referencia original: 0–148":
                   "Referencia original: 0–1480"}
                 value={gearNumber(project,input.name)}
@@ -506,6 +595,7 @@ export function GearSprayScene({project,mode,setupError,onPushButton,
             {GEAR_FIELD_INPUTS.filter(x=>x.type==="BOOL").map(x=>
               <label key={x.name} className="flex cursor-pointer items-start gap-2 rounded border border-[#354d62] bg-[#0f2434] p-2 text-[11px]">
                 <input type="checkbox" checked={v(x.name)}
+                  disabled={physics.enabled&&x.name!=="_310_PLC104_YI_MillRun"}
                   onChange={event=>onDigitalInput(x.name as GearDigitalInput,event.target.checked)}
                   className="mt-0.5 accent-sky-500"/>
                 <span className="min-w-0 break-words text-slate-200">
