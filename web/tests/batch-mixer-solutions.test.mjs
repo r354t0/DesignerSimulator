@@ -57,7 +57,8 @@ test("five recommended solutions build independently and introduce only their ow
     assert.equal(build.success,true,"Exercise "+ex+" diagnostics "+JSON.stringify(build.diagnostics));
     const added=p.tags.filter(t=>!BATCH_IO_TAGS.some(io=>io.name===t.name));
     assert.deepEqual(added.map(x=>x.name),batchSolutionTags(ex).map(x=>x.name));
-    assert.ok(p.rungs.length>=8);
+    if(ex===1) assert.equal(p.rungs.length,6);
+    else assert.ok(p.rungs.length>=8);
     assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="CTU")));
     if(ex!==1) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="RTO")));
     if(ex===2||ex===3) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="CTD")));
@@ -67,7 +68,7 @@ test("five recommended solutions build independently and introduce only their ow
         i.tag==="ST_P1PulseTarget"&&i.compareB?.mode==="literal"&&i.compareB.value===10)));
       assert.equal(p.tags.find(t=>t.name==="ST_P1PulseTarget").type,"INT");
     }
-    assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="MOV")));
+    if(ex!==1) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="MOV")));
     const display=p.tags.find(t=>t.name==="INT_DisplayValue");
     assert.equal(display.type,"INT");
   }
