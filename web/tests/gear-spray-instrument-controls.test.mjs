@@ -15,7 +15,7 @@ test("Instrumentación usa descripción como título y tag debajo",()=>{
   assert.match(panel,/label=\{isAir\?"Presión de aire":"Presión de lubricante"\}/);
   for(const caption of [
     "Frecuencia entre lubricaciones","Pulsos por lubricación",
-    "Tiempo máximo de lubricación","Duración de mantenimiento"
+    "Tiempo de alarma por flujo bajo","Duración de mantenimiento"
   ]) assert.ok(panel.includes(caption),caption);
 });
 
