@@ -459,6 +459,9 @@ export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3
       lubricantSolenoid:v("_310_SV_2561"),
       atomizationSolenoid:v("_310_SV_2563"),
     }):v("_310_SV_2561")&&v("_310_SV_2563");
+  const cycleState=gearNumber(project,"SM_Cycle_State");
+  const cycleName=({0:"INACTIVO",10:"ESPERA",20:"LUBRICACIÓN",
+    30:"PURGA",90:"BLOQUEADO"} as Record<number,string>)[cycleState]??"DESCONOCIDO";
   const diagnostics:{label:string;value:ReactNode}[]=[
     {label:"Presión de aire (valor CCW)",
       value:gearNumber(project,"_310_PI_2561").toFixed(1)},
@@ -467,7 +470,7 @@ export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3
     {label:"Molino",value:v("_310_PLC104_YI_MillRun")?"MARCHA":"DETENIDO"},
     {label:"Pulso dosificador",value:v("_310_SQS_2561")?"ACTIVO":"INACTIVO"},
     {label:"Pulverización",value:processActive?"SOLENOIDES ACTIVOS":"SIN ACTIVACIÓN"},
-    {label:"Secuencia CCW",value:"PENDIENTE DE PORTAR"},
+    {label:"Secuencia CCW (P03)",value:phase3Loaded?cycleState+" · "+cycleName:"PENDIENTE"},
   ];
   return <div ref={sceneRef}
     className="sort-scada-shell scada-control-shell gear-scada-shell flex h-full min-h-0 flex-col overflow-y-auto p-3 text-slate-100">
@@ -793,16 +796,26 @@ export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3
             <AlertTriangle size={13} className="mr-1 inline"/>
             {phase3Loaded?"P01, P02 y P03 incorporados al Ladder. FB_GearSpray_Sequence ejecutable; P04–P07 pendientes.":
               "P01–P07 y FB_GearSpray_Sequence pendientes de portar."}
-            Las alarmas y secuencias CCW aún no se calculan automáticamente.
+            {phase3Loaded?
+              " La máquina de estados P03 funciona; la lógica de alarmas P05 sigue pendiente.":
+              " Las alarmas y secuencias CCW aún no se calculan automáticamente."}
           </div>
           <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-200">
-            <div className="rounded bg-[#0c1b28] p-2">Máquina de estados: <strong>no disponible</strong></div>
+            <div className="rounded bg-[#0c1b28] p-2">
+              Máquina de estados: <strong> {phase3Loaded?cycleState+" · "+cycleName:"no disponible"}</strong>
+            </div>
             <div className="rounded bg-[#0c1b28] p-2">Fault_Code: <strong>no disponible</strong></div>
             <div className="rounded bg-[#0c1b28] p-2">
               Pulso del dosificador (DI_PDB):
               <strong> {v("DI_PDB")?"ACTIVO":"INACTIVO"}</strong>
             </div>
-            <div className="rounded bg-[#0c1b28] p-2">Alarmas CCW: <strong>no disponibles</strong></div>
+            <div className="rounded bg-[#0c1b28] p-2">
+              {phase3Loaded?"Pulsos (CTN_Lubeflo)":"Alarmas CCW"}:
+              <strong> {phase3Loaded?
+                String((project.tags.find(t=>t.name==="CTN_Lubeflo")?.value as
+                  Record<string,number|boolean>|undefined)?.ACC??0):
+                "no disponibles"}</strong>
+            </div>
           </div>
           <div className="mt-3 flex items-center gap-1 text-[10px] text-emerald-300">
             <CheckCircle2 size={13}/> Las salidas visibles leen Controller Tags.
