@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
-import {initialGearSprayProject, gearNumber, writeGearScadaInput}
+import {initialGearSprayProject, gearNumber, writeGearScadaInput, GEAR_HMI_SETPOINTS}
   from "../src/plc/gearSpraySceneModel.ts";
 
 const code=readFileSync(new URL("../src/components/ide/GearSprayScene.tsx",import.meta.url),"utf8");
@@ -17,6 +17,8 @@ test("Instrumentación usa descripción como título y tag debajo",()=>{
     "Frecuencia entre lubricaciones","Pulsos por lubricación",
     "Tiempo de alarma por flujo bajo","Duración de mantenimiento"
   ]) assert.ok(panel.includes(caption),caption);
+  assert.equal(GEAR_HMI_SETPOINTS.find(tag=>tag.name==="TMR_LubeFlo_SP")?.description,
+    "Setpoint del temporizador de alarma por flujo bajo");
 });
 
 test("La entrada analógica ofrece número y slider dentro de las escalas originales",()=>{
