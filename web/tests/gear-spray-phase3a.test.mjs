@@ -192,12 +192,12 @@ test("P02 AUTO lock-in is not artificially gated by earlier helper OTE",()=>{
 test("Phase 3A loader is reversible and mutually exclusive with Stage B FAT",()=>{
   const app=source("../src/App.tsx");
   const scene=source("../src/components/ide/GearSprayScene.tsx");
-  assert.match(app,/createGearPhase3AProject/);
+  assert.match(app,/createGearPhase3Project/);
   assert.match(app,/gearPhase3Backup.current=scanRef.current.project/);
   assert.match(app,/gearPhase3Backup.current=null/);
   assert.match(app,/gearPhase3Loaded\|\|gearFatLoaded/);
-  assert.match(scene,/Cargar P01 \+ P02 \(Fase 3A\)/);
+  assert.match(scene,/Cargar P01 \+ P02 \+ P03 \(Fase 3B\)/);
   assert.match(scene,/onClick=\{onRestorePhase3\}/);
   assert.match(scene,/disabled=\{mode!=="stopped"\|\|fatLoaded\}/);
-  assert.match(scene,/P03–P07, bombeo automático y alarmas todavía pendientes/);
+  assert.match(scene,/P04–P07 y la lógica completa de alarmas todavía pendientes/);
 });
