@@ -180,5 +180,5 @@ test("STOP de-energizes pump, alarm and atomizer; no hidden SCADA logic",()=>{
   const app=read("../src/App.tsx");
   const scene=read("../src/components/ide/GearSprayScene.tsx");
   assert.match(app,/createGearCompleteProject/);
-  assert.match(scene,/Cargar P01–P07 \(FAT integrado\)/);
+  assert.match(scene,/onResetProgram=\{onResetProgram\}/);
 });
