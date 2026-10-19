@@ -804,7 +804,13 @@ export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3
             <div className="rounded bg-[#0c1b28] p-2">
               Máquina de estados: <strong> {phase3Loaded?cycleState+" · "+cycleName:"no disponible"}</strong>
             </div>
-            <div className="rounded bg-[#0c1b28] p-2">Fault_Code: <strong>{phase3Loaded?gearNumber(project,"Fault_Code"):"no disponible"}</strong></div>
+            <div className="rounded bg-[#0c1b28] p-2">
+              Código de falla (Fault_Code): <strong>{phase3Loaded?gearNumber(project,"Fault_Code"):"no disponible"}</strong>
+              {phase3Loaded&&<span className="block text-[10px] text-slate-400">
+                {({0:"Sin falla priorizada",1:"Falta de aire",2:"Flujo bajo",
+                  3:"Presión baja",4:"Presión alta",5:"Nivel bajo"} as Record<number,string>)[gearNumber(project,"Fault_Code")]??"Desconocido"}
+              </span>}
+            </div>
             <div className="rounded bg-[#0c1b28] p-2">
               Pulso del dosificador (DI_PDB):
               <strong> {v("DI_PDB")?"ACTIVO":"INACTIVO"}</strong>
@@ -817,7 +823,19 @@ export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3
                 "no disponibles"}</strong>
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-1 text-[10px] text-emerald-300">
+          {phase3Loaded&&<div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-200">
+              {([
+                ["Próximo ciclo (ms)","NextCycle_Show"],
+                ["Flujo: tiempo restante (ms)","FloAlrm_Remain"],
+                ["Mantenimiento restante (min)","Maint_Duration_Remain_Min"],
+                ["Parada restante (min)","Shutdown_Time_Remaining"],
+              ] as const).map(([title,name])=><div key={name} className="rounded bg-[#0c1b28] p-2">
+                <span className="block text-slate-400">{title}</span>
+                <strong className="font-mono tabular-nums">{gearNumber(project,name).toFixed(0)}</strong>
+                <span className="block break-all font-mono text-[9px] text-slate-500">({name})</span>
+              </div>)}
+            </div>}
+            <div className="mt-3 flex items-center gap-1 text-[10px] text-emerald-300">
             <CheckCircle2 size={13}/> Las salidas visibles leen Controller Tags.
           </div>
         </section>
