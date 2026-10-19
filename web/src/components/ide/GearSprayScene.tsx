@@ -78,7 +78,7 @@ function Pilot({label,active,tone="green"}:{
 
 /** Diagrama de proceso para la escena 06.
  * Tuberías representadas como redes independientes: aire instrumental/atomización
- * (azul) y grasa presurizada (acero/ámbar). El SCADA únicamente lee tags PLC.
+ * (azul) y lubricante presurizada (acero/ámbar). El SCADA únicamente lee tags PLC.
  * Los cruces sin unión entre redes se muestran con un puente blanco.
  */
 function ProcessGraphic({project}: {project:PracticeProject}){
@@ -124,7 +124,7 @@ function ProcessGraphic({project}: {project:PracticeProject}){
         fill="#fff" stroke="#91a4b7"/>
       <text x={cx} y={cy+36} textAnchor="middle" fontSize="11.5" fontWeight="750"
         fill="#334155">{code}</text>
-      <title>{code+" · "+(kind==="air"?"Válvula de aire":"Válvula de grasa")+
+      <title>{code+" · "+(kind==="air"?"Válvula de aire":"Válvula de lubricante")+
         " · "+(on?"Activa":"Inactiva")}</title>
     </g>
   );
@@ -137,13 +137,13 @@ function ProcessGraphic({project}: {project:PracticeProject}){
       LUBRICACIÓN DE CORONA · GEAR SPRAY
     </text>
     <text x="24" y="49" fontSize="11" fill="#64748b">
-      Escena 06 · Distribución de aire y grasa · E/S físicas del Micro850
+      Escena 06 · Distribución de aire y lubricante · E/S físicas del Micro850
     </text>
     <g fontSize="10.5" fill="#334155">
       <path d="M771 24 H801" stroke="#168bd1" strokeWidth="6"/>
       <text x="811" y="28">Aire</text>
       <path d="M869 24 H899" stroke="#a4adb9" strokeWidth="7"/>
-      <text x="909" y="28">Grasa</text>
+      <text x="909" y="28">Lubricante</text>
       <circle cx="988" cy="24" r="6" fill="#16a34a"/>
       <text x="1001" y="28">Activo</text>
     </g>
@@ -183,10 +183,10 @@ function ProcessGraphic({project}: {project:PracticeProject}){
     <text x="700" y="277" textAnchor="middle" fontSize="17" fontWeight="750"
       fill="#075985">{gearNumber(project,"_310_PI_2561").toFixed(1)}</text>
 
-    {/* GRASA: succión desde el tambor, descarga de la bomba, filtro y
+    {/* LUBRICANTE: succión desde el tambor, descarga de la bomba, filtro y
         válvula SV-2561 hasta la entrada lateral del dosificador. */}
-    <text x="414" y="315" fontSize="11.5" fontWeight="700" fill="#92400e">
-      CIRCUITO DE GRASA
+    <text x="433" y="506" fontSize="11.5" fontWeight="700" fill="#92400e">
+      CIRCUITO DE LUBRICANTE
     </text>
     <rect x="208" y="483" width="103" height="109" rx="9"
       fill="#334155" stroke="#0f172a" strokeWidth="3"/>
@@ -213,7 +213,7 @@ function ProcessGraphic({project}: {project:PracticeProject}){
     <text x="263" y="395" fontSize="11" fontWeight="750"
       fill="#334155" textAnchor="middle">BOMBA NEUMÁTICA</text>
 
-    {/* Equipos montados sobre la tubería de grasa, sin juntas ficticias. */}
+    {/* Equipos montados sobre la tubería de lubricante, sin juntas ficticias. */}
     {/* Filtro compacto para liberar espacio respecto al transmisor PI-2560. */}
     <rect x="389" y="432" width="32" height="26" rx="4"
       fill="#fff" stroke="#64748b" strokeWidth="2.5"/>
@@ -224,14 +224,14 @@ function ProcessGraphic({project}: {project:PracticeProject}){
     {solenoid(659,445,"SV-2561",grease,"lube")}
 
     {/* PI-2560: presión de lubricante en la toma entre el FILTRO y SV-2561.
-        Derivación vertical conectada al mismo tramo continuo de grasa. */}
+        Derivación vertical conectada al mismo tramo continuo de lubricante. */}
     <path d="M530 445 V416" stroke="#64748b" strokeWidth="4" fill="none"/>
     {tee(530,445,"lube")}
     <circle cx="530" cy="402" r="14" fill="#ffedd5"
       stroke="#d97706" strokeWidth="3"/>
     <path d="M530 402 L538 396" stroke="#92400e" strokeWidth="2.5"/>
     <text x="530" y="337" textAnchor="middle" fontSize="11.5" fontWeight="750" fill="#334155">
-      PI-2560 · GRASA
+      PI-2560 · LUBRICANTE
     </text>
     <rect x="473" y="345" width="114" height="34" rx="5"
       fill="#ffedd5" stroke="#d97706" strokeWidth="1.5"/>
@@ -248,7 +248,7 @@ function ProcessGraphic({project}: {project:PracticeProject}){
     <rect x="839" y="275" width="12" height="26" rx="2"
       fill="#94a3b8" stroke="#475569" strokeWidth="2"/>
 
-    {/* Bloque de dosificación: la alimentación de grasa entra por la
+    {/* Bloque de dosificación: la alimentación de lubricante entra por la
         conexión izquierda; sus seis salidas alimentan las boquillas. */}
     <rect x="779" y="301" width="132" height="251" rx="9"
       fill="#cbd5e1" stroke="#475569" strokeWidth="3"/>
@@ -265,7 +265,7 @@ function ProcessGraphic({project}: {project:PracticeProject}){
     <text x="845" y="576" textAnchor="middle" fontSize="11.5"
       fontWeight="750" fill="#334155">BLOQUE DOSIFICADOR</text>
 
-    {/* Cada boquilla es un cabezal mixto: una entrada de grasa y otra de aire.
+    {/* Cada boquilla es un cabezal mixto: una entrada de lubricante y otra de aire.
         Las líneas cruzan el colector de aire SIN conectarse: el pequeño puente
         blanco marca el cruce, y las dos entradas terminan en el mismo cabezal. */}
     {nozzleYs.map((y,i)=><g key={"nozzle-"+i}>
@@ -300,7 +300,7 @@ function ProcessGraphic({project}: {project:PracticeProject}){
     </text>
     <circle cx="172" cy="620" r="6" fill={grease?"#16a34a":"#94a3b8"}/>
     <text x="185" y="624" fontSize="11" fill="#334155" fontWeight="650">
-      Grasa: {grease?"ON":"OFF"}
+      Lubricante: {grease?"ON":"OFF"}
     </text>
     <rect x="860" y="606" width="186" height="28" rx="5"
       fill={mill?"#d1fae5":"#e2e8f0"} stroke="#94a3b8"/>
