@@ -39,7 +39,8 @@ test("labels and roads/equipment retain contrast while operation LEDs remain ind
   assert.match(traffic, /fill="#1f3443"/);
   for (const scene of ["Conveyor", "Sort", "Tank", "Traffic"]) {
     const view = source("../src/components/ide/"+scene+"Scene.tsx");
-    assert.match(view, /scada-pilot-grid/, scene);
+    assert.match(view, /ScadaLedGroup/, scene);
+    assert.match(view, /scada-led-panel/, scene);
   }
 });
 
