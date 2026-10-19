@@ -6,13 +6,13 @@ Plantilla Ladder unificada en DesignerSimulator para pruebas virtuales del Gear 
 
 ## Preparación
 
-1. Escena 06, PLC STOP. Si está cargada una plantilla anterior, restaurarla antes de continuar.
-2. Abrir «Instrumentación y setpoints» → «Cargar P01–P07 (FAT integrado)». Confirmar respaldo temporal y ejecutar Build.
-3. Revisar los comentarios P01 a P07. En P01, LubePress_Lo permanece en el quinto rung. Se eliminaron el rung 8 de P01 y la conversión inicial de P03.
+1. Abrir la **escena 06**, que ya tiene P01–P07 cargado desde la primera entrada. El PLC inicia en STOP.
+2. Abrir «Información de la escena» → **«Reiniciar programa»**, confirmar para restaurar la programación original y la física predeterminada si se realizaron ensayos anteriores; ejecutar Build.
+3. Revisar los comentarios P01 a P07. En P01, LubePress_Lo permanece en el quinto rung. Se eliminaron el rung 8 de P01 y la conversión inicial de P03. En «Entradas analógicas», el checkbox «Simulación física automática» alterna entre inyección manual de presión y controles de la planta física.
 4. Consignas de ejemplo al cargar: frecuencia 60000 ms, pulsos por ciclo 5, alarma de flujo bajo 10000 ms, mantenimiento 30 min. Son valores solo para FAT, no para campo.
 5. Física automática: aire 100, tambor 100 %, pérdida de presión 1×, ninguna falla seleccionada.
 6. Utilizar modo MANUAL con molino detenido para ensayos iniciales, y AUTO con señal externa Mill Run para ensayos de ciclo.
-7. Durante todas las pruebas observar SCADA, Controller Tags y Ladder simultáneamente. No recargar navegador antes de guardar/restaurar el respaldo.
+7. Durante todas las pruebas observar SCADA, Controller Tags y Ladder simultáneamente. Para volver al original tras editar el Ladder, usar «Información de la escena» → «Reiniciar programa»; esta operación descarta los cambios de esa escena previa confirmación.
 
 ## Matriz de verificación FAT conjunta
 
