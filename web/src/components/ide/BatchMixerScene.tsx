@@ -95,7 +95,7 @@ function BatchProcessGraphic({state,outputs,sp}:{state:BatchMixerState;
             className={active?"tank-flow-motion":undefined}/>
           <Flowmeter x={76} y={y} label={"FM-"+(i+1)} active={active}/>
           <Pump x={166} y={y} label={"P"+(i+1)} on={active}/>
-          <text x="18" y={y-21} fontSize="10" fill="#334155">
+          <text x="18" y={y-48} fontSize="10" fill="#334155" fontWeight="700">
             {i===0?"PRODUCTO 1":"PRODUCTO 2"}
           </text>
         </g>;
@@ -109,21 +109,25 @@ function BatchProcessGraphic({state,outputs,sp}:{state:BatchMixerState;
         {state.level>0&&<path d={"M292 "+levelY+" Q330 "+(levelY-4)+" 382 "+levelY+
           " T476 "+levelY} fill="none" stroke="#e0f2fe" strokeWidth="2"/>}
       </g>
-      <text x="385" y="69" textAnchor="middle" fontSize="13"
+      {/* The tank's title and the two probe names remain outside equipment
+          outlines, in clear white space. The HMI already shows level %. */}
+      <text x="590" y="57" textAnchor="middle" fontSize="13"
         fontWeight="700" fill="#263a47">TK-05 · BATCH MIXER</text>
-      <g fontSize="11" fontWeight="700" textAnchor="end" fill="#334155">
-        <text x="270" y="85">100%</text><text x="270" y="104">90%</text>
-        <text x="270" y="279">10%</text><text x="270" y="302">0%</text>
+      {/* Each sensor has normally-open (wet = TRUE) detection.
+          HI is mounted at 100%, LO at the tank floor (0%).
+          No intermediate level lines: the SCADA shows the percentage below. */}
+      <g>
+        <rect x="479" y="79" width="14" height="13" rx="3"
+          fill={state.level>=100?"#eab308":"#64748b"} stroke="#334155" strokeWidth="1.5"/>
+        <text x="500" y="90" fontSize="12" fontWeight="700"
+          fill="#243746">HI-LEVEL</text>
       </g>
-      {/* Digital upper/lower limit sensors */}
-      {[{y:92,name:"HI",on:state.level>=100},
-        {y:282,name:"LO",on:state.level<=0}].map(sensor=><g key={sensor.name}>
-        <path d={"M285 "+sensor.y+" H484"} stroke="#64748b" strokeDasharray="5 5"/>
-        <rect x="479" y={sensor.y-10} width="14" height="20" rx="3"
-          fill={sensor.on?"#eab308":"#64748b"} stroke="#334155"/>
-        <text x="499" y={sensor.y+4} fontSize="12" fontWeight="700"
-          fill="#243746">{sensor.name}-LEVEL</text>
-      </g>)}
+      <g>
+        <rect x="279" y="283" width="14" height="13" rx="3"
+          fill={state.level>0?"#eab308":"#64748b"} stroke="#334155" strokeWidth="1.5"/>
+        <text x="268" y="292" textAnchor="end" fontSize="12" fontWeight="700"
+          fill="#243746">LO-LEVEL</text>
+      </g>
       {/* Mixer motor and rotating shaft */}
       <rect x="356" y="16" width="55" height="29" rx="5"
         fill={outputs.mixer?"#16a34a":"#b45309"} stroke="#334155" strokeWidth="2"/>
