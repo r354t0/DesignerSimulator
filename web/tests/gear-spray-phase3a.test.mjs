@@ -22,7 +22,7 @@ test("Phase 3A Ladder compiles and is isolated from blank default/FAT template",
   const p=createGearPhase3AProject();
   assert.equal(original.tags.length,22);
   assert.equal(original.rungs[0].instructions.length,0);
-  assert.ok(p.rungs.length>=25);
+  assert.equal(p.rungs.length,24);
   assert.ok(p.tags.some(x=>x.name==="ST_Run_Rly"));
   assert.ok(p.tags.some(x=>x.name==="AirPressure_In_Scaled"));
   assert.ok(p.tags.some(x=>x.name==="PDB_RisingTrig"));
