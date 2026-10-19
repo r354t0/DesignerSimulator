@@ -80,7 +80,8 @@ test("integrated E4: two products, digital thermostat, 4s hold and drain to low"
   assert.equal(sim.physical.temperature,20,
     "the empty vessel must be at ambient for the next batch");
   assert.equal(batchBool(sim.controller.project,"DO_Pump3"),false);
-  assert.equal(batchBool(sim.controller.project,"ST_BatchDone"),true);
+  assert.equal(batchBool(sim.controller.project,"ST_Draining"),false);
+  assert.equal(batchBool(sim.controller.project,"DI_LowLevel"),false);
 });
 
 test("integrated E5: two configured batches complete, then everything stops",()=>{
