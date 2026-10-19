@@ -86,11 +86,11 @@ export function BatchMixerSceneInfoDialog({open,project,selectedExercise,onClose
             {current.criteria.map(item=><li key={item}>{item}</li>)}
           </ul>
           {exercise===1&&<p className="mt-2 text-[11px] text-slate-400">
-            Equivalencia didáctica: cada pulso del caudalímetro representa 1 % del volumen;
-            por tanto, 90 pulsos equivalen aproximadamente al 90 %.</p>}
+            Equivalencia didáctica: cada pulso representa 0,1 % del volumen nominal;
+            900 pulsos equivalen al 90 % y 1000 pulsos al tanque lleno.</p>}
           {exercise===4&&<p className="mt-2 text-[11px] text-slate-400">
             Modo A: un lote y nueva orden START después de vaciar. La relación
-            se aplica al 100 % de capacidad para facilitar el ejercicio.</p>}
+            se aplica al 100 % de capacidad: 1000 pulsos en total, 10 pulsos por cada 1 %.</p>}
           {exercise===5&&<p className="mt-2 text-[11px] text-slate-400">
             Modo B: el lote producido se visualiza como entero en INT_DisplayValue.</p>}
         </div>
@@ -106,8 +106,8 @@ export function BatchMixerSceneInfoDialog({open,project,selectedExercise,onClose
         <h4 className="mb-2 font-semibold">Variables adicionales · Ejercicio {exercise}</h4>
         <SceneTagTable specs={batchSolutionTags(exercise)} project={project} preview/>
         <p className="mt-2 text-[11px] text-slate-400">
-          {exercise<4?"Los caudalímetros generan pulsos y el volumen lo representa CNT_Volume.":
-            "El termostato es una DI. INT_RatioP1 se compara con CNT_Product1.ACC; la temperatura real pertenece a la física simulada."}
+          {exercise<4?"Cada pulso de FM1 y FM3 equivale a 0,1 % y CNT_Volume registra los pulsos netos.":
+            "El termostato es una DI. El Ladder convierte INT_RatioP1 a pulsos mediante MUL × 10 y compara el resultado con CNT_Product1.ACC; la temperatura real pertenece a la física simulada."}
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" onClick={()=>{onClose();onLoadSolution(exercise);}}
