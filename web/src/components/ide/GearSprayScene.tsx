@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, BookOpen, CheckCircle2, CircleHelp, Gauge,
+import { AlertTriangle, CheckCircle2, CircleHelp, Gauge,
   Play, ShieldAlert, Wrench, RotateCcw, Settings2, Droplets } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
@@ -92,17 +92,23 @@ function NumberSetting({label,name,value,onCommit,integer=false,caption,
   </div>;
 }
 
-function Pilot({label,active,tone="green"}:{
-  label:string;active:boolean;tone?:"green"|"amber"|"blue"|"red";
+function Pilot({description,tag,active,tone="green"}:{
+  description:string;tag:string;active:boolean;
+  tone?:"green"|"amber"|"blue"|"red";
 }){
   const tones={green:"bg-emerald-400 shadow-[0_0_11px_#34d399]",
     amber:"bg-amber-400 shadow-[0_0_11px_#fbbf24]",
     blue:"bg-sky-400 shadow-[0_0_11px_#38bdf8]",
     red:"bg-red-400 shadow-[0_0_11px_#f87171]"};
-  return <div className="flex min-h-9 min-w-0 items-center gap-2 rounded border border-[#34495d] bg-[#101e2b] px-2">
-    <span className={"size-3 shrink-0 rounded-full border border-slate-500 "+
+  return <div className="flex min-h-12 min-w-0 items-start gap-2 rounded border border-[#34495d] bg-[#101e2b] px-2 py-2">
+    <span className={"mt-1 size-3 shrink-0 rounded-full border border-slate-500 "+
       (active?tones[tone]:"bg-slate-700")}/>
-    <span className="min-w-0 break-words text-[10px] leading-snug text-slate-200">{label}</span>
+    <span className="min-w-0 text-[10px] leading-snug text-slate-200">
+      <span className="block font-semibold">{description}</span>
+      <span className="mt-0.5 block break-all font-mono text-sky-300">
+        ({tag})
+      </span>
+    </span>
   </div>;
 }
 
@@ -383,10 +389,10 @@ function InfoModal({onClose,onOpenTags}:{
         la lógica del programa CCW (rutinas P01–P07 y UDFB).
       </p>
       <div className="mt-3 rounded border border-amber-700/70 bg-amber-950/40 p-3 text-xs text-amber-100">
-        <strong>Correspondencias pendientes:</strong> P01 copia _310_SQS_2561
-        a DI_PDB_2, pero P03 cuenta DI_PDB. Se conservan como señales diferentes.
-        La escala/unidad de presión y la polaridad de _310_LSL aún requieren
-        comprobación. P05 incluye AFI para la alarma de alta presión.
+        <strong>Asignación del dosificador:</strong> _310_SQS_2561 es la señal
+        física del sensor y alimenta DI_PDB, utilizada para contar los pulsos
+        de lubricación. La escala/unidad de presión y la polaridad de _310_LSL
+        aún requieren comprobación. P05 incluye AFI para la alarma de alta presión.
       </div>
       <div className="mt-4 space-y-4">
         {headings.map(group=><section key={group.title}>
@@ -426,7 +432,6 @@ export function GearSprayScene({project,mode,physics,onPhysicsChange,onPhysicsRe
   const [openInfo,setOpenInfo]=useState(false);
   const sceneRef=useRef<HTMLDivElement>(null);
   const v=(name:string)=>gearBool(project,name);
-  const outputs=GEAR_FIELD_OUTPUTS;
   const modeLabel=mode==="running"?"PLC RUN":
     mode==="paused"?"PLC PAUSE":"PLC STOP";
   useEffect(()=>{
@@ -568,7 +573,7 @@ export function GearSprayScene({project,mode,physics,onPhysicsChange,onPhysicsRe
               </div>
               <p className="mt-2 text-[10px] text-amber-200">
                 Modelo simplificado para FAT, no calibrado. Polaridad de LSL y
-                equivalencia DI_PDB/DI_PDB_2 pendientes de confirmar en CCW.
+                se utiliza DI_PDB para los pulsos de dosificación del sensor SQS-2561.
               </p>
             </>}
           </div>
@@ -643,24 +648,27 @@ export function GearSprayScene({project,mode,physics,onPhysicsChange,onPhysicsRe
         <section className="sort-panel scada-led-panel min-w-0 rounded-lg border border-[#344c5e] p-3">
           <h3 className="mb-3 text-xs font-semibold">Pilotos LED y equipos</h3>
           <div className="space-y-3">
-            <ScadaLedGroup kind="status">
-              <Pilot label="SISTEMA HEALTHY" active={v("_310_YI_SystemHealthy")}/>
-              <Pilot label="LUBRICACIÓN RUN" active={v("_310_YI_LubricationSystemRunning")}/>
-              <Pilot label="ALARMA ACTIVA" active={v("_310_UY_2560")} tone="red"/>
-              <Pilot label="MOLINO RUN" active={v("_310_PLC104_YI_MillRun")} tone="blue"/>
-            </ScadaLedGroup>
-            <ScadaLedGroup kind="inputs">
-              {GEAR_HMI_PUSHBUTTONS.map(tag=>
-                <Pilot key={tag.name} label={tag.name} active={v(tag.name)} tone="blue"/>)}
-              {GEAR_FIELD_INPUTS.filter(x=>x.type==="BOOL").map(tag=>
-                <Pilot key={tag.name} label={tag.name} active={v(tag.name)} tone="amber"/>)}
-            </ScadaLedGroup>
-            <ScadaLedGroup kind="outputs">
-              {outputs.map(tag=>
-                <Pilot key={tag.name} label={tag.name}
-                  active={v(tag.name)}
-                  tone={tag.name==="_310_UY_2560"?"red":"green"}/>)}
-            </ScadaLedGroup>
+            <div>
+              <h4 className="mb-2 text-[11px] font-semibold text-slate-300">
+                Estado del sistema
+              </h4>
+              <ScadaLedGroup kind="status">
+                <Pilot description="Sistema disponible"
+                  tag="_310_YI_SystemHealthy" active={v("_310_YI_SystemHealthy")}/>
+                <Pilot description="Lubricación en marcha"
+                  tag="_310_YI_LubricationSystemRunning"
+                  active={v("_310_YI_LubricationSystemRunning")}/>
+              </ScadaLedGroup>
+            </div>
+            <div>
+              <h4 className="mb-2 text-[11px] font-semibold text-slate-300">
+                Salidas digitales
+              </h4>
+              <ScadaLedGroup kind="outputs">
+                <Pilot description="Alarma sonora" tag="_310_UY_2560"
+                  active={v("_310_UY_2560")} tone="red"/>
+              </ScadaLedGroup>
+            </div>
           </div>
         </section>
         <section className="rounded-lg border border-[#344c5e] bg-[#132432] p-3">
@@ -675,26 +683,15 @@ export function GearSprayScene({project,mode,physics,onPhysicsChange,onPhysicsRe
           <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-200">
             <div className="rounded bg-[#0c1b28] p-2">Máquina de estados: <strong>no disponible</strong></div>
             <div className="rounded bg-[#0c1b28] p-2">Fault_Code: <strong>no disponible</strong></div>
-            <div className="rounded bg-[#0c1b28] p-2">Pulsos DI_PDB: <strong>sin correspondencia confirmada</strong></div>
+            <div className="rounded bg-[#0c1b28] p-2">
+              Pulso del dosificador (DI_PDB):
+              <strong> {v("DI_PDB")?"ACTIVO":"INACTIVO"}</strong>
+            </div>
             <div className="rounded bg-[#0c1b28] p-2">Alarmas CCW: <strong>no disponibles</strong></div>
           </div>
           <div className="mt-3 flex items-center gap-1 text-[10px] text-emerald-300">
             <CheckCircle2 size={13}/> Las salidas visibles leen Controller Tags.
           </div>
-        </section>
-        <section className="rounded-lg border border-[#344c5e] bg-[#132432] p-3">
-          <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold">
-            <BookOpen size={15}/> Programa y referencias
-          </h3>
-          <p className="text-[11px] text-slate-300">
-            CCW: P01 Mapping, P02 Mode Manager, P03 Cycle Manager,
-            P04 Pump Pressure Control, P05 Alarms, P06 Shutdown/Maintenance,
-            P07 HMI Diagnostics y FB_GearSpray_Sequence.
-          </p>
-          <button type="button" onClick={onOpenTags}
-            className="mt-3 rounded border border-sky-700 px-3 py-1.5 text-xs text-sky-200 hover:bg-sky-950">
-            Abrir Controller Tags
-          </button>
         </section>
       </aside>
     </div>
