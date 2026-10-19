@@ -54,6 +54,13 @@ export function BatchMixerSceneInfoDialog({open,project,selectedExercise,onClose
           La temperatura física se simula internamente y el termostato entrega únicamente
           <strong> DI_Thermostat (BOOL)</strong> cuando se cumple la consigna. No se emplean
           decodificadores BCD ni una entrada analógica de temperatura.</p>
+        <p className="mt-2 text-slate-300">
+          Los sensores de nivel son de detección de líquido: <strong>TRUE (1)</strong>
+          cuando el líquido alcanza su posición y <strong>FALSE (0)</strong> cuando
+          están secos. HI-LEVEL detecta el llenado al 100 %; LO-LEVEL está ubicado
+          en el fondo y se desactiva al vaciarse el tanque (0 %).
+          La referencia porcentual del nivel se consulta en el indicador del SCADA.
+        </p>
       </section>
       <section>
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
