@@ -63,6 +63,40 @@ test("Loss of air, clogged filter and doser jam prevent new pulses",()=>{
   }
 });
 
+test("Pressure loss slider changes decay speed, not initial pressure or growth",()=>{
+  const base=configureGearPhysical(initialGearPhysicalState(),{enabled:true});
+  const on={pumpSolenoid:true,lubricantSolenoid:false,atomizationSolenoid:false};
+  const off={pumpSolenoid:false,lubricantSolenoid:false,atomizationSolenoid:false};
+  const build=(plant,cmd,ticks)=>{
+    for(let i=0;i<ticks;i++)plant=stepGearPhysical(plant,cmd,50);
+    return plant;
+  };
+  const charged=build(base,on,100);
+  const slow=build(configureGearPhysical(charged,{pressureDecayFactor:0.25}),off,20);
+  const normal=build(configureGearPhysical(charged,{pressureDecayFactor:1}),off,20);
+  const fast=build(configureGearPhysical(charged,{pressureDecayFactor:4}),off,20);
+  assert.ok(slow.lubePressure>normal.lubePressure);
+  assert.ok(normal.lubePressure>fast.lubePressure);
+  assert.equal(slow.airPressure,normal.airPressure);
+  const low=configureGearPhysical(base,{pressureDecayFactor:-4});
+  const high=configureGearPhysical(base,{pressureDecayFactor:200});
+  assert.equal(low.pressureDecayFactor,0.25);
+  assert.equal(high.pressureDecayFactor,4);
+  const slowBuild=build(configureGearPhysical(base,{pressureDecayFactor:0.25}),on,25);
+  const fastBuild=build(configureGearPhysical(base,{pressureDecayFactor:4}),on,25);
+  assert.equal(slowBuild.lubePressure,fastBuild.lubePressure,
+    "Slider may not accelerate pressure buildup");
+  const lossStart=build(charged,off,1);
+  assert.ok(lossStart.lubePressure<charged.lubePressure);
+  const pressurizedAir=build(configureGearPhysical(base,{airLoss:true,
+    pressureDecayFactor:4}),off,20);
+  assert.equal(pressurizedAir.airPressure,0);
+  const replenish=build(configureGearPhysical(base,{airSupply:148}),off,25);
+  const lowAir=configureGearPhysical(replenish,{airLoss:true,pressureDecayFactor:0.25});
+  const highAir=configureGearPhysical(replenish,{airLoss:true,pressureDecayFactor:4});
+  assert.ok(build(lowAir,off,10).airPressure>build(highAir,off,10).airPressure);
+});
+
 test("Drum can be replenished and sensor polarity is an explicit test assumption",()=>{
   const state=configureGearPhysical(initialGearPhysicalState(),{
     enabled:true,drumPercent:9.5,airSupply:999,
@@ -90,6 +124,8 @@ test("Scene 06 physics only runs under its own PLC RUN and writes input tags onl
   assert.doesNotMatch(physicalEffect,/setTagValue\(result.project,"_310_SV_/);
   assert.match(physicalEffect,/applySceneSensorBoolInput/);
   assert.match(scene,/Simulación física automática/);
+  assert.match(scene,/Velocidad de pérdida de presión/);
+  assert.match(scene,/pressureDecayFactor:Number\(e.target.value\)/);
   assert.match(scene,/Pérdida de aire/);
   assert.match(scene,/Filtro obstruido/);
   assert.match(scene,/Dosificador atascado/);
