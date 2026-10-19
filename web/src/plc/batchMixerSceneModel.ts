@@ -193,6 +193,41 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
       p=addParallelContact(p,id,id0,ins(choice),undefined,lane.id);
     }
   };
+  // LAB 01 · Exercise 1: reproduce the student's six-rung reference
+  // exactly, including two PARALLEL output coils in rung 4. No extra
+  // RUN/IDLE/display rungs or lower-level permissives in this exercise.
+  if (exercise===1) {
+    // R0: (PB_Start OR ST_RunEnable) AND NOT PB_Stop -> ST_RunEnable.
+    any("rung-1",[X("PB_Start"),X("ST_RunEnable")],
+      [N("PB_Stop")],O("OTE","ST_RunEnable"));
+    // R1: START with run permission latches filling.
+    rung("bm-start-fill",[
+      X("ST_RunEnable"),X("PB_Start"),O("OTL","ST_Filling"),
+    ]);
+    // R2: energize P1 while running and filling.
+    rung("bm-p1",[
+      X("ST_RunEnable"),X("ST_Filling"),O("OTE","DO_Pump1"),
+    ]);
+    // R3: count only flow pulses admitted during the filling stage.
+    rung("bm-ctu-level",[
+      X("ST_RunEnable"),X("ST_Filling"),X("DI_Flowmeter1"),
+      O("CTU","CNT_Volume"),
+    ]);
+    // R4: once ACC >= 900, unlatch filling and latch FULL together.
+    // Multiple outputs on one rung render as Studio-style parallel coils,
+    // with the same energized series path for both.
+    rung("bm-reach-90",[
+      X("ST_RunEnable"),X("ST_Filling"),
+      C("GEQ","CNT_Volume.ACC",900),
+      O("OTU","ST_Filling"),O("OTL","ST_Full"),
+    ]);
+    // R5: the FULL pilot follows the latched bit with RUN permission.
+    rung("bm-full-lamp",[
+      X("ST_RunEnable"),X("ST_Full"),O("OTE","DO_FullLamp"),
+    ]);
+    return p;
+  }
+
   const advanced=exercise>=4;
   const continuous=exercise===3 || exercise===5;
   const endCondition=advanced?X("DI_HighLevel"):C("GEQ","CNT_Volume.ACC",900);
