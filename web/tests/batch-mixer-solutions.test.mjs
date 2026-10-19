@@ -77,8 +77,8 @@ test("five recommended solutions build independently and introduce only their ow
       assert.equal(p.tags.find(t=>t.name==="INT_PresetP1").type,"INT");
     }
     if(ex>=4) assert.equal(p.rungs.some(r=>r.instructions.some(i=>i.kind==="MOV")),false);
-    const display=p.tags.find(t=>t.name==="INT_DisplayValue");
-    assert.equal(display.type,"INT");
+    assert.equal(p.tags.some(t=>t.name==="INT_DisplayValue"),false,
+      "removed HMI display should not generate an unused output tag");
   }
 });
 test("Ejercicio 1: six rungs exactly match reference, with two parallel output coils in rung 4",()=>{
