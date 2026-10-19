@@ -31,8 +31,8 @@ const started=(exercise,adjust=project=>project)=>{
   assert.equal(build.success,true,"Exercise "+exercise+": "+JSON.stringify(build.diagnostics));
   let plc=startPracticeScans(setScanPeriod(initialPracticeScanState(project),500));
   plc=press(plc,"PB_Start");
-  // After the first inflow pulse, the physically empty-level switch drops.
-  plc=applySceneSensorBoolInput(plc,"DI_LowLevel",false);
+  // The bottom sensor turns ON as soon as liquid reaches the probe.
+  plc=applySceneSensorBoolInput(plc,"DI_LowLevel",true);
   return plc;
 };
 const setBOOL=(plc,name,value)=>applySceneSensorBoolInput(plc,name,value);
@@ -98,7 +98,7 @@ test("lab 01 exercise 2: RTO mixes for eight seconds, CTD drains to zero",()=>{
   for(let i=0;i<900;i++)plc=pulse(plc,"DI_Flowmeter3");
   assert.equal(count(plc,"CNT_Volume"),0);
   assert.equal(output(plc,"DO_Pump3"),false);
-  plc=setBOOL(plc,"DI_LowLevel",true);
+  plc=setBOOL(plc,"DI_LowLevel",false);
   plc=press(plc,"PB_Start");
   assert.equal(output(plc,"DO_Pump1"),true);
 });
@@ -136,7 +136,7 @@ test("advanced exercise 4: integer ratio controls P1/P2, DI thermostat triggers 
   assert.equal(output(plc,"DO_Pump3"),true);
   assert.equal(output(plc,"DO_Mixer"),false);
   plc=setBOOL(plc,"DI_HighLevel",false);
-  plc=setBOOL(plc,"DI_LowLevel",true);
+  plc=setBOOL(plc,"DI_LowLevel",false);
   assert.equal(output(plc,"DO_Pump3"),false);
   assert.equal(batchBool(plc.project,"ST_BatchDone"),true);
 });
@@ -151,7 +151,7 @@ test("advanced exercise 5: mode B runs batches up to INT target and display incr
     for(let i=0;i<8;i++)plc=tickPracticeScan(plc);
     assert.equal(output(plc,"DO_Pump3"),true);
     plc=setBOOL(plc,"DI_HighLevel",false);
-    plc=setBOOL(plc,"DI_LowLevel",true);
+    plc=setBOOL(plc,"DI_LowLevel",false);
     assert.equal(count(plc,"CNT_Lotes"),lot);
     assert.equal(batchInt(plc.project,"INT_DisplayValue"),lot);
     if(lot===1){
@@ -159,7 +159,7 @@ test("advanced exercise 5: mode B runs batches up to INT target and display incr
       // at the following PLC scan, as expected for a top-to-bottom Ladder.
       plc=tickPracticeScan(plc);
       assert.equal(output(plc,"DO_Pump1"),true);
-      plc=setBOOL(plc,"DI_LowLevel",false);
+      plc=setBOOL(plc,"DI_LowLevel",true);
       plc=setBOOL(plc,"DI_Thermostat",false);
     }else{
       assert.equal(output(plc,"DO_Pump1"),false);
@@ -171,7 +171,7 @@ test("advanced exercise 5: mode B runs batches up to INT target and display incr
 test("real physics generates pulses, temperature remains internal and thermostat is digital",()=>{
   let st=initialBatchState();
   assert.deepEqual(batchDigitalSensors(st,32),{
-    DI_LowLevel:true,DI_HighLevel:false,DI_Thermostat:false,
+    DI_LowLevel:false,DI_HighLevel:false,DI_Thermostat:false,
   });
   for(let i=0;i<250;i++)
     st=stepBatchPhysics(st,{pump1:true,pump2:false,pump3:false,heater:false},50);
@@ -179,13 +179,14 @@ test("real physics generates pulses, temperature remains internal and thermostat
   assert.equal(st.totalPulses[0],1000);
   assert.equal(st.totalPulses[1],0);
   assert.equal(batchDigitalSensors(st,32).DI_HighLevel,true);
+  assert.equal(batchDigitalSensors(st,32).DI_LowLevel,true);
   for(let i=0;i<80;i++)
     st=stepBatchPhysics(st,{pump1:false,pump2:false,pump3:false,heater:true},50);
   assert.ok(st.temperature>=32);
   assert.equal(batchDigitalSensors(st,32).DI_Thermostat,true);
   const reset=resetBatchProgramState(createBatchSolution(5));
   assert.equal(batchInt(reset,"INT_TempSP"),32);
-  assert.equal(batchBool(reset,"DI_LowLevel"),true);
+  assert.equal(batchBool(reset,"DI_LowLevel"),false);
   assert.equal(batchBool(reset,"DI_ModeB"),true);
   assert.equal(batchCounter(reset,"CNT_Lotes"),0);
 });
