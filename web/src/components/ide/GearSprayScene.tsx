@@ -393,8 +393,10 @@ function InfoModal({onClose,onOpenTags,phase3Loaded}:{
         PLC_107_Molino_Bolas_SM · Rutinas P01–P07 y FB_GearSpray_Sequence.
         La pantalla está conectada al motor de tags y MainRoutine de
         DesignerSimulator. Fase 2: modelo físico determinista opcional de
-        presiones, depósito, pulsos y fallas de proceso. Aún no se ha traducido
-        la lógica del programa CCW (rutinas P01–P07 y UDFB).
+        presiones, depósito, pulsos y fallas de proceso.
+        {phase3Loaded?
+          " Fase 3A: P01 y P02 están portadas a Ladder editable; P03–P07 y UDFB pendientes.":
+          " P01–P07 y UDFB pendientes mientras no se cargue la plantilla de Fase 3A."}
       </p>
       <div className="mt-3 rounded border border-amber-700/70 bg-amber-950/40 p-3 text-xs text-amber-100">
         <strong>Asignación del dosificador:</strong> _310_SQS_2561 es la señal
