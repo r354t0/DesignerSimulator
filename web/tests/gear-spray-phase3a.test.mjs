@@ -33,6 +33,18 @@ test("Phase 3A Ladder compiles and is isolated from blank default/FAT template",
   assert.deepEqual(original,initialGearSprayProject());
 });
 
+test("P01 LubePress_Lo remains in source rung 5 after LubePress_Hi",()=>{
+  const project=createGearPhase3AProject();
+  const ids=project.rungs.map(r=>r.id);
+  assert.equal(ids.indexOf("gear3a-p01-hi"),3);
+  assert.equal(ids.indexOf("gear3a-p01-low"),4);
+  assert.equal(ids.indexOf("gear3a-p01-mill"),5);
+  assert.ok(ids.indexOf("gear3a-p01-low")<ids.indexOf("gear3a-p02-auto"));
+  const low=project.rungs[4];
+  assert.deepEqual(low.instructions.map(i=>i.kind),["XIC","LES","OTE"]);
+  assert.deepEqual(low.instructions.map(i=>i.tag),["Run_Rly","","LubePress_Lo"]);
+});
+
 test("P01 maps both transmitters and detects pressure thresholds",()=>{
   let p=run();
   assert.equal(gearBool(p.project,"AirPress_In"),false);
