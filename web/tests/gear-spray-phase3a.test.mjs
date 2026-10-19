@@ -120,14 +120,14 @@ test("P02 keeps every lock-in network inside a single Ladder rung",()=>{
   assert.equal(auto.instructions.filter(i=>i.kind==="OTE").length,1);
   for(const [id,branches] of [
     ["gear3a-p02-manual",1],["gear3a-p02-maint",1],
-    ["gear3a-p02-run",3],["gear3a-p02-selected",1]
+    ["gear3a-p02-run",2],["gear3a-p02-selected",1]
   ]){
     const rung=find(id);
     assert.equal(rung.parallelBranches.length,branches,id);
     assert.equal(rung.instructions.filter(i=>i.kind==="OTE").length,1,id);
   }
   assert.deepEqual(find("gear3a-p02-run").parallelBranches
-    .slice(1).map(b=>b.instructions.map(i=>i.tag)),
+    .map(b=>b.instructions.map(i=>i.tag)),
     [["ST_Maint_Mode","DI_Mill_Run"],["ST_Man_Mode"]]);
   assert.equal(project.rungs.some(r=>r.id==="gear3a-p02-autoreq"),false);
   assert.ok(!project.tags.some(t=>t.name.startsWith("P02_")));
