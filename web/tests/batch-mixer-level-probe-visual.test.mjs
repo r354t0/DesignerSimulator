@@ -55,8 +55,10 @@ test("all batch solutions and resets agree that DI_LowLevel TRUE means wet",()=>
         ["XIC","ST_RunEnable"],["XIC","PB_Start"],["OTL","ST_Filling"],
       ],"exercise 1 matches the screenshot without extra lower-level contact");
     }else{
-      assert.ok(start.instructions.some(i=>i.kind==="XIO"&&i.tag==="DI_LowLevel"),
-        "start when empty via XIO lower probe");
+      assert.ok(start.instructions.some(i=>i.kind==="XIC"&&i.tag==="PB_Start"),
+        "E4/E5 single-start OR multiple-batch start follows the reference");
+      assert.ok(!start.instructions.some(i=>i.tag==="DI_LowLevel"),
+        "the new 16/17 rung screenshots do not gate START by LO level");
     }
     if(exercise>1){
       const rearm=solution.rungs.find(r=>r.id==="bm-stop-drain");
