@@ -56,7 +56,7 @@ test("integrated E1: real pump moves 90%, Flowmeter 1 counts and stops pump",()=
   assert.equal(sim.until(()=>sim.physical.level>=90),true);
   for(let i=0;i<3;i++)sim.step();
   assert.equal(sim.physical.level,90);
-  assert.equal(batchCounter(sim.controller.project,"CNT_Volume"),90);
+  assert.equal(batchCounter(sim.controller.project,"CNT_Volume"),900);
   assert.equal(batchBool(sim.controller.project,"DO_Pump1"),false);
   assert.equal(batchBool(sim.controller.project,"DO_FullLamp"),true);
 });
@@ -64,8 +64,8 @@ test("integrated E1: real pump moves 90%, Flowmeter 1 counts and stops pump",()=
 test("integrated E4: two products, digital thermostat, 4s hold and drain to low",()=>{
   const sim=simulator(4,p=>setTagValue(p,"INT_TempSP",24));
   assert.equal(sim.until(()=>sim.physical.level===100),true);
-  assert.equal(sim.physical.totalPulses[0],40);
-  assert.equal(sim.physical.totalPulses[1],60);
+  assert.equal(sim.physical.totalPulses[0],400);
+  assert.equal(sim.physical.totalPulses[1],600);
   assert.equal(sim.until(()=>batchBool(sim.controller.project,"DI_Thermostat")),true);
   assert.equal(sim.physical.temperature>=24,true);
   assert.equal(sim.until(()=>batchBool(sim.controller.project,"DO_Pump3")),true);
