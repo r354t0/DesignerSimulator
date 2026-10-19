@@ -122,7 +122,9 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
       counterUpdates.set(instruction.tag,next);
       return next;
     }
-    if (instruction.kind === "RES") {
+    if(instruction.kind==="CTD"&&instruction.loadTag&&tagValues.get(instruction.loadTag)===true){
+      next={...next,ACC:pre,CU:false,CD:false,DN:false,OV:false,UN:false};
+    }else if (instruction.kind === "RES") {
       if (enabled) next = { ...next, ACC: 0, CU: false, CD: false,
         DN: false, OV: false, UN: false };
     } else if (instruction.kind === "CTU") {
@@ -140,7 +142,7 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
         next.UN = previous.UN || underflow;
       }
       next.CD = enabled;
-      next.DN = next.ACC >= pre;
+      next.DN = instruction.loadTag?next.ACC<=0:next.ACC>=pre;
     }
     counters.set(instruction.tag, next);
     counterUpdates.set(instruction.tag, next);
