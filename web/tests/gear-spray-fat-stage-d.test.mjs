@@ -82,24 +82,22 @@ test("D06-D07: STOP clears outputs and exclusively FAT commands, disarming resta
     "STOP->RUN never inadvertently opens a FAT solenoid");
 });
 
-test("D08: changing scenes stops previous controller and preserves the physical state",()=>{
+test("D08: changing scenes stops controllers and retains individual programs",()=>{
   const app=read("../src/App.tsx");
-  assert.match(app,/sceneSessions\.current\[previous\] = stopSceneController\(current,previous\)/);
-  assert.match(app,/return stopSceneController\(sceneSessions\.current\[next\],next\)/);
+  assert.match(app,/sceneSessions\.current\[previous\] = stopPracticeScans\(current\)/);
+  assert.match(app,/return stopPracticeScans\(sceneSessions\.current\[next\]\)/);
   assert.match(app,/if\(practiceMode!=="running"\|\|activeControllerScene\.current!=="gear"\)return/);
   assert.match(app,/if\(plc\.mode!=="running"\|\|activeControllerScene\.current!=="gear"\|\|!physical\.enabled\)return/);
-  assert.match(app,/changeScan\(state=>stopSceneController\(state,activeControllerScene\.current\)\)/);
-  assert.match(app,/clearGearFatCommands\(state\.project\)/);
-  assert.match(app,/clearGearFatCommands\(stopped\.project\)/);
+  assert.match(app,/changeScan\(stopPracticeScans\)/);
 });
 
-test("D09: FAT can only be loaded/restored at STOP; backup is preserved",()=>{
+test("D09: original Gear Spray program is always available via reset",()=>{
   const app=read("../src/App.tsx");
   const scene=read("../src/components/ide/GearSprayScene.tsx");
-  assert.match(app,/gearFatBackup\.current=scanRef\.current\.project/);
-  assert.match(app,/const backup=gearFatBackup\.current/);
-  assert.match(app,/gearFatBackup\.current=null/);
-  assert.match(app,/scanRef\.current\.mode!=="stopped"/);
-  assert.match(scene,/onClick=\{onRestoreFat\}/);
-  assert.match(scene,/disabled=\{mode!=="stopped"\}/);
+  assert.match(app,/const resetGearProgram=useCallback/);
+  assert.match(app,/window\.confirm\(/);
+  assert.match(app,/initialPracticeScanState\(createGearCompleteProject\(\)\)/);
+  assert.match(app,/changeGearPhysical\(\(\)=>initialGearPhysicalState\(\)\)/);
+  assert.match(scene,/Reiniciar programa/);
+  assert.match(scene,/onResetProgram=\{onResetProgram\}/);
 });
