@@ -347,7 +347,7 @@ function ProcessGraphic({project,physics}: {project:PracticeProject;physics:Gear
       MOLINO {mill?"RUN":"STOP"}
     </text>
     <text x="25" y="679" fontSize="11" fill="#64748b">
-      Visualización de E/S CCW · Presiones sin unidad verificada · sin física automática en fase 1
+      Visualización CCW · Física opcional simplificada para FAT · P01–P07 aún pendientes de portar
     </text>
   </svg>;
 }
