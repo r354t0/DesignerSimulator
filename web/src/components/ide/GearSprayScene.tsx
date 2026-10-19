@@ -824,6 +824,24 @@ export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3
             </div>
           </div>
           {phase3Loaded&&<div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-200">
+            {([
+              ["Permiso P06 (DO_LS_Healthy)","DO_LS_Healthy"],
+              ["Modo manual (ST_Man_Mode)","ST_Man_Mode"],
+              ["Alarma general (ST_General_Trip_Rly)","ST_General_Trip_Rly"],
+              ["Memoria de bloqueo (SM_Cycle_BlockLatched)","SM_Cycle_BlockLatched"],
+            ] as const).map(([label,tag])=><div key={tag}
+              className="rounded bg-[#0c1b28] p-2">
+              <span className="block text-slate-400">{label}</span>
+              <strong className="font-mono tabular-nums">{v(tag)?"TRUE":"FALSE"}</strong>
+            </div>)}
+          </div>}
+          {phase3Loaded&&v("SM_Cycle_BlockLatched")&&!v("ST_General_Trip_Rly")&&
+            <p className="mt-2 rounded border border-amber-700/60 bg-amber-950/40 p-2 text-[10px] text-amber-200">
+              Bloqueo retenido sin alarma general actual. La memoria requiere RESET
+              durante RUN, con permiso de sistema o modo MANUAL activo.
+              STOP por sí solo no borra el bloqueo.
+            </p>}
+          {phase3Loaded&&<div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-200">
               {([
                 ["Próximo ciclo (ms)","NextCycle_Show"],
                 ["Flujo: tiempo restante (ms)","FloAlrm_Remain"],
