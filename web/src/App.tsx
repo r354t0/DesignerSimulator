@@ -31,6 +31,10 @@ import {
   type GearSetpoint,
 } from "./plc/gearSpraySceneModel";
 import {
+  initialGearPhysicalState, configureGearPhysical, stepGearPhysical,
+  gearPhysicalSensors, type GearPhysicalState,
+} from "./plc/gearSprayPhysics";
+import {
   initialBatchProject, createBatchSolution, prepareBatchTags,
   initialBatchState, stepBatchPhysics, batchDigitalSensors, resetBatchProgramState,
   batchBool, batchInt,
@@ -202,6 +206,15 @@ export default function App() {
   }, []);
 
   const [gearSetupError, setGearSetupError] = useState<string | null>(null);
+  const [gearPhysical,setGearPhysical]=useState<GearPhysicalState>(initialGearPhysicalState);
+  const gearPhysicalRef=useRef(gearPhysical);
+  const changeGearPhysical=useCallback((operation:(state:GearPhysicalState)=>GearPhysicalState)=>{
+    const next=operation(gearPhysicalRef.current);
+    if(next!==gearPhysicalRef.current){
+      gearPhysicalRef.current=next;
+      setGearPhysical(next);
+    }
+  },[]);
   const [batchSetupError, setBatchSetupError] = useState<string | null>(null);
   const [batchExercise, setBatchExercise] = useState<BatchExercise | null>(null);
   const [batchState, setBatchState] = useState<BatchMixerState>(initialBatchState);
@@ -411,6 +424,44 @@ export default function App() {
     return () => window.clearInterval(id);
   }, [practiceMode, simulationTab, changeTank, changeScan]);
 
+  // Gear Spray phase 2: ONLY true PLC outputs drive pressure and dosing.
+  // No CCW routines/UDFB are simulated here. PAUSE, STOP and other scenes freeze
+  // this plant model. Changes to sensors are fed to the existing scan adapter.
+  useEffect(()=>{
+    if(practiceMode!=="running"||activeControllerScene.current!=="gear")return;
+    const id=window.setInterval(()=>{
+      const plc=scanRef.current;
+      const physical=gearPhysicalRef.current;
+      if(plc.mode!=="running"||activeControllerScene.current!=="gear"||!physical.enabled)return;
+      const getOutput=(name:string)=>plc.project.tags.some(t=>
+        t.name===name&&t.type==="BOOL"&&t.value===true);
+      const next=stepGearPhysical(physical,{
+        pumpSolenoid:getOutput("_310_SV_2560"),
+        lubricantSolenoid:getOutput("_310_SV_2561"),
+        atomizationSolenoid:getOutput("_310_SV_2563"),
+      },50);
+      if(next!==physical)changeGearPhysical(()=>next);
+      const sensor=gearPhysicalSensors(next);
+      changeScan(state=>{
+        if(state.mode!=="running"||activeControllerScene.current!=="gear")return state;
+        let result=state;
+        for(const name of ["_310_PI_2561","_310_PI_2560"] as const){
+          const tag=result.project.tags.find(t=>t.name===name);
+          if(tag?.type==="REAL"&&tag.value!==sensor[name])
+            result=changePracticeScanProject(result,
+              setTagValue(result.project,name,sensor[name]));
+        }
+        for(const name of ["_310_SQS_2561","_310_LSL"] as const){
+          const tag=result.project.tags.find(t=>t.name===name);
+          if(tag?.type==="BOOL"&&tag.value!==sensor[name])
+            result=applySceneSensorBoolInput(result,name,sensor[name]);
+        }
+        return result;
+      });
+    },50);
+    return ()=>window.clearInterval(id);
+  },[practiceMode,simulationTab,changeGearPhysical,changeScan]);
+
   // Advance the five fixed demo rungs with elapsed milliseconds, independent of
   // React render frequency. This is NOT a controller-quality real-time scan.
   useEffect(() => {
@@ -446,19 +497,30 @@ export default function App() {
   const handlePracticeChange = useCallback((next: PracticeProject) =>
     changeScan((state) => changePracticeScanProject(state, next)), [changeScan]);
 
-  // Scene 06: only documented physical inputs and HMI commands are writable.
-  // No independently generated PLC outputs, alarms, UDFB transitions or
-  // pressure physics are implied by this first stage of implementation.
+  // Scene 06: retain manual FAT inputs when physical simulation is disabled.
+  // Physical mode owns PI-2561, PI-2560, SQS-2561 and LSL, never PLC outputs.
+  const setGearPhysicalConfig=useCallback((patch:Partial<Pick<GearPhysicalState,
+    "enabled"|"airSupply"|"drumPercent"|"airLoss"|"filterBlocked"|"doserBlocked">>)=>{
+    if(activeControllerScene.current!=="gear")return;
+    changeGearPhysical(state=>configureGearPhysical(state,patch));
+  },[changeGearPhysical]);
+  const resetGearPhysical=useCallback(()=>{
+    if(activeControllerScene.current!=="gear")return;
+    changeGearPhysical(state=>({...initialGearPhysicalState(),enabled:state.enabled}));
+  },[changeGearPhysical]);
   const setGearPushButton=useCallback((tag:GearPushButton,value:boolean)=>{
     if(activeControllerScene.current!=="gear")return;
     changeScan(state=>applyMomentaryBoolInput(state,tag,value,true));
   },[changeScan]);
   const setGearDigitalInput=useCallback((tag:GearDigitalInput,value:boolean)=>{
     if(activeControllerScene.current!=="gear")return;
+    if(gearPhysicalRef.current.enabled&&tag!=="_310_PLC104_YI_MillRun")return;
     changeScan(state=>applySceneSensorBoolInput(state,tag,value));
   },[changeScan]);
   const setGearNumber=useCallback((tag:GearAnalogInput|GearSetpoint,value:number)=>{
     if(activeControllerScene.current!=="gear")return;
+    if(gearPhysicalRef.current.enabled&&
+      (tag==="_310_PI_2561"||tag==="_310_PI_2560"))return;
     changeScan(state=>changePracticeScanProject(state,
       writeGearScadaInput(state.project,tag,value)));
   },[changeScan]);
@@ -947,6 +1009,9 @@ export default function App() {
                           onResetSolution={() => resetRecommendedSolution("batch")}/>
                     : simulationTab === "gear"
                       ? <GearSprayScene project={practice} mode={practiceMode}
+                          physics={gearPhysical}
+                          onPhysicsChange={setGearPhysicalConfig}
+                          onPhysicsReset={resetGearPhysical}
                           setupError={gearSetupError}
                           onPushButton={setGearPushButton}
                           onDigitalInput={setGearDigitalInput}
@@ -976,7 +1041,8 @@ export default function App() {
       setTrafficInput, resetTraffic, prepareTraffic, trafficSetupError,
       loadTrafficExample, batchState, batchExercise, batchSetupError,
       setBatchInput, setBatchMode, setBatchIntegers, resetBatch, prepareBatch, loadBatchSolution,
-      gearSetupError, setGearPushButton, setGearDigitalInput, setGearNumber, prepareGear],
+      gearSetupError, gearPhysical, setGearPhysicalConfig, resetGearPhysical,
+      setGearPushButton, setGearDigitalInput, setGearNumber, prepareGear],
   );
 
   const syncTabSelection = useCallback((updatedModel: Model) => {
