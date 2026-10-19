@@ -134,7 +134,7 @@ test("Scene 6 UI shows process and only nonredundant LED groups",()=>{
   for(const name of physicalOutputTags)assert.ok(scene.includes(name),"output "+name+" not wired");
   assert.doesNotMatch(scene,/stepGearPhysics|runGearUdfb|GearSpraySimulationEngine/);
   assert.match(scene,/pendientes de portar/);
-  assert.match(scene,/Física opcional simplificada para FAT/);
+  assert.match(scene,/Física FAT · Fase 3A P01\/P02 disponible/);
 });
 
 test("App adds Gear Spray as independent programming scene and restores its scan state",()=>{
