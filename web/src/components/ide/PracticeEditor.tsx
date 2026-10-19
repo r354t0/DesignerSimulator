@@ -758,6 +758,7 @@ export function PracticeEditor({
             const outputs = rung.instructions.filter((part) => isOutputKind(part.kind));
             const hasTimerOutputs = outputs.some((part) =>
               (isTimerKind(part.kind) && part.kind !== "RES") ||
+              part.kind === "GEAR_SEQ" ||
               isCounterKind(part.kind) || isMathKind(part.kind));
             const emptyOutputBranches = rung.emptyOutputBranches ?? [];
             // Keep every rung at its persisted height while dragging.
@@ -1213,7 +1214,35 @@ export function PracticeEditor({
                                   const assignedTag = project.tags.find((tag) => tag.name === output.tag);
                                   return (
                                     <g key={output.id}>
-                                      {isMathKind(output.kind) ? (
+                                      {output.kind === "GEAR_SEQ" ? (
+                                        <>
+                                          <Wire x1={coilX - 142} y1={coilRowY}
+                                            x2={coilX - 122} y2={coilRowY} live={rungLive}/>
+                                          <rect x={coilX - 122} y={coilRowY - 39} width="180"
+                                            height="79" rx="5" fill="#eff6ff"
+                                            stroke={selected===output.id?"#0284c7":"#36536b"}
+                                            strokeWidth={selected===output.id?2:1.5}/>
+                                          <text x={coilX - 115} y={coilRowY - 23} fontSize="10"
+                                            fontWeight="700" fill="#0f3654">
+                                            FB_GearSpray_Sequence
+                                          </text>
+                                          <text x={coilX - 115} y={coilRowY - 8} fontSize="9"
+                                            fill="#334155">i_Run · ST_Run_Rly</text>
+                                          <text x={coilX - 115} y={coilRowY + 6} fontSize="9"
+                                            fill="#334155">o_CycleRun · {output.tag}</text>
+                                          <text x={coilX - 115} y={coilRowY + 21} fontSize="9"
+                                            fontWeight="700" fill="#0f3654">
+                                            Estado: {String(project.tags.find(t=>t.name==="SM_Cycle_State")?.value??0)}
+                                          </text>
+                                          <text x={coilX + 51} y={coilRowY + 21}
+                                            textAnchor="end" fontSize="8" fill="#334155">
+                                            {project.tags.find(t=>t.name==="SM_Cycle_Blocked")?.value===true?
+                                              "BLOQUEO":"OPERATIVO"}
+                                          </text>
+                                          <Wire x1={coilX + 58} y1={coilRowY}
+                                            x2={width - 30} y2={coilRowY} live={rungLive}/>
+                                        </>
+                                      ) : isMathKind(output.kind) ? (
                                         <>
                                           <Wire x1={coilX - 142} y1={coilRowY}
                                             x2={coilX - 120} y2={coilRowY} live={rungLive}/>
@@ -1268,6 +1297,12 @@ export function PracticeEditor({
                                               typeof assignedTag.value === "object" && assignedTag.value.UN === true}
                                             selected={selected === output.id}
                                             online={running} live={rungLive}/>
+                                          {(output.doneTag||output.resetTag)&&
+                                            <text x={coilX - 112} y={coilRowY + 54} fontSize="9"
+                                              fontFamily="monospace" fill="#0f3654">
+                                              {output.doneTag?"Q → "+output.doneTag:""}
+                                              {output.resetTag?"  RESET ← "+output.resetTag:""}
+                                            </text>}
                                           <Wire x1={coilX + 16} y1={coilRowY}
                                             x2={width - 30} y2={coilRowY} live={rungLive}/>
                                         </>
@@ -1297,6 +1332,12 @@ export function PracticeEditor({
                                               assignedTag.value.DN === true}
                                             selected={selected === output.id}
                                             online={running} live={rungLive}/>
+                                          {(output.doneTag||output.resetTag)&&
+                                            <text x={coilX - 112} y={coilRowY + 54} fontSize="9"
+                                              fontFamily="monospace" fill="#0f3654">
+                                              {output.doneTag?"Q → "+output.doneTag:""}
+                                              {output.resetTag?"  RESET ← "+output.resetTag:""}
+                                            </text>}
                                           <Wire x1={coilX + 16} y1={coilRowY}
                                             x2={width - 30} y2={coilRowY} live={rungLive}/>
                                         </>
