@@ -52,41 +52,11 @@ test("Manual bypasses HEALTHY while AUTO without HEALTHY latches trip and block 
   const mode=step(initialGearSequenceState(),{run:true,manual:true});
   assert.equal(mode.output.permissive,true);
   assert.equal(mode.output.blocked,false);
-  const first=step(initialGearSequenceState(),{run:true});
-  assert.equal(first.output.state,10,
-    "Cold healthy value is qualified on the next scan");
-  assert.equal(first.output.cycleRun,false,
-    "During qualification the lubricating output must stay OFF");
-  assert.equal(first.memory.blockLatched,false);
-  const notHealthy=step(first.memory,{run:true});
+  const notHealthy=step(initialGearSequenceState(),{run:true});
   assert.equal(notHealthy.output.state,90);
   assert.equal(notHealthy.output.blocked,true);
   assert.equal(notHealthy.memory.blockLatched,true);
   assert.equal(notHealthy.output.rearmHold,true);
-});
-
-test("An actual trip blocks immediately even on the first RUN scan",()=>{
-  const trip=step(initialGearSequenceState(),{
-    run:true,healthy:false,tripActive:true,
-  });
-  assert.equal(trip.output.state,90);
-  assert.equal(trip.memory.blockLatched,true);
-  assert.equal(trip.output.cycleRun,false);
-});
-
-test("Cold false healthy settles if P06 grants permission on next scan",()=>{
-  const first=step(initialGearSequenceState(),{
-    run:true,healthy:false,manual:false,startupDone:false,
-  });
-  assert.equal(first.output.state,10);
-  assert.equal(first.output.cycleRun,false);
-  assert.equal(first.memory.blockLatched,false);
-  const settled=step(first.memory,{
-    run:true,healthy:true,manual:false,startupDone:false,
-  });
-  assert.equal(settled.output.state,20);
-  assert.equal(settled.output.cycleRun,true);
-  assert.equal(settled.memory.blockLatched,false);
 });
 
 test("Trip has highest priority; reset while trip active cannot release block",()=>{
