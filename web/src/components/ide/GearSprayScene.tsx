@@ -30,15 +30,26 @@ const surfaces = {
   lube:"#b45309", steel:"#334155",
 };
 
-/** Numeric field commits on blur/Enter, with whole-word edits. No implicit
- * changes to PLC values during intermediate keyboard editing. */
-function NumberSetting({name,value,onCommit,integer=false,caption}:{
-  name:string;value:number;onCommit:(value:number)=>void;
-  integer?:boolean;caption?:string;
+/** Edición numérica y deslizante sincronizada. Los setpoints DINT no tienen
+ * escalamiento de proceso publicado: su slider usa una ventana local ampliable,
+ * pero el campo numérico conserva el rango permitido por el PLC. */
+function NumberSetting({label,name,value,onCommit,integer=false,caption,
+  min=0,max,step}:{label:string;name:string;value:number;
+  onCommit:(value:number)=>void;integer?:boolean;caption?:string;
+  min?:number;max?:number;step?:number;
 }){
   const [draft,setDraft]=useState(String(value));
   const [error,setError]=useState("");
+  const [windowMax,setWindowMax]=useState(()=>
+    Math.max(100,Math.ceil(Math.max(value,0)/100)*100));
   useEffect(()=>setDraft(String(value)),[value]);
+  useEffect(()=>{
+    if(max===undefined&&value>windowMax)
+      setWindowMax(Math.ceil(value/100)*100);
+  },[max,value,windowMax]);
+  const sliderMax=max??windowMax;
+  const sliderStep=step??(integer?1:0.1);
+  const outOfRange=value<min||value>sliderMax;
   const save=()=>{
     if(draft.trim()===""){setError("Introduce un valor.");setDraft(String(value));return;}
     const parsed=Number(draft);
@@ -49,17 +60,37 @@ function NumberSetting({name,value,onCommit,integer=false,caption}:{
     }
     onCommit(parsed);setError("");
   };
-  return <label className="block min-w-0">
-    <span className="mb-1 block truncate text-[10px] font-medium text-slate-300"
-      title={name}>{name}</span>
-    <input type="number" min="0" step={integer?"1":"any"}
-      value={draft} onChange={e=>setDraft(e.target.value)}
-      onBlur={save} onKeyDown={e=>{if(e.key==="Enter")e.currentTarget.blur();}}
+  return <div className="min-w-0 rounded border border-[#354d62] bg-[#0f2434] p-2.5">
+    <label htmlFor={"gear-value-"+name} className="block">
+      <span className="block text-[11px] font-semibold text-slate-100">{label}</span>
+      <span className="mb-2 block break-all font-mono text-[10px] text-sky-300">{name}</span>
+    </label>
+    <input id={"gear-value-"+name} type="number" min={min}
+      step={integer?"1":"any"} value={draft}
+      onChange={e=>setDraft(e.target.value)} onBlur={save}
+      onKeyDown={e=>{if(e.key==="Enter")e.currentTarget.blur();}}
       className="w-full min-w-0 rounded border border-[#466075] bg-[#0c1d2a] px-2 py-1.5 text-xs text-slate-100 outline-none focus:border-sky-400"
-      aria-label={name}/>
-    {caption&&<span className="block pt-1 text-[9px] text-slate-500">{caption}</span>}
+      aria-label={label+" · valor numérico"}/>
+    <input type="range" min={min} max={sliderMax} step={sliderStep}
+      value={Math.min(sliderMax,Math.max(min,value))}
+      onChange={e=>{onCommit(Number(e.target.value));setError("");}}
+      className="mt-3 block h-2 w-full cursor-pointer accent-sky-500"
+      aria-label={label+" · barra deslizante"}/>
+    <div className="mt-1 flex items-center justify-between gap-1 text-[10px] tabular-nums text-slate-400">
+      <span>{min}</span><span>{sliderMax}</span>
+    </div>
+    {max===undefined&&<button type="button"
+      className="mt-1 text-[10px] text-sky-300 underline decoration-dotted hover:text-sky-100"
+      onClick={()=>setWindowMax(prev=>Math.min(2147483647,prev*2))}>
+      Ampliar escala del deslizador
+    </button>}
+    {caption&&<span className="mt-1 block text-[10px] leading-snug text-slate-400">{caption}</span>}
+    {outOfRange&&max!==undefined&&
+      <span className="block text-[10px] text-amber-300">
+        Valor fuera del rango de referencia. Usa el campo numérico para pruebas de falla.
+      </span>}
     {error&&<span role="alert" className="block text-[10px] text-amber-400">{error}</span>}
-  </label>;
+  </div>;
 }
 
 function Pilot({label,active,tone="green"}:{
@@ -185,7 +216,7 @@ function ProcessGraphic({project}: {project:PracticeProject}){
 
     {/* LUBRICANTE: succión desde el tambor, descarga de la bomba, filtro y
         válvula SV-2561 hasta la entrada lateral del dosificador. */}
-    <text x="433" y="506" fontSize="11.5" fontWeight="700" fill="#92400e">
+    <text x="433" y="491" fontSize="11.5" fontWeight="700" fill="#92400e">
       CIRCUITO DE LUBRICANTE
     </text>
     <rect x="208" y="483" width="103" height="109" rx="9"
@@ -476,29 +507,46 @@ export function GearSprayScene({project,mode,setupError,onPushButton,
             <Gauge size={15}/> Instrumentación y setpoints
           </h3>
           <p className="mb-3 text-[10px] text-slate-400">
-            Fase 1: consignas manuales para pruebas. Unidades de presión
-            según CCW, pendientes de escalamiento.
+            Ingresa un número o mueve la barra. Presiones: rangos de escalamiento
+            del sistema original Cscape; falta confirmar la equivalencia en CCW.
           </p>
-          <div className="grid grid-cols-2 gap-3">
-            {GEAR_FIELD_INPUTS.filter(x=>x.type==="REAL").map(input=>
-              <NumberSetting key={input.name} name={input.name}
-                caption={input.name==="_310_PI_2561"?"Presión de aire · simulada manualmente":
-                  "Presión de lubricante · simulada manualmente"}
+          <h4 className="mb-2 text-[11px] font-semibold text-slate-200">Entradas analógicas</h4>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {GEAR_FIELD_INPUTS.filter(x=>x.type==="REAL").map(input=>{
+              const isAir=input.name==="_310_PI_2561";
+              return <NumberSetting key={input.name} name={input.name}
+                label={isAir?"Presión de aire":"Presión de lubricante"}
+                min={0} max={isAir?148:1480} step={0.1}
+                caption={isAir?"Referencia original: 0–148":
+                  "Referencia original: 0–1480"}
                 value={gearNumber(project,input.name)}
-                onCommit={value=>onAnalogInput(input.name as GearAnalogInput,value)}/>)}
+                onCommit={value=>onAnalogInput(input.name as GearAnalogInput,value)}/>;
+            })}
+          </div>
+          <h4 className="mb-2 mt-3 text-[11px] font-semibold text-slate-200">Setpoints de operación</h4>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {GEAR_HMI_SETPOINTS.map(sp=><NumberSetting key={sp.name}
               name={sp.name} integer value={gearNumber(project,sp.name)}
-              caption={sp.description}
+              label={sp.name==="TMR_Freq_SP"?"Frecuencia entre lubricaciones":
+                sp.name==="CNT_LubeFlo_SP"?"Pulsos por lubricación":
+                sp.name==="TMR_LubeFlo_SP"?"Tiempo máximo de lubricación":
+                "Duración de mantenimiento"}
+              caption="Deslizador con escala ampliable; el programa no define un máximo operativo para esta consigna."
               onCommit={value=>onSetpoint(sp.name as GearSetpoint,value)}/>)}
           </div>
           <div className="mt-3 space-y-2 border-t border-slate-700 pt-3">
             <h4 className="text-[11px] font-semibold">Entradas digitales de campo</h4>
             {GEAR_FIELD_INPUTS.filter(x=>x.type==="BOOL").map(x=>
-              <label key={x.name} className="flex cursor-pointer items-center gap-2 text-[11px]">
+              <label key={x.name} className="flex cursor-pointer items-start gap-2 rounded border border-[#354d62] bg-[#0f2434] p-2 text-[11px]">
                 <input type="checkbox" checked={v(x.name)}
                   onChange={event=>onDigitalInput(x.name as GearDigitalInput,event.target.checked)}
-                  className="accent-sky-500" />
-                <span className="break-all text-slate-200">{x.name}</span>
+                  className="mt-0.5 accent-sky-500"/>
+                <span className="min-w-0 break-words text-slate-200">
+                  {x.name==="_310_PLC104_YI_MillRun"?"Confirmación de molino en marcha":
+                    x.name==="_310_SQS_2561"?"Pulso del dosificador":
+                    "Sensor de nivel bajo de lubricante"}{" "}
+                  <span className="font-mono text-sky-300">({x.name})</span>
+                </span>
               </label>)}
           </div>
         </section>
