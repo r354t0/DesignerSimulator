@@ -151,8 +151,8 @@ test("App exposes scene switch and independently saved MainRoutine sessions",()=
   const view=readFileSync(new URL("../src/components/ide/SortScene.tsx",import.meta.url),"utf8");
   const info=readFileSync(new URL("../src/components/ide/SortSceneInfoDialog.tsx",import.meta.url),"utf8");
   assert.match(app,/<option value="sorting">Clasificación de cajas<\/option>/);
-  assert.match(app,/sceneSessions\.current\[previous\] = stopPracticeScans\(current\)/);
-  assert.match(app,/stopPracticeScans\(sceneSessions\.current\[next\]\)/);
+  assert.match(app,/sceneSessions\.current\[previous\] = stopSceneController\(current,previous\)/);
+  assert.match(app,/stopSceneController\(sceneSessions\.current\[next\],next\)/);
   assert.match(app,/<SortScene project=\{practice\}/);
   assert.match(app,/applySortSensorInput\(state, name, value\)/);
   assert.match(tags,/activeScene === "motor" \? "demo" : "practice"/);
