@@ -45,7 +45,9 @@ test("Gear Spray phase 1 registers exactly the P01 physical CCW I/O and HMI valu
   assert.equal(p.rungs.length,1);
   assert.equal(p.rungs[0].instructions.length,0);
   assert.ok(p.tags.every(t=>!t.name.startsWith("ST_")&&!t.name.startsWith("ALM_")));
-  assert.equal(buildPracticeProject(p).success,true);
+  // MainRoutine deliberately starts blank. Until the CCW logic is ported,
+  // the build correctly refuses an empty rung rather than running fake PLC logic.
+  assert.equal(buildPracticeProject(p).success,false);
 });
 
 test("Gear Spray preserves customized programs/tags when revisiting",()=>{
