@@ -99,7 +99,8 @@ export function BatchMixerSceneInfoDialog({open,project,selectedExercise,onClose
             Modo A: un lote y nueva orden START después de vaciar. La relación
             se aplica al 100 % de capacidad: 1000 pulsos en total, 10 pulsos por cada 1 %.</p>}
           {exercise===5&&<p className="mt-2 text-[11px] text-slate-400">
-            Modo B: el lote producido se visualiza como entero en INT_DisplayValue.</p>}
+            Modo B: el contador CNT_Lotes se presenta en el display del SCADA
+            sin agregar una instrucción MOV a los 17 rungs de la solución.</p>}
         </div>
       </section>
       <section aria-label="Solución Recomendada"
@@ -111,13 +112,12 @@ export function BatchMixerSceneInfoDialog({open,project,selectedExercise,onClose
           salidas e interbloqueos. Las variables adicionales solo se crean al implementarla.
         </p>
         <h4 className="mb-2 font-semibold">
-          {exercise<=3?"Variables utilizadas en la solución":"Variables adicionales"} · Ejercicio {exercise}
+          Variables utilizadas en la solución · Ejercicio {exercise}
         </h4>
         <SceneTagTable
-          specs={exercise===1||exercise===2||exercise===3
-            ? batchSolutionUsedTags(exercise) : batchSolutionTags(exercise)}
+          specs={batchSolutionUsedTags(exercise)}
           project={project} preview/>
-        {exercise<=3&&<p className="mt-1.5 text-[10px] text-slate-400">
+        {<p className="mt-1.5 text-[10px] text-slate-400">
           Solo aparecen los tags referenciados en los rungs de este ejercicio.
           Las E/S ya existen en el SCADA; las variables internas se crean al
           implementar la solución.
@@ -126,7 +126,8 @@ export function BatchMixerSceneInfoDialog({open,project,selectedExercise,onClose
           {exercise===1?"FM1 incrementa CNT_Volume hasta 900 pulsos (90 %).":
             exercise===2?"FM1 incrementa y FM3 decrementa CNT_Volume. TON TMR_Mixing utiliza PRE = 8000 ms; su bit TT habilita el mezclador y DN inicia el drenaje.":
             exercise===3?"Utiliza los 12 rungs del ejercicio 2 y añade después del rung 0 dos rungs: IDLE enclavado con STOP / desactivado por START, y RUN controlado por ST_RunEnable.":
-            "El termostato es una DI. El Ladder convierte INT_RatioP1 a pulsos mediante MUL × 10 y compara el resultado con CNT_Product1.ACC; la temperatura real pertenece a la física simulada."}
+            exercise===4?"Lote A: R5 MUL convierte INT_RatioP1 a INT_PresetP1 (×10); R6 CTU CNT_Volume usa PRE = INT_PresetP1. P2 completa el tanque; el termostato DI dispara TON de 4000 ms y luego comienza el drenaje.":
+            "Lotes B: agrega una rama OR en R3 que reinicia el llenado mientras CNT_Lotes.DN sea FALSE. R15 genera ST_BatchComplete y R16 cuenta los lotes con PRE = INT_BatchTarget. Se mantiene el Ladder de las capturas sin rungs adicionales."}
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <button type="button" onClick={()=>{onClose();onLoadSolution(exercise);}}
