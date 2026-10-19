@@ -126,7 +126,6 @@ export function BatchMixerSceneInfoDialog({open,project,selectedExercise,onClose
           {exercise===1?"FM1 incrementa CNT_Volume hasta 900 pulsos (90 %).":
             exercise===2?"FM1 incrementa y FM3 decrementa CNT_Volume. TON TMR_Mixing utiliza PRE = 8000 ms; su bit TT habilita el mezclador y DN inicia el drenaje.":
             exercise===3?"Utiliza los 12 rungs del ejercicio 2 y añade después del rung 0 dos rungs: IDLE enclavado con STOP / desactivado por START, y RUN controlado por ST_RunEnable.":
-            exercise===3?"Cada pulso de FM1 y FM3 equivale a 0,1 % y CNT_Volume registra los pulsos netos.":
             "El termostato es una DI. El Ladder convierte INT_RatioP1 a pulsos mediante MUL × 10 y compara el resultado con CNT_Product1.ACC; la temperatura real pertenece a la física simulada."}
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
