@@ -48,6 +48,7 @@ test("Lube pulses and level consumption require SV-2561 and sufficient pressure"
   const sensors=gearPhysicalSensors(state);
   assert.equal(sensors._310_PI_2561,state.airPressure);
   assert.equal(sensors._310_PI_2560,state.lubePressure);
+  assert.equal(sensors.DI_PDB,sensors._310_SQS_2561);
   const count=state.totalPulses;
   state=advance(state,pumped,2);
   assert.equal(state.totalPulses,count);
@@ -84,7 +85,7 @@ test("Scene 06 physics only runs under its own PLC RUN and writes input tags onl
   assert.match(physicalEffect,/if\(!physical.enabled\)return|!physical.enabled\)return/);
   for(const tag of ["_310_SV_2560","_310_SV_2561","_310_SV_2563"])
     assert.ok(physicalEffect.includes(tag),tag);
-  for(const tag of ["_310_PI_2560","_310_PI_2561","_310_SQS_2561","_310_LSL"])
+  for(const tag of ["_310_PI_2560","_310_PI_2561","_310_SQS_2561","DI_PDB","_310_LSL"])
     assert.ok(physicalEffect.includes(tag),tag);
   assert.doesNotMatch(physicalEffect,/setTagValue\(result.project,"_310_SV_/);
   assert.match(physicalEffect,/applySceneSensorBoolInput/);
@@ -96,5 +97,6 @@ test("Scene 06 physics only runs under its own PLC RUN and writes input tags onl
   assert.match(scene,/onPhysicsReset/);
   assert.match(scene,/physics.totalPulses/);
   assert.match(scene,/gearSprayIsActive/);
-  assert.match(scene,/DI_PDB\/DI_PDB_2 pendientes/);
+  assert.match(scene,/se utiliza DI_PDB para los pulsos/);
+  assert.doesNotMatch(scene,/DI_PDB_2/);
 });
