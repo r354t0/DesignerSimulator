@@ -33,8 +33,10 @@ function createMath(kind) {
 
 for(const kind of ["MOV","ADD","SUB","MUL","DIV"]){
   const scenarios=[
-    ["INT a DINT","SourceInt",null,"DestDint",18],
-    ["DINT a INT","SourceDint",null,"DestInt",7],
+    ["INT a DINT","SourceInt",null,"DestDint",
+      kind==="MOV" ? 18 : {ADD:20,SUB:16,MUL:36,DIV:9}[kind]],
+    ["DINT a INT","SourceDint",null,"DestInt",
+      kind==="MOV" ? 7 : {ADD:9,SUB:5,MUL:14,DIV:3}[kind]],
     ["DINT con DINT a INT","SourceDint","SecondDint","DestInt",
       {ADD:9,SUB:5,MUL:14,DIV:3}[kind]],
     ["INT con DINT a DINT","SourceInt","SecondDint","DestDint",
