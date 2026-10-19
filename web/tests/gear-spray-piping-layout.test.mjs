@@ -38,17 +38,33 @@ test("PI-2560 está conectado entre el filtro y SV-2561 sin solaparse con la vá
   assert.ok(graphic.includes('<path d="M575 445 V416"'),
     "El transmisor debe comunicarse con el circuito de grasa");
   assert.ok(graphic.includes('<circle cx="575" cy="402" r="14"'));
-  assert.ok(graphic.includes('<rect x="517" y="345" width="121" height="34"'));
+  assert.ok(graphic.includes('<rect x="518" y="345" width="114" height="34"'));
   assert.ok(graphic.includes('PI-2560 · GRASA'));
   assert.ok(!graphic.includes('tee(707,445,"lube")'),
     "No debe permanecer la toma de presión posterior a la solenoide");
+});
+
+test("Filtro compacto, PI-2560 y SV-2561 tienen separación horizontal",()=>{
+  const filter={x:492,width:32};
+  const transmitter={x:575,radius:14};
+  const valve={x:665,halfWidth:19};
+  assert.ok(graphic.includes('<rect x="492" y="432" width="32" height="26"'),
+    "Filtro más pequeño que la versión anterior");
+  assert.ok(graphic.includes('<circle cx="575" cy="402" r="14"'));
+  assert.ok(graphic.includes('solenoid(665,445,"SV-2561",grease,"lube")'));
+  assert.ok(transmitter.x-transmitter.radius-(filter.x+filter.width)>=30,
+    "Separación mínima de filtro a PI-2560");
+  assert.ok(valve.x-valve.halfWidth-(transmitter.x+transmitter.radius)>=40,
+    "Separación mínima de PI-2560 a SV-2561");
+  assert.ok(graphic.includes('text x="575" y="337" textAnchor="middle"'),
+    "La etiqueta de PI-2560 debe quedar centrada");
 });
 
 test("Los instrumentos mantienen sus tags CCW y la vista no escribe salidas",()=>{
   for(const ref of [
     'solenoid(464,156,"SV-2563",air,"air")',
     'solenoid(394,305,"SV-2560",pump,"air")',
-    'solenoid(612,445,"SV-2561",grease,"lube")',
+    'solenoid(665,445,"SV-2561",grease,"lube")',
     '"_310_SQS_2561"',
     '"_310_PLC104_YI_MillRun"',
     'gearNumber(project,"_310_PI_2561").toFixed(1)',
