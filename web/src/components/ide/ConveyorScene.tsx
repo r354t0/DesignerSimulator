@@ -256,7 +256,7 @@ export function ConveyorScene({
               )}
             </div>
           </section>
-          <section className="sort-panel min-w-0 rounded-lg border border-[#344c5e] p-3"
+          <section className="sort-panel scada-led-panel min-w-0 rounded-lg border border-[#344c5e] p-3"
             aria-label="Pilotos LED">
             <div className="mb-2 text-xs font-semibold text-slate-200">Pilotos LED</div>
             <div className="space-y-3">
