@@ -88,8 +88,9 @@ test("P05 AFI high-pressure timer is intentionally disabled via false contact",(
 
 test("P05 low-pressure alarm triggers and P07 calculates nonzero fault code",()=>{
   let p=manual();
-  // Keep low-flow alarm from masking the independent low-pressure timer.
+  // Isolate low pressure from air-fail (5 s) and low-flow (10 s) alarms.
   p=set(p,"TMR_LubeFlo_SP",60000);
+  p=field(p,"_310_PI_2561",100);
   p=field(p,"_310_PI_2560",100);
   p=tick(p,120);
   assert.equal(val(p,"TMR_LubePress_Lo").DN,true);
