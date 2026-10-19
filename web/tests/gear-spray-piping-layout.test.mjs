@@ -32,6 +32,18 @@ test("PI-2561 se encuentra junto al dosificador y ninguna etiqueta tapa su entra
   assert.match(graphic,/PI-2560 · GRASA/);
 });
 
+test("PI-2560 está conectado entre el filtro y SV-2561 sin solaparse con la válvula",()=>{
+  assert.ok(graphic.includes('tee(575,445,"lube")'),
+    "La derivación debe quedar a la derecha del filtro (x=559) y antes de SV-2561 (x=593)");
+  assert.ok(graphic.includes('<path d="M575 445 V416"'),
+    "El transmisor debe comunicarse con el circuito de grasa");
+  assert.ok(graphic.includes('<circle cx="575" cy="402" r="14"'));
+  assert.ok(graphic.includes('<rect x="517" y="345" width="121" height="34"'));
+  assert.ok(graphic.includes('PI-2560 · GRASA'));
+  assert.ok(!graphic.includes('tee(707,445,"lube")'),
+    "No debe permanecer la toma de presión posterior a la solenoide");
+});
+
 test("Los instrumentos mantienen sus tags CCW y la vista no escribe salidas",()=>{
   for(const ref of [
     'solenoid(464,156,"SV-2563",air,"air")',
