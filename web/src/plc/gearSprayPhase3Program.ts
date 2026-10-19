@@ -117,6 +117,10 @@ export function createGearPhase3AProject():PracticeProject {
     mov("_310_PI_2560","LubePressure_In_Scaled")]);
   make("gear3a-p01-hi",[
     reg("GRT","LubePressure_In_Scaled",1500),o("LubePress_Hi")]);
+  // P01 rung 5: retain its ORIGINAL position immediately after high pressure.
+  // Run_Rly reflects the prior completed scan because P02 follows P01.
+  make("gear3a-p01-low",[
+    x("Run_Rly"),reg("LES","LubePressure_In_Scaled",400),o("LubePress_Lo")]);
   make("gear3a-p01-mill",[
     x("_310_PLC104_YI_MillRun"),o("DI_Mill_Run")]);
   make("gear3a-p01-pulse",[
@@ -166,13 +170,12 @@ export function createGearPhase3AProject():PracticeProject {
     nx("ST_Man_Mode"),
   ],o("ST_Auto_Selected"));
 
-  // P01 physical output mappings execute AFTER mode manager rungs so
-  // signal propagation does not depend on a stale previous-scan copy.
+  // Compatibility bridge: P02 updates ST_Run_Rly later in this scan.
+  // Update Run_Rly here for the NEXT scan of the original P01 rung 5;
+  // NEVER move LubePress_Lo out of its source-code position.
   make("gear3a-p01-run",[
     x("ST_Run_Rly"),o("Run_Rly")],
     "P01 — MAPPING | Salidas y condiciones de marcha.");
-  make("gear3a-p01-low",[
-    x("Run_Rly"),reg("LES","LubePressure_In_Scaled",400),o("LubePress_Lo")]);
   make("gear3a-p01-running-light",[
     x("DO_LS_Running_Output"),o("LS_Running_Output")]);
   const terminals=[
