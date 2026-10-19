@@ -469,7 +469,7 @@ export function GearSprayScene({project,mode,setupError,onPushButton,
             <div className="mt-1 text-xs font-semibold text-slate-100">{item.value}</div>
           </div>)}
         </div>
-        <section className="sort-panel rounded-lg border border-[#344c5e] p-3">
+        <section className="sort-panel mt-3 rounded-lg border border-[#344c5e] p-3">
           <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold">
             <Gauge size={15}/> Instrumentación y setpoints
           </h3>
