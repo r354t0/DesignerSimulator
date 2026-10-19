@@ -50,7 +50,7 @@ test("MainRoutine is the real programmable Ladder, never the fixed motor demo",(
 
 test("Controller Tags shows only the active scene scope",()=>{
  assert.match(app,/<ControllerTags activeScene=\{simulationTab\}/);
- assert.match(tags,/activeScene: "conveyor" \| "sorting" \| "tank" \| "traffic" \| "batch" \| "motor"/);
+ assert.match(tags,/activeScene: "conveyor" \| "sorting" \| "tank" \| "traffic" \| "batch" \| "gear" \| "motor"/);
  assert.match(tags,/activeScene === "motor" \? "demo" : "practice"/);
  assert.doesNotMatch(tags,/setScope\(/);
  assert.match(tags,/MainRoutine · Faja transportadora/);
