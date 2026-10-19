@@ -69,8 +69,16 @@ test("integrated E4: two products, digital thermostat, 4s hold and drain to low"
   assert.equal(sim.until(()=>batchBool(sim.controller.project,"DI_Thermostat")),true);
   assert.equal(sim.physical.temperature>=24,true);
   assert.equal(sim.until(()=>batchBool(sim.controller.project,"DO_Pump3")),true);
+  const temperatureAtDrainStart=sim.physical.temperature;
+  for(let i=0;i<20;i++)sim.step();
+  assert.ok(sim.physical.temperature<temperatureAtDrainStart,
+    "E4 SCADA must cool as soon as the draining pump is active");
+  assert.equal(batchBool(sim.controller.project,"DI_Thermostat"),false,
+    "digital thermostat clears as temperature drops below the INT setpoint");
   assert.equal(sim.until(()=>sim.physical.level===0),true);
   for(let i=0;i<3;i++)sim.step();
+  assert.equal(sim.physical.temperature,20,
+    "the empty vessel must be at ambient for the next batch");
   assert.equal(batchBool(sim.controller.project,"DO_Pump3"),false);
   assert.equal(batchBool(sim.controller.project,"ST_BatchDone"),true);
 });
