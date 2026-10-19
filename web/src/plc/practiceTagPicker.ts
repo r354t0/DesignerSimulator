@@ -1,4 +1,5 @@
 import { isCounterKind, isTimerKind, isMathKind, type EditableKind, type PracticeTag } from "./practiceDocument.ts";
+import { mathDestinationOptions } from "./practiceMath.ts";
 
 export interface TagPickerRow {
   name: string;
@@ -29,9 +30,13 @@ export function getTagPickerRows(
   const roots = [...tags].sort((a, b) => a.name.localeCompare(b.name));
   const rows: TagPickerRow[] = [];
   const boolContact = kind === "XIC" || kind === "XIO";
+  // Destinations do not inherit the type of Source A or Source B.
+  // Share the same candidate rules with the math validation/assignment path.
+  const mathDestinations = isMathKind(kind)
+    ? new Set(mathDestinationOptions(tags).map(tag => tag.name)) : null;
   for (const tag of roots) {
     if (isMathKind(kind)) {
-      if (!tag.constant && ["INT", "DINT", "REAL"].includes(tag.type) &&
+      if (mathDestinations?.has(tag.name) &&
           matches(tag.name, tag.description)) {
         rows.push({ name: tag.name, type: tag.type as "INT" | "DINT" | "REAL",
           description: tag.description, selectable: true, depth: 0,
