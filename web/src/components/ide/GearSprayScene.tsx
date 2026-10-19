@@ -26,7 +26,7 @@ interface Props {
   onFatCommand:(tag:GearFatCommand,value:boolean)=>void;
   physics:GearPhysicalState;
   onPhysicsChange:(patch:Partial<Pick<GearPhysicalState,
-    "enabled"|"airSupply"|"drumPercent"|"airLoss"|"filterBlocked"|"doserBlocked">>)=>void;
+    "enabled"|"airSupply"|"drumPercent"|"pressureDecayFactor"|"airLoss"|"filterBlocked"|"doserBlocked">>)=>void;
   onPhysicsReset:()=>void;
   setupError: string | null;
   onPushButton: (tag: GearPushButton, value: boolean) => void;
@@ -602,6 +602,31 @@ export function GearSprayScene({project,mode,fatLoaded,onLoadFat,onRestoreFat,
                   </div>
                 </label>
               </div>
+              <label className="mt-3 block min-w-0 rounded border border-[#354d62] bg-[#122b3c] p-2.5 text-[11px] text-slate-200">
+                <span className="block font-semibold">
+                  Velocidad de pérdida de presión
+                </span>
+                <span className="mb-2 block text-[10px] text-slate-400">
+                  Controla la caída de presión de aire y lubricante; no modifica
+                  la velocidad de aumento de presión.
+                </span>
+                <div className="flex items-center gap-2">
+                  <input type="range" min={0.25} max={4} step={0.25}
+                    value={physics.pressureDecayFactor}
+                    onChange={e=>onPhysicsChange({
+                      pressureDecayFactor:Number(e.target.value)})}
+                    className="min-w-0 flex-1 accent-sky-500"
+                    aria-label="Velocidad de pérdida de presión"/>
+                  <span className="w-12 text-right font-mono font-semibold tabular-nums text-sky-200">
+                    {physics.pressureDecayFactor.toFixed(2)}×
+                  </span>
+                </div>
+                <div className="mt-1 flex justify-between text-[10px] text-slate-400">
+                  <span>Lenta (0.25×)</span>
+                  <span>Normal (1×)</span>
+                  <span>Rápida (4×)</span>
+                </div>
+              </label>
               <p className="mb-2 mt-3 text-[10px] font-semibold text-slate-300">
                 Inyección de fallas físicas
               </p>
