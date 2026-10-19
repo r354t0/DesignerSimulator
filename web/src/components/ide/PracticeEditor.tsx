@@ -51,6 +51,7 @@ import {
   isMathKind,
   OR_JUNCTION_KIND,
   setInstructionPreset,
+  setRungComment,
   type EditableKind,
   type PracticeProject,
 } from "../../plc/practiceDocument";
@@ -87,6 +88,7 @@ export function PracticeEditor({
 }: Props) {
   const [selected, setSelected] = useState<string | null>(null);
   const [selectedRungId, setSelectedRungId] = useState<string | null>(null);
+  const [editingRungCommentId,setEditingRungCommentId]=useState<string|null>(null);
   const [selectedOrBranch, setSelectedOrBranch] = useState<{ rungId: string; branchId: string } | null>(null);
   const [error, setError] = useState("");
   const [dropPreview, setDropPreview] = useState<(VisualLadderDropTarget & { rungId: string }) | null>(null);
@@ -908,6 +910,31 @@ export function PracticeEditor({
                   }
                 }}
               >
+                <div className="ml-[50px] flex min-h-[24px] items-start gap-2 border-b border-slate-100 bg-[#f8fafc] px-2 py-1">
+                  {editingRungCommentId===rung.id?
+                    <textarea autoFocus rows={2} maxLength={240}
+                      aria-label={"Comentario del rung "+rungIndex}
+                      value={rung.comment??""}
+                      onChange={e=>onChange(setRungComment(project,rung.id,e.target.value))}
+                      onKeyDown={e=>{
+                        e.stopPropagation();
+                        if(e.key==="Escape"){
+                          e.preventDefault();setEditingRungCommentId(null);
+                        }
+                      }}
+                      onBlur={()=>setEditingRungCommentId(null)}
+                      placeholder="Escribe el comentario de este rung..."
+                      className="min-h-[40px] w-full max-w-2xl resize-y rounded border border-sky-400 bg-white px-2 py-1 font-mono text-[11px] text-slate-700 outline-none focus:ring-1 focus:ring-sky-500"/>:
+                    <button type="button"
+                      title="Agregar o editar comentario del rung"
+                      aria-label={"Editar comentario del rung "+rungIndex}
+                      onClick={()=>setEditingRungCommentId(rung.id)}
+                      className={"min-w-0 whitespace-pre-wrap break-words text-left text-[11px] leading-snug "+
+                        (rung.comment?.trim()?
+                          "font-mono font-medium text-sky-900":"italic text-slate-400 hover:text-sky-700")}>
+                      {rung.comment?.trim()||"+ Añadir comentario al rung"}
+                    </button>}
+                </div>
                 {rungDropTarget?.rungId === rung.id && draggingRungId !== rung.id && (
                   <div aria-hidden="true" className={
                     "pointer-events-none absolute inset-x-0 z-40 border-t-[3px] border-sky-500 " +
