@@ -49,3 +49,41 @@ aprobación de FAT visual.
 - B08 restaura el proyecto respaldado solo dentro de la sesión actual. No
   recargar el navegador mientras la plantilla esté cargada.
 - Ante discrepancias: anotar ID, valor de entrada/salida/tag y captura.
+
+
+## FAT Fase 2 — Etapa D: RUN, PAUSE, SCAN, STOP y cambio de escena
+
+**Prerrequisitos:** PLC STOP; plantilla Ladder temporal FAT cargada y Build
+satisfactorio. Física automática habilitada; aire de acometida = 100,
+tambor = 100 %, fallas desactivadas. Verificar cada paso en el navegador.
+
+| ID | Acción | Resultado esperado |
+|---|---|---|
+| D01 | RUN con los tres mandos FAT desactivados | El número de scans aumenta; presión de aire converge a 100, presión de lubricante es 0 y no hay pulsos |
+| D02 | En RUN activar bomba, válvula de lubricante y aire de atomización | Las tres salidas OTE activas; presión de lubricante alcanza >400; aparecen pulsos DI_PDB y decrece nivel |
+| D03 | Pulsar PAUSE con dosificación activa; observar 3–5 s | Número de scans, nivel, presiones y contador de pulsos congelados. **Los OTE conservan su último estado ON**: PAUSE no es parada de seguridad |
+| D04 | Pulsar SCAN exactamente una vez mientras PAUSE | Número de scans aumenta exactamente 1; estado PAUSE se mantiene; el modelo físico sigue congelado |
+| D05 | Pulsar RUN para reanudar | Se conserva el programa/estado del scan y vuelven a avanzar los pulsos, la física y el contador |
+| D06 | Pulsar STOP con las tres salidas activadas | El PLC pone las bobinas OTE en OFF y el banco FAT desmarca los tres mandos. Los valores físicos quedan **congelados**, no decaen hasta el próximo RUN |
+| D07 | Volver a pulsar RUN después de STOP sin tocar mandos | Las tres electroválvulas permanecen OFF; no hay rearranque inesperado. La presión residual de lubricante cae progresivamente al reanudarse el modelo físico |
+| D08 | En RUN activar bomba; cambiar a otra escena y regresar a Gear Spray | El controlador de Gear Spray queda en STOP, los mandos FAT desmarcados y su Ladder conservado; la física no avanzó durante la ausencia |
+| D09 | En STOP restaurar el programa anterior | MainRoutine y tags originales reaparecen; no quedan comandos FAT activos |
+
+**Precauciones / interpretación:**
+- STOP desenergiza las bobinas OTE, pero no simula el vaciado instantáneo de una
+  instalación real. La presión visual no cambia hasta la siguiente ejecución
+  física en RUN. PAUSE mantiene la imagen OTE de la última evaluación, aunque
+  no continúan los movimientos ni pulsos.
+- Los tres comandos FAT se desarman en STOP, incluso al cambiar de escena o
+  cuando la aplicación entra a STOP por una modificación estructural del Ladder.
+  Esta salvaguarda es específica de la plantilla temporal y **no** modifica
+  las entradas normales ni la lógica CCW definitiva.
+- Al volver a RUN tras D06, observar la caída de presión de lubricante sin
+  activar la bomba, debida a la dinámica de descarga física simulada.
+- SCAN durante PAUSE ejecuta un ciclo Ladder pero **no** avanza el reloj de la
+  física: un SCAN por sí solo no debe generar pulsos de dosificación.
+- No recargar el navegador antes de restaurar la copia guardada: el respaldo
+  del programa anterior existe solamente en memoria de esta sesión.
+- En D08 el estado físico del modelo permanece guardado y congelado durante
+  el cambio de escena, mientras la sesión de control permanece en STOP al
+  regresar. No confundir retención de valores con actividad física.
