@@ -146,15 +146,6 @@ Mantener **separación estricta** entre:
 - El SCADA muestra el estado de la máquina y el acumulado del contador. STOP desenergiza `ST_Cycle_Rly` y salidas Q no retentivas; PAUSE conserva los estados y detiene el tiempo simulado.
 - Pruebas `web/tests/gear-spray-phase3b-p03.test.mjs` validan el orden, compilación, ciclos, conteo, purga 30 s, bloqueo/rearme y STOP. El FAT visual sigue pendiente de aprobación.
 
-## Corrección de bloqueo espurio en P03 al iniciar AUTO
-
-- **Causa reproducida:** P03 ejecutaba `FB_GearSpray_Sequence` antes de que P06 escribiese `DO_LS_Healthy` en el mismo scan. Al pulsar AUTO después de estar detenido, P03 leía el FALSE de la sesión anterior, activaba `SM_Cycle_BlockLatched` y permanecía en estado 90 **aunque `ST_General_Trip_Rly` y todas las alarmas fueran FALSE**.
-- **Adaptación explícita del simulador:** la **primera ejecución al pasar de estado 0 a RUN**, sin trip activo y sin bloque retenido previo, tolera **exactamente un scan** para que se actualice el permiso de P06. Durante ese scan `ST_Cycle_Rly` sigue FALSE si no hay permiso; las válvulas no son habilitadas por el FB. En el siguiente scan, si `DO_LS_Healthy` continúa FALSE y no existe bypass MANUAL, el bloque entra en 90.
-- **Seguridad y retención preservadas:** `ST_General_Trip_Rly=TRUE` bloquea de inmediato, incluso durante el scan inicial; la falta persistente de permiso también bloquea. Un bloqueo previamente retenido **no se borra automáticamente** al despejarse una falla ni con STOP: se requiere RESET con RUN activo, permiso disponible y sin trip.
-- **Diferencia respecto del ST de CCW:** la tolerancia de un scan durante la inicialización se añadió únicamente para reconciliar el orden P03→P06 de este motor Ladder unificado. Debe confirmarse su necesidad frente al ciclo de ejecución final del PLC real.
-- El SCADA muestra ahora `DO_LS_Healthy`, `ST_Man_Mode`, `ST_General_Trip_Rly` y `SM_Cycle_BlockLatched` para identificar permiso, disparo y bloqueo retenido.
-- Pruebas de regresión: arranque AUTO sin alarmas, permiso P06 actualizado al scan siguiente, alarma real inmediata, permiso permanentemente ausente con bloqueo al segundo scan y rearme mediante RESET.
-
 ## Plantilla unificada P01–P07 — estado actual
 
 - Archivo: `web/src/plc/gearSprayCompleteProgram.ts`. La escena 06 lo carga desde `createGearCompleteProject()` con copia temporal reversible del proyecto anterior.
