@@ -597,7 +597,7 @@ export function GearSprayScene({project,mode,physics,onPhysicsChange,onPhysicsRe
               name={sp.name} integer value={gearNumber(project,sp.name)}
               label={sp.name==="TMR_Freq_SP"?"Frecuencia entre lubricaciones":
                 sp.name==="CNT_LubeFlo_SP"?"Pulsos por lubricación":
-                sp.name==="TMR_LubeFlo_SP"?"Tiempo máximo de lubricación":
+                sp.name==="TMR_LubeFlo_SP"?"Tiempo de alarma por flujo bajo":
                 "Duración de mantenimiento"}
               caption={sp.description}
               onCommit={value=>onSetpoint(sp.name as GearSetpoint,value)}/>)}
