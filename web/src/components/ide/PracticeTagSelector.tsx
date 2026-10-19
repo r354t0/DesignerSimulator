@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
 import { createPortal } from "react-dom";
 import { Check, Search, X, ChevronDown, ChevronRight } from "lucide-react";
 import { getTagPickerRows } from "../../plc/practiceTagPicker";
-import { type PracticeTag, type EditableKind } from "../../plc/practiceDocument";
+import { isMathKind, type PracticeTag, type EditableKind } from "../../plc/practiceDocument";
 
 export type TagSelectorMode = "suggestions" | "dialog" | "edit";
 
@@ -38,6 +38,7 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose, onEdit,
   const rows = useMemo(() =>
     getTagPickerRows(tags, selector.kind as EditableKind, query, expandedTimers),
     [tags, selector.kind, query, expandedTimers]);
+  const mathDestination = isMathKind(selector.kind as EditableKind);
   const suggestions = selector.mode === "suggestions";
   const editing = selector.mode === "edit";
   // Show every compatible tag in both selector modes. The quick popup stays
@@ -156,7 +157,7 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose, onEdit,
           <thead className="sticky top-0 bg-slate-100 text-slate-600">
             <tr>
               <th className="px-3 py-2 font-semibold">Nombre</th>
-              {!suggestions && <th className="px-3 py-2 font-semibold">Tipo</th>}
+              <th className="px-3 py-2 font-semibold">Tipo</th>
               <th className="px-3 py-2 font-semibold">Descripción</th>
             </tr>
           </thead>
@@ -166,7 +167,7 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose, onEdit,
               const isActive = selectableIndex === activeIndex && row.selectable;
               return (
                 <tr key={row.name}>
-                  <td colSpan={suggestions ? 2 : 3} className="p-0">
+                  <td colSpan={3} className="p-0">
                     <button type="button"
                       aria-label={(row.expandable ? (row.expanded ? "Contraer " : "Expandir ") : "Asignar tag ") + row.name}
                       aria-selected={isActive}
@@ -177,7 +178,7 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose, onEdit,
                       onClick={() => row.expandable ? toggleExpanded(row.name) : row.selectable && onSelect(row.name)}
                       className={
                         "grid w-full items-center gap-2 border-t border-slate-100 px-3 py-1.5 text-left " +
-                        (suggestions ? "grid-cols-[minmax(105px,0.8fr)_minmax(100px,1.2fr)]" :
+                        (suggestions ? "grid-cols-[minmax(105px,1fr)_52px_minmax(90px,1.2fr)]" :
                           "grid-cols-[minmax(130px,1fr)_62px_minmax(170px,1.5fr)]") +
                         (isActive ? " bg-sky-50" : row.depth ? " bg-[#f7f9fb]" : " bg-white") +
                         (row.selectable || row.expandable ? " hover:bg-sky-50" : " cursor-default text-slate-400")
@@ -193,7 +194,7 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose, onEdit,
                         <span className="truncate">{row.depth ? row.name.split(".").at(-1) : row.name}</span>
                         {row.name === selector.currentTag && <Check size={12} className="shrink-0 text-emerald-700" />}
                       </span>
-                      {!suggestions && <span className="text-slate-500">{row.type}</span>}
+                      <span className="text-slate-600">{row.type}</span>
                       <span className="min-w-0 truncate text-slate-500" title={row.description}>
                         {row.description || "—"}{!row.selectable && !row.expandable ? " · Solo lectura" : ""}
                       </span>
@@ -228,7 +229,7 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose, onEdit,
           }
         }}>
         <div className="mb-1.5 text-[11px] font-semibold text-slate-700">
-          Editar operando · {selector.kind}
+          {mathDestination ? "Editar Dest · INT / DINT / REAL" : "Editar operando · " + selector.kind}
         </div>
         <div className="flex gap-1.5">
           <input ref={inputRef} type="text" spellCheck={false}
@@ -269,7 +270,8 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose, onEdit,
         style={{ position: "fixed", left, top, width, zIndex: 1100 }}
         className="rounded-md border border-slate-300 bg-white p-2 text-slate-900 shadow-xl">
         <div className="mb-2 flex items-center justify-between gap-2 px-1">
-          <strong className="text-xs">Asignar variable · {selector.kind}</strong>
+          <strong className="text-xs">{mathDestination ? "Dest matemático · INT / DINT / REAL" :
+            "Asignar variable · " + selector.kind}</strong>
           <button type="button" onClick={onClose} aria-label="Cerrar búsqueda" className="rounded p-1 hover:bg-slate-100">
             <X size={14} />
           </button>
@@ -277,7 +279,9 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose, onEdit,
         {searchField}
         <div className="mt-2 rounded border border-slate-200">{tableRows}</div>
         <p className="pt-2 text-[10px] text-slate-500">
-          {selectable.length} variable(s) compatible(s) · Desplázate para ver todas · ↑ ↓ seleccionar · Enter asignar · Esc cerrar
+          {mathDestination
+            ? "Dest puede ser INT, DINT o REAL aunque Source A/B tengan otro tipo."
+            : selectable.length + " variable(s) compatible(s)"} · Desplázate para ver todas · ↑ ↓ seleccionar · Enter asignar · Esc cerrar
         </p>
       </div>,
       document.body,
@@ -296,7 +300,10 @@ export function PracticeTagSelector({ tags, selector, onSelect, onClose, onEdit,
         <header className="flex items-center justify-between border-b border-slate-200 bg-[#f4f6f8] px-4 py-3">
           <div>
             <h3 className="text-sm font-semibold">Seleccionar variable · {selector.kind}</h3>
-            <p className="mt-1 text-xs text-slate-500">Tags compatibles de PracticeRoutine · Actual: {selector.currentTag || "Sin asignar"}</p>
+            <p className="mt-1 text-xs text-slate-500">
+              {mathDestination ? "Destino INT/DINT/REAL independiente de Source A y B" :
+                "Tags compatibles de PracticeRoutine"} · Actual: {selector.currentTag || "Sin asignar"}
+            </p>
           </div>
           <button type="button" aria-label="Cerrar selector de tags" onClick={onClose}
             className="rounded p-2 text-slate-500 hover:bg-slate-200"><X size={17}/></button>
