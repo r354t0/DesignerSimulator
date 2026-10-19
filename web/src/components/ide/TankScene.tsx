@@ -3,6 +3,7 @@ import { AlertTriangle, Clock3, Droplets, Info, Pause, Play, RotateCcw, ScanLine
 import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
 import { MomentaryPushButton } from "./MomentaryPushButton";
+import { ScadaLedGroup } from "./ScadaLedGroup";
 import { TankSceneInfoDialog } from "./TankSceneInfoDialog";
 import {
   hasTankTags, readTankBool, TANK_BATCH_TARGET, TANK_TIMER_PRESETS, type TankState,
@@ -304,15 +305,27 @@ export function TankScene({
           <section className="sort-panel min-w-0 rounded-lg border border-[#344c5e] p-3"
             aria-label="Pilotos LED y nivel">
             <h3 className="mb-2 text-xs font-semibold">Pilotos LED y nivel</h3>
-            <div className="scada-pilot-grid grid grid-cols-2 gap-2">
-              <Pilot label="BOMBA" active={pump} tone="green"/>
-              <Pilot label="VÁLVULA ENTRADA" active={inlet} tone="blue"/>
-              <Pilot label="NIVEL BAJO" active={low} tone="amber"/>
-              <Pilot label="NIVEL ALTO" active={high} tone="amber"/>
-              <Pilot label="VÁLVULA DRENAJE" active={drain} tone="blue"/>
-              <Pilot label="AGITADOR M-02" active={mixer} tone="green"/>
-              <Pilot label="ALARMA" active={alarm} tone="amber"/>
-              <Pilot label="LOTE TERMINADO" active={complete} tone="green"/>
+            <div className="space-y-3">
+              <ScadaLedGroup kind="status">
+                <Pilot label="RUN" active={auto} tone="green"/>
+                <Pilot label="IDLE" active={!auto} tone="amber"/>
+                <Pilot label="ALARMA" active={alarm} tone="amber"/>
+                <Pilot label="LOTE TERMINADO" active={complete} tone="green"/>
+              </ScadaLedGroup>
+              <ScadaLedGroup kind="inputs">
+                <Pilot label="PB START" active={readTankBool(project, "PB_Start")} tone="blue"/>
+                <Pilot label="PB STOP" active={readTankBool(project, "PB_Stop")} tone="blue"/>
+                <Pilot label="PB DRENAR" active={readTankBool(project, "PB_Drain")} tone="blue"/>
+                <Pilot label="PB RESET" active={readTankBool(project, "PB_Reset")} tone="blue"/>
+                <Pilot label="NIVEL BAJO" active={low} tone="amber"/>
+                <Pilot label="NIVEL ALTO" active={high} tone="amber"/>
+              </ScadaLedGroup>
+              <ScadaLedGroup kind="outputs">
+                <Pilot label="BOMBA" active={pump} tone="green"/>
+                <Pilot label="VÁLVULA ENTRADA" active={inlet} tone="blue"/>
+                <Pilot label="VÁLVULA DRENAJE" active={drain} tone="blue"/>
+                <Pilot label="AGITADOR M-02" active={mixer} tone="green"/>
+              </ScadaLedGroup>
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 border-t border-slate-700 pt-2 text-center text-[11px]">
               <div><span className="text-slate-400">Nivel</span>
