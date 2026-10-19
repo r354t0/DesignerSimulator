@@ -120,7 +120,12 @@ test("Ejercicio 1: STOP pauses pump and FULL pilot until run is reenabled",()=>{
   assert.equal(batchBool(plc.project,"ST_Full"),true,"FULL latch persists");
   plc=press(plc,"PB_Start");
   assert.equal(output(plc,"DO_FullLamp"),true);
-  assert.equal(output(plc,"DO_Pump1"),false,"counter is already at preset");
+  // In the reference rung order, R2 precedes the GEQ/OTU of R4.
+  // A new START can therefore energize P1 for one PLC pass while R4
+  // immediately clears ST_Filling; the next scan deenergizes the pump.
+  assert.equal(batchBool(plc.project,"ST_Filling"),false);
+  plc=tickPracticeScan(plc);
+  assert.equal(output(plc,"DO_Pump1"),false,"R2 follows the cleared filling latch");
 });
 
 test("lab 01 exercise 1: P1 fills via 900 rising pulses (0.1 % each), FULL and stop behave",()=>{
