@@ -35,7 +35,8 @@ import {
   gearPhysicalSensors, type GearPhysicalState,
 } from "./plc/gearSprayPhysics";
 import {
-  createGearFatProject, GEAR_FAT_COMMANDS, type GearFatCommand,
+  createGearFatProject, GEAR_FAT_COMMANDS, clearGearFatCommands,
+  type GearFatCommand,
 } from "./plc/gearSprayFatProgram";
 import {
   initialBatchProject, createBatchSolution, prepareBatchTags,
@@ -234,12 +235,31 @@ export default function App() {
     }
   },[]);
 
+  const stopSceneController=useCallback((state:PracticeScanState,scene:ProgrammingScene)=>{
+    const stopped=stopPracticeScans(state);
+    if(scene!=="gear"||!gearFatLoaded)return stopped;
+    const project=clearGearFatCommands(stopped.project);
+    return project===stopped.project?stopped:{...stopped,project};
+  },[gearFatLoaded]);
+
+  // A structural edit can also take the controller to STOP without pressing
+  // the toolbar STOP button. Disarm any held FAT commands in that case too.
+  useEffect(()=>{
+    if(practiceMode!=="stopped"||activeControllerScene.current!=="gear"||
+      !gearFatLoaded)return;
+    changeScan(state=>{
+      if(state.mode!=="stopped")return state;
+      const project=clearGearFatCommands(state.project);
+      return project===state.project?state:{...state,project};
+    });
+  },[practiceMode,simulationTab,gearFatLoaded,changeScan]);
+
   const chooseSimulationTab = useCallback((next: SimulationTab) => {
     if (next === simulationTab) return;
     if (next === "motor") {
       // The standalone demo is not connected to MainRoutine. Pause this
       // programming scene safely so it cannot run unseen in the background.
-      changeScan(stopPracticeScans);
+      changeScan(state=>stopSceneController(state,activeControllerScene.current));
       setSimulationTab(next);
       return;
     }
@@ -248,13 +268,13 @@ export default function App() {
         const previous = activeControllerScene.current;
         // Switching stops the previous controller, but saves its Ladder,
         // counters, and customized tags for when the user returns.
-        sceneSessions.current[previous] = stopPracticeScans(current);
+        sceneSessions.current[previous] = stopSceneController(current,previous);
         activeControllerScene.current = next;
-        return stopPracticeScans(sceneSessions.current[next]);
+        return stopSceneController(sceneSessions.current[next],next);
       });
     }
     setSimulationTab(next);
-  }, [simulationTab, changeScan]);
+  }, [simulationTab, changeScan,stopSceneController]);
   const [conveyorTagSetupError, setConveyorTagSetupError] = useState<string | null>(null);
   const [conveyor, setConveyor] = useState<ConveyorState>(initialConveyorState);
   const conveyorRef = useRef(conveyor);
@@ -750,7 +770,8 @@ export default function App() {
   const startPractice = useCallback(() =>
     changeScan(startPracticeScans), [changeScan]);
   const stopPractice = useCallback(() =>
-    changeScan(stopPracticeScans), [changeScan]);
+    changeScan(state=>stopSceneController(state,activeControllerScene.current)),
+    [changeScan,stopSceneController]);
   const pausePractice = useCallback(() =>
     changeScan(pausePracticeScans), [changeScan]);
   const resumePractice = useCallback(() =>
