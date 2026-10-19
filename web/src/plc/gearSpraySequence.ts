@@ -11,11 +11,11 @@ export interface GearSequenceInputs {
   run:boolean;          // i_Run: ST_Run_Rly
   healthy:boolean;      // i_Healthy: DO_LS_Healthy
   manual:boolean;       // i_Manual: ST_Man_Mode
-  freqDone:boolean;     // i_FreqDone: TMR_Freq_Dn
-  startupDone:boolean;  // i_StartUpDone: TMR_Startup_Cycle_Dn
+  freqDone:boolean;     // i_FreqDone: TMR_Freq.DN
+  startupDone:boolean;  // i_StartUpDone: TMR_Startup_Cycle.DN
   extraPulse:boolean;   // i_ExtraPulse: PB_Extra (rung)
-  flowDone:boolean;     // i_FlowDone: CNT_Lubeflo_Dn
-  purgeActive:boolean;  // i_PurgeActive: TMR_Purge_Dn
+  flowDone:boolean;     // i_FlowDone: CTN_Lubeflo.DN
+  purgeActive:boolean;  // i_PurgeActive: TMR_Purge.DN
   resetPulse:boolean;   // i_ResetPulse: PB_Reset
   tripActive:boolean;   // i_TripActive: ST_General_Trip_Rly
 }
