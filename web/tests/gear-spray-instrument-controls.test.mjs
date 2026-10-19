@@ -37,15 +37,35 @@ test("La entrada analógica ofrece número y slider dentro de las escalas origin
   assert.equal(gearNumber(p,"_310_PI_2560"),1501);
 });
 
-test("Los setpoints DINT se pueden editar con ambos controles sin inventar máximos de proceso",()=>{
+test("Setpoints DINT son de edición exclusivamente numérica; las presiones conservan el slider",()=>{
   assert.match(panel,/GEAR_HMI_SETPOINTS\.map/);
   assert.match(panel,/integer value=\{gearNumber\(project,sp.name\)\}/);
-  assert.match(controls,/max\?\?windowMax/);
-  assert.match(controls,/Ampliar escala del deslizador/);
-  assert.match(panel,/programa no define un máximo operativo/);
+  assert.match(panel,/caption=\{sp.description\}/);
+  assert.match(controls,/\{max!==undefined&&<>/);
+  assert.match(controls,/type="number"/);
+  assert.match(controls,/type="range"/);
+  const setpointCall=panel.slice(panel.indexOf("GEAR_HMI_SETPOINTS.map"),
+    panel.indexOf("Entradas digitales de campo"));
+  assert.doesNotMatch(setpointCall,/\smax=\{/,
+    "Setpoints sin max no muestran deslizador");
+  assert.doesNotMatch(setpointCall,/Deslizador|barra deslizante/);
   let p=initialGearSprayProject();
   p=writeGearScadaInput(p,"TMR_Freq_SP",200);
   assert.equal(gearNumber(p,"TMR_Freq_SP"),200);
+});
+
+test("Instrumentación queda debajo de la vista de proceso y fuera de la barra lateral",()=>{
+  const processStart=code.indexOf('<section className="scada-process-panel');
+  const diagnosticStart=code.indexOf('{diagnostics.map',processStart);
+  const instrumentStart=code.indexOf('Instrumentación y setpoints',diagnosticStart);
+  const sidebarStart=code.indexOf('<aside className="scada-scene-sidebar',processStart);
+  assert.ok(processStart>=0&&diagnosticStart>processStart&&
+    instrumentStart>diagnosticStart&&sidebarStart>instrumentStart,
+    "La instrumentación debe estar bajo la vista y sus diagnósticos");
+  const sidebar=code.slice(sidebarStart,code.indexOf("Pilotos LED y equipos",sidebarStart));
+  assert.doesNotMatch(sidebar,/Instrumentación y setpoints/);
+  assert.match(sidebar,/Tablero de mando/);
+  assert.match(code,/sort-panel mt-3 rounded-lg border/);
 });
 
 test("Las entradas digitales muestran una descripción y el tag entre paréntesis",()=>{
