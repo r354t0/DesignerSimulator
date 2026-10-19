@@ -1,5 +1,6 @@
 import {
   createTag, createRung, insertInstruction, createParallelBranch,
+  setInstructionPreset,
   addParallelContact, setTagValue, initialPracticeProject,
   type PracticeProject, type PracticeInstruction, type TagType,
 } from "./practiceDocument.ts";
@@ -51,6 +52,10 @@ export const BATCH_INTERNAL_TAGS: readonly BatchTagSpec[] = [
   { name: "CNT_Product1", type: "COUNTER", direction: "Interna", description: "Pulsos de P1 para porcentaje de mezcla" },
   { name: "ST_P1PulseTarget", type: "INT", direction: "Interna",
     description: "Objetivo P1 en pulsos: INT_RatioP1 × 10 (0,1 % por pulso)" },
+  { name: "INT_PresetP1", type: "INT", direction: "Interna",
+    description: "Pulsos para producto 1: INT_RatioP1 × 10" },
+  { name: "ST_BatchComplete", type: "BOOL", direction: "Interna",
+    description: "Pulso de lote terminado al vaciar el tanque" },
   { name: "CNT_Lotes", type: "COUNTER", direction: "Interna", description: "Lotes terminados" },
 ];
 export const BATCH_EXERCISES: readonly {
@@ -102,12 +107,10 @@ const additional: Record<BatchExercise, readonly string[]> = {
       "CNT_Volume","TMR_Mixing"],
   3: ["ST_RunEnable","ST_Filling","ST_Full","ST_Draining",
       "CNT_Volume","TMR_Mixing"],
-  4: ["ST_RunEnable","ST_Filling","ST_Full","ST_Mixing","ST_Draining",
-      "ST_ToMix","ST_ToDrain","ST_ToDone","ST_BatchDone",
-      "CNT_Product1","ST_P1PulseTarget","TMR_PostTemp4s"],
-  5: ["ST_RunEnable","ST_Filling","ST_Full","ST_Mixing","ST_Draining",
-      "ST_ToMix","ST_ToDrain","ST_ToDone","ST_BatchDone",
-      "CNT_Product1","ST_P1PulseTarget","CNT_Lotes","TMR_PostTemp4s"],
+  4: ["ST_RunEnable","ST_Filling","ST_Full","ST_Draining",
+      "CNT_Volume","INT_PresetP1","TMR_Mixing"],
+  5: ["ST_RunEnable","ST_Filling","ST_Full","ST_Draining",
+      "ST_BatchComplete","CNT_Volume","INT_PresetP1","TMR_Mixing","CNT_Lotes"],
 };
 export function batchSolutionTags(exercise: BatchExercise): BatchTagSpec[] {
   return BATCH_INTERNAL_TAGS.filter(tag => additional[exercise].includes(tag.name));
@@ -115,7 +118,7 @@ export function batchSolutionTags(exercise: BatchExercise): BatchTagSpec[] {
 /** The information table for Lab 01 mirrors the tags that actually occur
  * in the recommended rungs (including SCADA I/O and internal declarations).
  * Timer/counter member references are listed under their parent tag. */
-export function batchSolutionUsedTags(exercise: 1 | 2 | 3): BatchTagSpec[] {
+export function batchSolutionUsedTags(exercise: BatchExercise): BatchTagSpec[] {
   const solution=createBatchSolution(exercise);
   const used=new Set<string>();
   const include=(operand?:string)=>{
@@ -178,11 +181,8 @@ const C=(kind:"GEQ"|"GRT"|"LES"|"LEQ"|"EQU",a:string,b:string|number):Spec=>({
   compareA:{mode:"tag",tag:a},
   compareB:typeof b==="number"?{mode:"literal",value:b}:{mode:"tag",tag:b},
 });
-const M=(dst:string,source:string):Spec=>({
-  kind:"MOV",tag:dst,compareA:{mode:"tag",tag:source},
-});
 const scaleP1=():Spec=>({
-  kind:"MUL",tag:"ST_P1PulseTarget",
+  kind:"MUL",tag:"INT_PresetP1",
   compareA:{mode:"tag",tag:"INT_RatioP1"},
   compareB:{mode:"literal",value:10},
 });
@@ -196,11 +196,15 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
   }
   for (const tag of batchSolutionTags(exercise))
     p=createTag(p,tag.name,tag.description,tag.type);
-  for(const tag of ["CNT_Volume","CNT_Product1","CNT_Lotes"]) {
+  if(exercise>=4) p=setTagValue(p,"INT_PresetP1",
+    Math.min(1000,Math.max(0,batchInt(p,"INT_RatioP1")*10)));
+  for(const tag of ["CNT_Volume","CNT_Lotes"]) {
     if(p.tags.some(t=>t.name===tag))
-      p=setTagValue(p,tag,tag==="CNT_Volume"?900:tag==="CNT_Product1"?1000:9999,"PRE");
+      p=setTagValue(p,tag,tag==="CNT_Volume"
+        ? (exercise>=4?batchInt(p,"INT_PresetP1"):900)
+        : batchInt(p,"INT_BatchTarget"),"PRE");
   }
-  for(const [name,ms] of [["TMR_Mix8s",8000],["TMR_Mixing",8000],["TMR_PostTemp4s",4000]] as const) {
+  for(const [name,ms] of [["TMR_Mixing",exercise>=4?4000:8000]] as const) {
     if(p.tags.some(tag=>tag.name===name))p=setTagValue(p,name,ms,"PRE");
   }
   let serial=0;
@@ -294,94 +298,111 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
     return p;
   }
 
-  const advanced=exercise>=4;
-  const continuous=exercise===5;
-  const endCondition=advanced?X("DI_HighLevel"):C("GEQ","CNT_Volume.ACC",900);
-  const emptyCondition=advanced?N("DI_LowLevel"):C("LEQ","CNT_Volume.ACC",0);
-
-  // Start/stop always affect actual outputs. Retained stage bits survive Stop.
+  // LAB 02 · Exercises 4 (Mode A) and 5 (Mode A/B).
+  // These are the screenshot rungs in their exact execution order.
+  // E4: 16 rungs (0–15), E5: the same 16 with a B-mode start OR lane,
+  //      an OTE batch-complete coil at R15, and a CTU at R16.
   any("rung-1",[X("PB_Start"),X("ST_RunEnable")],
-      [N("PB_Stop")],O("OTE","ST_RunEnable"));
-  // A fresh START after a finished single batch clears the completion latch.
-  if(!continuous)
-    rung("bm-rearm",[X("PB_Start"),N("DI_LowLevel"),O("OTU","ST_BatchDone")]);
-  const init=[X("PB_Start"),N("DI_LowLevel"),N("ST_Filling"),
-    N("ST_Mixing"),N("ST_Draining")];
-  if(advanced) init.push(X(exercise===4?"DI_ModeA":"DI_ModeB"));
-  if(advanced) init.push(N("ST_BatchDone"));
-  rung("bm-start-fill",[...init,O("OTL","ST_Filling")]);
+    [N("PB_Stop")],O("OTE","ST_RunEnable"));
+  any("bm-idle-lamp",[X("PB_Stop"),X("DO_IdleLamp")],
+    [N("PB_Start")],O("OTE","DO_IdleLamp"));
+  rung("bm-run-lamp",[
+    X("ST_RunEnable"),O("OTE","DO_RunLamp"),
+  ]);
 
-  // FM1 produces one pulse per 0.1% of the tank. An INT HMI percentage
-  // becomes a pulse target through an editable Ladder MUL instruction.
-  // Example: 40% P1 = 400 pulses, remaining 60% P2 = 600 pulses.
-  if(advanced) {
-    rung("bm-p1-pulse-target",[scaleP1()]);
-    rung("bm-p1",[X("ST_RunEnable"),X("ST_Filling"),N("DI_HighLevel"),
-      C("LES","CNT_Product1.ACC","ST_P1PulseTarget"),O("OTE","DO_Pump1")]);
-    rung("bm-p2",[X("ST_RunEnable"),X("ST_Filling"),N("DI_HighLevel"),
-      C("GEQ","CNT_Product1.ACC","ST_P1PulseTarget"),O("OTE","DO_Pump2")]);
-    rung("bm-ctu-p1",[X("DI_Flowmeter1"),O("CTU","CNT_Product1")]);
-  }else{
-    rung("bm-p1",[X("ST_RunEnable"),X("ST_Filling"),N("ST_Full"),O("OTE","DO_Pump1")]);
-    rung("bm-ctu-level",[X("DI_Flowmeter1"),O("CTU","CNT_Volume")]);
-  }
-
-  // Exercises 3–5: progressive mixing, heating and discharge sequence.
-  {
-    rung("bm-to-mix",[X("ST_Filling"),endCondition,O("OTE","ST_ToMix")]);
-    rung("bm-leave-fill",[X("ST_ToMix"),O("OTU","ST_Filling")]);
-    rung("bm-enter-mix",[X("ST_ToMix"),O("OTL","ST_Mixing")]);
-    rung("bm-full-latch",[X("ST_ToMix"),O("OTL","ST_Full")]);
-    rung("bm-full-lamp",[X("ST_Full"),O("OTE","DO_FullLamp")]);
-    if(advanced) {
-      // The thermostat is BOOL; actual temperature is private scene physics.
-      rung("bm-timer",[X("ST_RunEnable"),X("ST_Mixing"),X("DI_Thermostat"),
-        O("RTO","TMR_PostTemp4s")]);
-      rung("bm-to-drain",[X("ST_Mixing"),X("TMR_PostTemp4s.DN"),
-        O("OTE","ST_ToDrain")]);
-    }else{
-      rung("bm-timer",[X("ST_RunEnable"),X("ST_Mixing"),O("RTO","TMR_Mix8s")]);
-      rung("bm-to-drain",[X("ST_Mixing"),X("TMR_Mix8s.DN"),
-        O("OTE","ST_ToDrain")]);
+  if(exercise===4) {
+    // R3: A, single batch, requires explicit START.
+    rung("bm-start-fill",[
+      X("ST_RunEnable"),X("DI_ModeA"),X("PB_Start"),
+      O("OTL","ST_Filling"),
+    ]);
+  } else {
+    // R3: explicit START OR (Mode B AND batch-complete AND NOT lots.DN).
+    rung("bm-start-fill",[
+      X("ST_RunEnable"),X("PB_Start"),O("OTL","ST_Filling"),
+    ]);
+    const startRung=p.rungs.find(r=>r.id==="bm-start-fill")!;
+    const anchor=startRung.instructions[1].id;
+    p=createParallelBranch(p,"bm-start-fill",anchor);
+    const branch=p.rungs.find(r=>r.id==="bm-start-fill")!.parallelBranches!.at(-1)!;
+    for(const item of [X("DI_ModeB"),X("ST_BatchComplete"),
+        N("CNT_Lotes.DN")]) {
+      p=addParallelContact(p,"bm-start-fill",anchor,
+        ins(item),undefined,branch.id);
     }
-    rung("bm-leave-mix",[X("ST_ToDrain"),O("OTU","ST_Mixing")]);
-    rung("bm-enter-drain",[X("ST_ToDrain"),O("OTL","ST_Draining")]);
-    rung("bm-clear-full",[X("ST_ToDrain"),O("OTU","ST_Full")]);
-    rung("bm-reset-mix",[X("ST_ToDrain"),
-      O("RES",advanced?"TMR_PostTemp4s":"TMR_Mix8s")]);
-    // Keep actuator coils AFTER the phase transition so they deenergize on
-    // the exact scan where the timer reaches DN.
-    rung("bm-mixer",[X("ST_RunEnable"),X("ST_Mixing"),O("OTE","DO_Mixer")]);
-    if(advanced) rung("bm-heater",[
-      X("ST_RunEnable"),X("ST_Mixing"),N("DI_Thermostat"),O("OTE","DO_Heater")]);
-    rung("bm-drain-pump",[X("ST_RunEnable"),X("ST_Draining"),
-      advanced?X("DI_LowLevel"):C("GRT","CNT_Volume.ACC",0),
-      O("OTE","DO_Pump3")]);
-    if(!advanced)
-      rung("bm-ctd-volume",[X("DI_Flowmeter3"),O("CTD","CNT_Volume")]);
-    rung("bm-drained",[X("ST_Draining"),emptyCondition,O("OTE","ST_ToDone")]);
-
-    // Single batch awaits a fresh Start. Continuous and B mode re-enter fill.
-    if(exercise===5) {
-      rung("bm-lot-counter",[X("ST_ToDone"),O("CTU","CNT_Lotes")]);
-      rung("bm-next-fill",[X("ST_ToDone"),X("ST_RunEnable"),
-        C("LES","CNT_Lotes.ACC","INT_BatchTarget"),O("OTL","ST_Filling")]);
-      rung("bm-batch-complete",[X("ST_ToDone"),
-        C("GEQ","CNT_Lotes.ACC","INT_BatchTarget"),O("OTL","ST_BatchDone")]);
-      rung("bm-clear-p1",[X("ST_ToDone"),O("RES","CNT_Product1")]);
-    }else{
-      rung("bm-batch-complete",[X("ST_ToDone"),O("OTL","ST_BatchDone")]);
-      if(advanced)rung("bm-clear-p1",[X("ST_ToDone"),O("RES","CNT_Product1")]);
-    }
-    rung("bm-leave-drain",[X("ST_ToDone"),O("OTU","ST_Draining")]);
   }
-  const runningOutputs=advanced?
-    ["DO_Pump1","DO_Pump2","DO_Pump3","DO_Mixer"]:
-    ["DO_Pump1","DO_Pump3","DO_Mixer"];
-  any("bm-run-lamp",runningOutputs.map(X),[],O("OTE","DO_RunLamp"));
-  rung("bm-idle-lamp",[N("ST_RunEnable"),O("OTE","DO_IdleLamp")]);
-  rung("bm-display",[M("INT_DisplayValue",exercise===5?"CNT_Lotes.ACC":
-    exercise>=4?"CNT_Product1.ACC":"CNT_Volume.ACC")]);
+  // R4: product 1 is energized until CTU.DN (its PRE is a live INT tag).
+  rung("bm-p1",[
+    X("ST_RunEnable"),X("ST_Filling"),N("CNT_Volume.DN"),
+    O("OTE","DO_Pump1"),
+  ]);
+  // R5: numerical HMI percentage converted to flowmeter pulses.
+  rung("bm-p1-pulse-target",[
+    X("ST_RunEnable"),X("ST_Filling"),scaleP1(),
+  ]);
+  // R6: flowmeter 1 CTU using INT_PresetP1 as its dynamic PRE.
+  rung("bm-ctu-level",[
+    X("ST_RunEnable"),X("ST_Filling"),X("DI_Flowmeter1"),
+    O("CTU","CNT_Volume"),
+  ]);
+  let ctu=p.rungs.find(r=>r.id==="bm-ctu-level")!.instructions.at(-1)!;
+  p=setInstructionPreset(p,ctu.id,{mode:"tag",tag:"INT_PresetP1"});
+
+  // R7: once P1 count.DN, P2 fills the rest until the HI digital probe.
+  rung("bm-p2",[
+    X("ST_RunEnable"),X("ST_Filling"),X("CNT_Volume.DN"),
+    N("DI_HighLevel"),O("OTE","DO_Pump2"),
+  ]);
+  // R8: the high-level probe ends filling and latches FULL.
+  rung("bm-reach-full",[
+    X("ST_RunEnable"),X("ST_Filling"),X("DI_HighLevel"),
+    O("OTU","ST_Filling"),O("OTL","ST_Full"),
+  ]);
+  // R9: FULL lamp.
+  rung("bm-full-lamp",[
+    X("ST_RunEnable"),X("ST_Full"),O("OTE","DO_FullLamp"),
+  ]);
+  // R10: heat while the digital thermostat remains FALSE.
+  rung("bm-heater",[
+    X("ST_RunEnable"),X("ST_Full"),N("DI_Thermostat"),
+    O("OTE","DO_Heater"),
+  ]);
+  // R11: thermostat TRUE starts TON PRE 4000 milliseconds.
+  rung("bm-mixing-timer",[
+    X("ST_RunEnable"),X("ST_Full"),X("DI_Thermostat"),
+    O("TON","TMR_Mixing"),
+  ]);
+  // R12: mixer works until timer DN; also mixes during heating.
+  rung("bm-mixer",[
+    X("ST_RunEnable"),X("ST_Full"),N("TMR_Mixing.DN"),
+    O("OTE","DO_Mixer"),
+  ]);
+  // R13: after TON.DN unlatch FULL and latch draining together.
+  rung("bm-start-drain",[
+    X("ST_RunEnable"),X("ST_Full"),X("TMR_Mixing.DN"),
+    O("OTU","ST_Full"),O("OTL","ST_Draining"),
+  ]);
+  // R14: pump 3 operates while the bottom wet-level probe is TRUE.
+  rung("bm-drain-pump",[
+    X("ST_RunEnable"),X("ST_Draining"),X("DI_LowLevel"),
+    O("OTE","DO_Pump3"),
+  ]);
+  // R15: when the lower probe is dry, finish draining. E5 also
+  // asserts a non-retentive completion pulse for the lot CTU and restart.
+  rung("bm-stop-drain",[
+    X("ST_RunEnable"),X("ST_Draining"),N("DI_LowLevel"),
+    O("OTU","ST_Draining"),
+    ...(exercise===5?[O("OTE","ST_BatchComplete")]:[]),
+  ]);
+  if(exercise===5) {
+    // R16: counted rising edges of batch-complete, preset INT_BatchTarget.
+    rung("bm-lot-counter",[
+      X("ST_RunEnable"),X("DI_ModeB"),X("ST_BatchComplete"),
+      O("CTU","CNT_Lotes"),
+    ]);
+    ctu=p.rungs.find(r=>r.id==="bm-lot-counter")!.instructions.at(-1)!;
+    p=setInstructionPreset(p,ctu.id,{mode:"tag",tag:"INT_BatchTarget"});
+  }
   return p;
 }
 
