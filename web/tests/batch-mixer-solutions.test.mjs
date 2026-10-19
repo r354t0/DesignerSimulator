@@ -62,19 +62,24 @@ test("five recommended solutions build independently and introduce only their ow
     if(ex!==1) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="RTO")));
     if(ex===2||ex===3) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="CTD")));
     if(ex>=4)assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="LES")));
+    if(ex>=4){
+      assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="MUL"&&
+        i.tag==="ST_P1PulseTarget"&&i.compareB?.mode==="literal"&&i.compareB.value===10)));
+      assert.equal(p.tags.find(t=>t.name==="ST_P1PulseTarget").type,"INT");
+    }
     assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="MOV")));
     const display=p.tags.find(t=>t.name==="INT_DisplayValue");
     assert.equal(display.type,"INT");
   }
 });
-test("lab 01 exercise 1: P1 fills via 90 rising pulses, FULL and stop behave",()=>{
+test("lab 01 exercise 1: P1 fills via 900 rising pulses (0.1 % each), FULL and stop behave",()=>{
   let plc=started(1);
   assert.equal(output(plc,"DO_Pump1"),true);
-  for(let i=0;i<89;i++)plc=pulse(plc,"DI_Flowmeter1");
-  assert.equal(count(plc,"CNT_Volume"),89);
+  for(let i=0;i<899;i++)plc=pulse(plc,"DI_Flowmeter1");
+  assert.equal(count(plc,"CNT_Volume"),899);
   assert.equal(output(plc,"DO_Pump1"),true);
   plc=pulse(plc,"DI_Flowmeter1");
-  assert.equal(count(plc,"CNT_Volume"),90);
+  assert.equal(count(plc,"CNT_Volume"),900);
   assert.equal(output(plc,"DO_Pump1"),false);
   assert.equal(output(plc,"DO_FullLamp"),true);
   plc=press(plc,"PB_Stop");
@@ -82,15 +87,15 @@ test("lab 01 exercise 1: P1 fills via 90 rising pulses, FULL and stop behave",()
 });
 test("lab 01 exercise 2: RTO mixes for eight seconds, CTD drains to zero",()=>{
   let plc=started(2);
-  for(let i=0;i<90;i++)plc=pulse(plc,"DI_Flowmeter1");
-  assert.equal(count(plc,"CNT_Volume"),90);
+  for(let i=0;i<900;i++)plc=pulse(plc,"DI_Flowmeter1");
+  assert.equal(count(plc,"CNT_Volume"),900);
   assert.equal(output(plc,"DO_Mixer"),true);
   for(let i=0;i<15;i++)plc=tickPracticeScan(plc);
   assert.equal(output(plc,"DO_Pump3"),false);
   plc=tickPracticeScan(plc);
   assert.equal(output(plc,"DO_Mixer"),false);
   assert.equal(output(plc,"DO_Pump3"),true);
-  for(let i=0;i<90;i++)plc=pulse(plc,"DI_Flowmeter3");
+  for(let i=0;i<900;i++)plc=pulse(plc,"DI_Flowmeter3");
   assert.equal(count(plc,"CNT_Volume"),0);
   assert.equal(output(plc,"DO_Pump3"),false);
   plc=setBOOL(plc,"DI_LowLevel",true);
@@ -99,7 +104,7 @@ test("lab 01 exercise 2: RTO mixes for eight seconds, CTD drains to zero",()=>{
 });
 test("lab 01 exercise 3: STOP freezes stage and RTO resumes; continuous auto cycles",()=>{
   let plc=started(3);
-  for(let i=0;i<90;i++)plc=pulse(plc,"DI_Flowmeter1");
+  for(let i=0;i<900;i++)plc=pulse(plc,"DI_Flowmeter1");
   for(let i=0;i<7;i++)plc=tickPracticeScan(plc);
   const elapsed=plc.project.tags.find(t=>t.name==="TMR_Mix8s").value.ACC;
   assert.ok(elapsed>0);
@@ -111,14 +116,14 @@ test("lab 01 exercise 3: STOP freezes stage and RTO resumes; continuous auto cyc
   assert.equal(output(plc,"DO_Mixer"),true);
   for(let i=0;i<9;i++)plc=tickPracticeScan(plc);
   assert.equal(output(plc,"DO_Pump3"),true);
-  for(let i=0;i<90;i++)plc=pulse(plc,"DI_Flowmeter3");
+  for(let i=0;i<900;i++)plc=pulse(plc,"DI_Flowmeter3");
   assert.equal(output(plc,"DO_Pump1"),true);
   assert.equal(output(plc,"DO_RunLamp"),true);
 });
 test("advanced exercise 4: integer ratio controls P1/P2, DI thermostat triggers 4 seconds",()=>{
   let plc=started(4);
-  for(let i=0;i<40;i++)plc=pulse(plc,"DI_Flowmeter1");
-  assert.equal(count(plc,"CNT_Product1"),40);
+  for(let i=0;i<400;i++)plc=pulse(plc,"DI_Flowmeter1");
+  assert.equal(count(plc,"CNT_Product1"),400);
   assert.equal(output(plc,"DO_Pump1"),false);
   assert.equal(output(plc,"DO_Pump2"),true);
   plc=setBOOL(plc,"DI_HighLevel",true);
@@ -139,7 +144,7 @@ test("advanced exercise 5: mode B runs batches up to INT target and display incr
   let plc=started(5,p=>setTagValue(p,"INT_BatchTarget",2));
   assert.equal(batchBool(plc.project,"DI_ModeB"),true);
   for(let lot=1;lot<=2;lot++){
-    for(let i=0;i<40;i++)plc=pulse(plc,"DI_Flowmeter1");
+    for(let i=0;i<400;i++)plc=pulse(plc,"DI_Flowmeter1");
     assert.equal(output(plc,"DO_Pump2"),true);
     plc=setBOOL(plc,"DI_HighLevel",true);
     plc=setBOOL(plc,"DI_Thermostat",true);
@@ -171,7 +176,7 @@ test("real physics generates pulses, temperature remains internal and thermostat
   for(let i=0;i<250;i++)
     st=stepBatchPhysics(st,{pump1:true,pump2:false,pump3:false,heater:false},50);
   assert.equal(st.level,100);
-  assert.equal(st.totalPulses[0],100);
+  assert.equal(st.totalPulses[0],1000);
   assert.equal(st.totalPulses[1],0);
   assert.equal(batchDigitalSensors(st,32).DI_HighLevel,true);
   for(let i=0;i<80;i++)
