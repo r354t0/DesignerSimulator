@@ -15,8 +15,11 @@ test("three SCADA scenes share a compact command board and give remaining width 
     assert.match(view, /scada-control-shell/);
     assert.match(view, /scada-dashboard-grid/);
     assert.match(view, /scada-command-buttons grid max-w-\[210px\] grid-cols-2 gap-2/);
-    assert.match(view, /scada-pilot-grid grid grid-cols-2 gap-2/);
-    assert.match(view, /sort-panel min-w-0 rounded-lg/);
+    assert.match(view, /import \{ ScadaLedGroup \} from "\.\/ScadaLedGroup"/);
+    assert.match(view, /<ScadaLedGroup kind="status">/);
+    assert.match(view, /<ScadaLedGroup kind="inputs">/);
+    assert.match(view, /<ScadaLedGroup kind="outputs">/);
+    assert.match(view, /sort-panel scada-led-panel min-w-0 rounded-lg/);
     assert.equal((view.match(/<MomentaryPushButton compact/g) ?? []).length,
       expectedButtons, file + " should use the smaller buttons");
   }
