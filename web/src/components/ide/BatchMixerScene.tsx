@@ -306,6 +306,9 @@ export function BatchMixerScene({project,mode,state,selectedExercise,setupError,
                     <RadioTower size={14}/> Entradas digitales
                   </h4>
                   <div className="batch-led-group grid grid-cols-2 gap-2">
+                    <Indicator name="PB START" active={batchBool(project,"PB_Start")} tone="blue"/>
+                    <Indicator name="PB STOP" active={batchBool(project,"PB_Stop")} tone="blue"/>
+                    <Indicator name="PB ENTER" active={batchBool(project,"PB_Enter")} tone="blue"/>
                     <Indicator name="FM-1" active={batchBool(project,"DI_Flowmeter1")}/>
                     <Indicator name="FM-2" active={batchBool(project,"DI_Flowmeter2")}/>
                     <Indicator name="FM-3" active={batchBool(project,"DI_Flowmeter3")}/>
