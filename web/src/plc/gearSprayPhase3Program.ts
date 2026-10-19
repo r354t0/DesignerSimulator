@@ -1,6 +1,7 @@
 import {
-  addParallelContact, createIndependentParallelBranch, createRung, createTag,
-  insertInstruction, insertIntoIndependentOrUpper,
+  addParallelContact, createIndependentParallelBranch, createParallelBranch,
+  createRung, createTag, insertInstruction, insertIntoIndependentOrUpper,
+  setRungComment,
   type PracticeInstruction, type PracticeProject,
 } from "./practiceDocument.ts";
 import {initialGearSprayProject} from "./gearSpraySceneModel.ts";
@@ -29,12 +30,6 @@ export const GEAR_PHASE3A_TAGS=[
   ["ST_Run_Rly","BOOL","P02: habilitación general"],
   ["ST_Auto_Selected","BOOL","P02: condición modo automático"],
   ["DO_LS_Running_Output","BOOL","P02: indicación de marcha"],
-  ["P02_Auto_Request","BOOL","P02: solicitud o retención de AUTO"],
-  ["P02_Auto_Allowed","BOOL","P02: interbloqueo de AUTO"],
-  ["P02_Manual_Request","BOOL","P02: solicitud o retención de MANUAL"],
-  ["P02_Maint_Request","BOOL","P02: solicitud o retención de mantenimiento"],
-  ["P02_Run_By_Mill","BOOL","P02: marcha AUTO/mantenimiento con molino"],
-  ["P02_Maint_During_Run","BOOL","P02: mantenimiento con molino en marcha"],
   ["Pump_Sol","BOOL","P01: señal interna de bomba (P04 pendiente)"],
   ["Air_Sol","BOOL","P01: señal interna de atomización (P03 pendiente)"],
   ["Lubecon_Sol","BOOL","P01: señal interna de lubricante (P03 pendiente)"],
@@ -56,40 +51,56 @@ const mov=(from:string,to:string):Spec=>({
 
 export function createGearPhase3AProject():PracticeProject {
   let p=initialGearSprayProject();
-  for(const [name,type,description] of GEAR_PHASE3A_TAGS){
+  for(const [name,type,description] of GEAR_PHASE3A_TAGS)
     p=createTag(p,name,description,type);
-  }
   let index=0;
-  function make(id:string,items:Spec[]){
+  const nextId=()=>"gear3a-i-"+(++index);
+  function make(id:string,items:Spec[],comment?:string){
     if(id!=="rung-1")p=createRung(p,id);
     for(let k=0;k<items.length;k++)
-      p=insertInstruction(p,id,k,{
-        id:"gear3a-i-"+(++index),...items[k],
-      });
+      p=insertInstruction(p,id,k,{id:nextId(),...items[k]});
+    if(comment)p=setRungComment(p,id,comment);
   }
-  function or(id:string,upper:Spec[],lower:Spec[],suffix:Spec[],coil:Spec){
-    make(id,[coil]);
-    p=createIndependentParallelBranch(p,id);
-    const root=p.rungs.find(r=>r.id===id)?.instructions.find(i=>i.kind==="OR_JUNCTION")?.id;
-    if(!root)throw new Error("No se pudo crear la unión OR "+id);
-    for(const spec of upper)
-      p=insertIntoIndependentOrUpper(p,id,root,{
-        id:"gear3a-i-"+(++index),...spec,
-      });
-    for(const spec of lower)
-      p=addParallelContact(p,id,root,{
-        id:"gear3a-i-"+(++index),...spec,
-      });
-    for(const spec of suffix){
-      const position=p.rungs.find(r=>r.id===id)!.instructions.filter(i=>
-        !["OTE","OTL","OTU","TON","TOF","RTO","CTU","CTD","RES"].includes(i.kind)).length;
-      p=insertInstruction(p,id,position,{
-        id:"gear3a-i-"+(++index),...spec,
-      });
+  /** A group is one continuous path of contacts. Independent OR junctions
+   * preserve each boolean term and self-holding contact on the SAME rung.
+   * Multiple groups in sequence are ANDed; no helper OTE or interscan lag.
+   */
+  type Group={or:Spec[][]}|Spec;
+  function logic(id:string,parts:Group[],out:Spec,comment?:string){
+    make(id,[out],comment);
+    for(const item of parts){
+      if(!("or" in item)){
+        const position=p.rungs.find(r=>r.id===id)!.instructions.filter(
+          ins=>ins.kind!=="OTE").length;
+        p=insertInstruction(p,id,position,{id:nextId(),...item});
+        continue;
+      }
+      if(item.or.length<2||item.or.some(path=>!path.length))
+        throw new Error("Grupo OR inválido: "+id);
+      // Adding at the END of the contact chain ensures successive AND groups
+      // remain disjoint from earlier OR spans.
+      p=createIndependentParallelBranch(p,id);
+      const rung=p.rungs.find(r=>r.id===id)!;
+      const anchor=rung.instructions.findLast(ins=>ins.kind==="OR_JUNCTION")?.id;
+      if(!anchor)throw new Error("OR sin unión: "+id);
+      for(const spec of item.or[0])
+        p=insertIntoIndependentOrUpper(p,id,anchor,{id:nextId(),...spec});
+      for(let pathIndex=1;pathIndex<item.or.length;pathIndex++){
+        if(pathIndex>1)p=createParallelBranch(p,id,anchor);
+        const current=p.rungs.find(r=>r.id===id)!;
+        const branch=current.parallelBranches!.filter(b=>b.anchorId===anchor)
+          [pathIndex-1];
+        if(!branch)throw new Error("No existe rama OR "+pathIndex);
+        for(const spec of item.or[pathIndex])
+          p=addParallelContact(p,id,anchor,{id:nextId(),...spec},
+            Number.MAX_SAFE_INTEGER,branch.id);
+      }
     }
   }
-  // P01 — physical input sampling and threshold aliases.
-  make("rung-1",[mov("_310_PI_2561","AirPressure_In_Scaled")]);
+
+  // P01 original physical signal mappings, one rung per physical equation.
+  make("rung-1",[mov("_310_PI_2561","AirPressure_In_Scaled")],
+    "P01 — MAPPING | Inicio de entradas, escalamiento y diagnóstico.");
   make("gear3a-p01-air",[
     reg("GRT","AirPressure_In_Scaled",40),o("AirPress_In")]);
   make("gear3a-p01-lube-copy",[
@@ -107,39 +118,49 @@ export function createGearPhase3AProject():PracticeProject {
   make("gear3a-p01-level",[
     x("_310_LSL"),o("Low_Level")]);
 
-  // P02 — original mode-manager expressions decomposed into explicit OR rungs.
-  or("gear3a-p02-autoreq",
-    [x("PB_Auto")],[x("ST_Auto_Mode")],[],o("P02_Auto_Request"));
-  or("gear3a-p02-autoallowed",
-    [nx("PB_Manual")],[x("DI_Mill_Run")],[],o("P02_Auto_Allowed"));
-  make("gear3a-p02-auto",[
-    x("P02_Auto_Request"),x("P02_Auto_Allowed"),nx("PB_Maint"),o("ST_Auto_Mode")]);
-  or("gear3a-p02-manreq",
-    [x("PB_Manual")],[x("ST_Man_Mode")],[],o("P02_Manual_Request"));
-  make("gear3a-p02-manual",[
-    x("P02_Manual_Request"),nx("PB_Auto"),nx("PB_Maint"),
-    nx("DI_Mill_Run"),o("ST_Man_Mode")]);
-  or("gear3a-p02-maintreq",
-    [x("PB_Maint")],[x("ST_Maint_Mode")],[],o("P02_Maint_Request"));
-  make("gear3a-p02-maint",[
-    x("P02_Maint_Request"),nx("PB_Auto"),nx("PB_Manual"),
-    x("DI_Mill_Run"),o("ST_Maint_Mode")]);
-  or("gear3a-p02-millmode",
-    [x("ST_Auto_Mode")],[x("ST_Maint_Mode")],
-    [x("DI_Mill_Run")],o("P02_Run_By_Mill"));
-  or("gear3a-p02-run",
-    [x("P02_Run_By_Mill")],[x("ST_Man_Mode")],[],o("ST_Run_Rly"));
+  // P02 Mode Manager – each original rung is kept atomic.
+  // Original: (PB_Auto OR ST_Auto_Mode) AND
+  //           (NOT PB_Manual OR DI_Mill_Run) AND NOT PB_Maint.
+  logic("gear3a-p02-auto",[
+    {or:[[x("PB_Auto")],[x("ST_Auto_Mode")]]},
+    {or:[[nx("PB_Manual")],[x("DI_Mill_Run")]]},
+    nx("PB_Maint"),
+  ],o("ST_Auto_Mode"),
+  "P02 — MODE MANAGER | Inicio de selección, enclavamientos y marcha.");
+  // Original: (PB_Manual OR ST_Man_Mode) AND NOT PB_Auto AND
+  //           NOT PB_Maint AND NOT DI_Mill_Run.
+  logic("gear3a-p02-manual",[
+    {or:[[x("PB_Manual")],[x("ST_Man_Mode")]]},
+    nx("PB_Auto"),nx("PB_Maint"),nx("DI_Mill_Run"),
+  ],o("ST_Man_Mode"));
+  // Original: (PB_Maint OR ST_Maint_Mode) AND NOT PB_Auto AND
+  //           NOT PB_Manual AND DI_Mill_Run.
+  logic("gear3a-p02-maint",[
+    {or:[[x("PB_Maint")],[x("ST_Maint_Mode")]]},
+    nx("PB_Auto"),nx("PB_Manual"),x("DI_Mill_Run"),
+  ],o("ST_Maint_Mode"));
+  // (AUTO OR MAINT) AND Mill_Run OR MANUAL. Distributive equivalent
+  // inside ONE rung – three OR lanes, without nested branch networks.
+  logic("gear3a-p02-run",[
+    {or:[
+      [x("ST_Auto_Mode"),x("DI_Mill_Run")],
+      [x("ST_Maint_Mode"),x("DI_Mill_Run")],
+      [x("ST_Man_Mode")],
+    ]},
+  ],o("ST_Run_Rly"));
   make("gear3a-p02-running-output",[
     x("ST_Run_Rly"),o("DO_LS_Running_Output")]);
-  make("gear3a-p02-maint-running",[
-    x("ST_Maint_Mode"),x("DI_Mill_Run"),o("P02_Maint_During_Run")]);
-  or("gear3a-p02-selected",
-    [x("ST_Auto_Mode")],[x("P02_Maint_During_Run")],
-    [nx("ST_Man_Mode")],o("ST_Auto_Selected"));
+  // Original: (AUTO OR (MAINT AND Mill_Run)) AND NOT MANUAL.
+  logic("gear3a-p02-selected",[
+    {or:[[x("ST_Auto_Mode")],[x("ST_Maint_Mode"),x("DI_Mill_Run")]]},
+    nx("ST_Man_Mode"),
+  ],o("ST_Auto_Selected"));
 
-  // P01 post-mode mapping: run relay, low-pressure flag and output terminals.
+  // P01 physical output mappings execute AFTER mode manager rungs so
+  // signal propagation does not depend on a stale previous-scan copy.
   make("gear3a-p01-run",[
-    x("ST_Run_Rly"),o("Run_Rly")]);
+    x("ST_Run_Rly"),o("Run_Rly")],
+    "P01 — MAPPING | Salidas y condiciones de marcha.");
   make("gear3a-p01-low",[
     x("Run_Rly"),reg("LES","LubePressure_In_Scaled",400),o("LubePress_Lo")]);
   make("gear3a-p01-running-light",[
@@ -152,10 +173,9 @@ export function createGearPhase3AProject():PracticeProject {
     ["LS_Healthy","_310_YI_SystemHealthy"],
     ["LS_Running_Output","_310_YI_LubricationSystemRunning"],
   ] as const;
-  for(let i=0;i<terminals.length;i++){
-    make("gear3a-p01-output-"+i,[
-      x(terminals[i][0]),o(terminals[i][1]),
+  for(let k=0;k<terminals.length;k++)
+    make("gear3a-p01-output-"+k,[
+      x(terminals[k][0]),o(terminals[k][1]),
     ]);
-  }
   return p;
 }
