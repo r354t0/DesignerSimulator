@@ -2,7 +2,7 @@ import { useEffect,useRef,useState } from "react";
 import { BookOpen, Info, X } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import {
-  BATCH_EXERCISES,BATCH_IO_TAGS,batchSolutionTags,
+  BATCH_EXERCISES,BATCH_IO_TAGS,batchSolutionTags,batchSolutionUsedTags,
   type BatchExercise,
 } from "../../plc/batchMixerSceneModel";
 import { SceneTagTable } from "./SceneTagTable";
@@ -110,10 +110,22 @@ export function BatchMixerSceneInfoDialog({open,project,selectedExercise,onClose
           ejercicio seleccionado, incluyendo sus CTU/CTD, temporizadores, comparaciones,
           salidas e interbloqueos. Las variables adicionales solo se crean al implementarla.
         </p>
-        <h4 className="mb-2 font-semibold">Variables adicionales · Ejercicio {exercise}</h4>
-        <SceneTagTable specs={batchSolutionTags(exercise)} project={project} preview/>
+        <h4 className="mb-2 font-semibold">
+          {exercise<=2?"Variables utilizadas en la solución":"Variables adicionales"} · Ejercicio {exercise}
+        </h4>
+        <SceneTagTable
+          specs={exercise===1||exercise===2
+            ? batchSolutionUsedTags(exercise) : batchSolutionTags(exercise)}
+          project={project} preview/>
+        {exercise<=2&&<p className="mt-1.5 text-[10px] text-slate-400">
+          Solo aparecen los tags referenciados en los rungs de este ejercicio.
+          Las E/S ya existen en el SCADA; las variables internas se crean al
+          implementar la solución.
+        </p>}
         <p className="mt-2 text-[11px] text-slate-400">
-          {exercise<4?"Cada pulso de FM1 y FM3 equivale a 0,1 % y CNT_Volume registra los pulsos netos.":
+          {exercise===1?"FM1 incrementa CNT_Volume hasta 900 pulsos (90 %).":
+            exercise===2?"FM1 incrementa y FM3 decrementa CNT_Volume. TON TMR_Mixing utiliza PRE = 8000 ms; su bit TT habilita el mezclador y DN inicia el drenaje.":
+            exercise===3?"Cada pulso de FM1 y FM3 equivale a 0,1 % y CNT_Volume registra los pulsos netos.":
             "El termostato es una DI. El Ladder convierte INT_RatioP1 a pulsos mediante MUL × 10 y compara el resultado con CNT_Product1.ACC; la temperatura real pertenece a la física simulada."}
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-2">
