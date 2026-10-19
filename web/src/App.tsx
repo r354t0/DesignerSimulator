@@ -35,6 +35,9 @@ import {
   gearPhysicalSensors, type GearPhysicalState,
 } from "./plc/gearSprayPhysics";
 import {
+  createGearFatProject, GEAR_FAT_COMMANDS, type GearFatCommand,
+} from "./plc/gearSprayFatProgram";
+import {
   initialBatchProject, createBatchSolution, prepareBatchTags,
   initialBatchState, stepBatchPhysics, batchDigitalSensors, resetBatchProgramState,
   batchBool, batchInt,
@@ -206,6 +209,10 @@ export default function App() {
   }, []);
 
   const [gearSetupError, setGearSetupError] = useState<string | null>(null);
+  // FAT template is optional and reversible; snapshot is independent from
+  // the normal recommended-solution snapshots of other scenes.
+  const [gearFatLoaded,setGearFatLoaded]=useState(false);
+  const gearFatBackup=useRef<PracticeProject|null>(null);
   const [gearPhysical,setGearPhysical]=useState<GearPhysicalState>(initialGearPhysicalState);
   const gearPhysicalRef=useRef(gearPhysical);
   const changeGearPhysical=useCallback((operation:(state:GearPhysicalState)=>GearPhysicalState)=>{
@@ -784,6 +791,52 @@ export default function App() {
     openEditorView("practice");
   }, [openEditorView]);
 
+  const loadGearFat=useCallback(()=>{
+    if(activeControllerScene.current!=="gear"||gearFatLoaded)return;
+    if(scanRef.current.mode!=="stopped"){
+      window.alert("Detén primero el PLC para cargar el Ladder temporal FAT.");
+      return;
+    }
+    if(!window.confirm("Cargar los tres rungs temporales del FAT Gear Spray? " +
+      "Se guardará una copia de tu programa actual para poder restaurarlo. " +
+      "La plantilla NO contiene la filosofía P01–P07."))return;
+    gearFatBackup.current=scanRef.current.project;
+    changeScan(state=>({
+      ...initialPracticeScanState(createGearFatProject()),
+      scanPeriodMs:state.scanPeriodMs,
+    }));
+    changeGearPhysical(state=>({...initialGearPhysicalState(),enabled:state.enabled}));
+    setGearFatLoaded(true);
+    openEditorView("practice");
+  },[gearFatLoaded,changeScan,changeGearPhysical,openEditorView]);
+
+  const restoreGearFat=useCallback(()=>{
+    if(activeControllerScene.current!=="gear"||!gearFatLoaded)return;
+    if(scanRef.current.mode!=="stopped"){
+      window.alert("Detén primero el PLC para restaurar el programa anterior.");
+      return;
+    }
+    if(!window.confirm("Restaurar el programa previo al FAT? " +
+      "Los cambios hechos en la plantilla temporal serán descartados."))return;
+    const backup=gearFatBackup.current;
+    if(!backup)return;
+    changeScan(state=>({
+      ...initialPracticeScanState(backup),
+      scanPeriodMs:state.scanPeriodMs,
+    }));
+    changeGearPhysical(state=>({...initialGearPhysicalState(),enabled:state.enabled}));
+    gearFatBackup.current=null;
+    setGearFatLoaded(false);
+    openEditorView("practice");
+  },[gearFatLoaded,changeScan,changeGearPhysical,openEditorView]);
+
+  const setGearFatCommand=useCallback((tag:GearFatCommand,value:boolean)=>{
+    if(activeControllerScene.current!=="gear"||!gearFatLoaded)return;
+    if(!GEAR_FAT_COMMANDS.some(c=>c.name===tag))return;
+    changeScan(state=>state.mode==="running"
+      ?applySceneSensorBoolInput(state,tag,value):state);
+  },[gearFatLoaded,changeScan]);
+
   const loadBatchSolution=useCallback((exercise:BatchExercise)=>{
     if(activeControllerScene.current!=="batch")return;
     if(!window.confirm("Implementar la solución del ejercicio "+exercise+
@@ -1015,6 +1068,10 @@ export default function App() {
                           onResetSolution={() => resetRecommendedSolution("batch")}/>
                     : simulationTab === "gear"
                       ? <GearSprayScene project={practice} mode={practiceMode}
+                          fatLoaded={gearFatLoaded}
+                          onLoadFat={loadGearFat}
+                          onRestoreFat={restoreGearFat}
+                          onFatCommand={setGearFatCommand}
                           physics={gearPhysical}
                           onPhysicsChange={setGearPhysicalConfig}
                           onPhysicsReset={resetGearPhysical}
@@ -1047,7 +1104,8 @@ export default function App() {
       setTrafficInput, resetTraffic, prepareTraffic, trafficSetupError,
       loadTrafficExample, batchState, batchExercise, batchSetupError,
       setBatchInput, setBatchMode, setBatchIntegers, resetBatch, prepareBatch, loadBatchSolution,
-      gearSetupError, gearPhysical, setGearPhysicalConfig, resetGearPhysical,
+      gearSetupError, gearPhysical, gearFatLoaded, loadGearFat, restoreGearFat,
+      setGearFatCommand, setGearPhysicalConfig, resetGearPhysical,
       setGearPushButton, setGearDigitalInput, setGearNumber, prepareGear],
   );
 
