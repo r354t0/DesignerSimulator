@@ -1409,7 +1409,7 @@ export function PracticeEditor({
                         return (
                           <button key={"pre-" + item.id} type="button"
                             aria-label={"Editar PRE de " + item.kind + " " + (item.tag || "sin asignar")}
-                            title="Clic para escribir PRE o seleccionar una variable DINT"
+                            title="Clic para escribir PRE o seleccionar una variable INT o DINT"
                             onClick={(event) => {
                               event.stopPropagation();
                               setSelected(item.id);
