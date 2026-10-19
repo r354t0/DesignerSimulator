@@ -59,7 +59,7 @@ export const GEAR_HMI_SETPOINTS: readonly GearTagSpec[] = [
   {name:"CNT_LubeFlo_SP",type:"DINT",direction:"HMI",
     description:"Cantidad de pulsos de dosificador por lubricación"},
   {name:"TMR_LubeFlo_SP",type:"DINT",direction:"HMI",
-    description:"Tiempo máximo de pulsos de lubricación"},
+    description:"Setpoint del temporizador de alarma por flujo bajo"},
   {name:"Maint_Duration_Min",type:"DINT",direction:"HMI",
     description:"Duración del permiso de mantenimiento, minutos"},
 ];
