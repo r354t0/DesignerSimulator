@@ -46,6 +46,7 @@ export const BATCH_INTERNAL_TAGS: readonly BatchTagSpec[] = [
       direction: "Interna" as const, description: "Secuencia interna · " + name.slice(3) })),
   { name: "CNT_Volume", type: "COUNTER", direction: "Interna", description: "Volumen neto: CTU entrada / CTD salida" },
   { name: "TMR_Mix8s", type: "TIMER", direction: "Interna", description: "Mezclado de 8 s, retentivo para pausa" },
+  { name: "TMR_Mixing", type: "TIMER", direction: "Interna", description: "TON de 8000 ms para la fase de mezcla del ejercicio 2" },
   { name: "TMR_PostTemp4s", type: "TIMER", direction: "Interna", description: "Mezcla 4 s después del termostato" },
   { name: "CNT_Product1", type: "COUNTER", direction: "Interna", description: "Pulsos de P1 para porcentaje de mezcla" },
   { name: "ST_P1PulseTarget", type: "INT", direction: "Interna",
@@ -97,8 +98,8 @@ export const BATCH_EXERCISES: readonly {
 
 const additional: Record<BatchExercise, readonly string[]> = {
   1: ["ST_RunEnable","ST_Filling","ST_Full","CNT_Volume"],
-  2: ["ST_RunEnable","ST_Filling","ST_Full","ST_Mixing","ST_Draining",
-      "ST_ToMix","ST_ToDrain","ST_ToDone","ST_BatchDone","CNT_Volume","TMR_Mix8s"],
+  2: ["ST_RunEnable","ST_Filling","ST_Full","ST_Draining",
+      "CNT_Volume","TMR_Mixing"],
   3: ["ST_RunEnable","ST_Filling","ST_Full","ST_Mixing","ST_Draining",
       "ST_ToMix","ST_ToDrain","ST_ToDone","CNT_Volume","TMR_Mix8s"],
   4: ["ST_RunEnable","ST_Filling","ST_Full","ST_Mixing","ST_Draining",
@@ -175,7 +176,7 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
     if(p.tags.some(t=>t.name===tag))
       p=setTagValue(p,tag,tag==="CNT_Volume"?900:tag==="CNT_Product1"?1000:9999,"PRE");
   }
-  for(const [name,ms] of [["TMR_Mix8s",8000],["TMR_PostTemp4s",4000]] as const) {
+  for(const [name,ms] of [["TMR_Mix8s",8000],["TMR_Mixing",8000],["TMR_PostTemp4s",4000]] as const) {
     if(p.tags.some(tag=>tag.name===name))p=setTagValue(p,name,ms,"PRE");
   }
   let serial=0;
@@ -193,10 +194,10 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
       p=addParallelContact(p,id,id0,ins(choice),undefined,lane.id);
     }
   };
-  // LAB 01 · Exercise 1: reproduce the student's six-rung reference
-  // exactly, including two PARALLEL output coils in rung 4. No extra
-  // RUN/IDLE/display rungs or lower-level permissives in this exercise.
-  if (exercise===1) {
+  // LAB 01 · Exercises 1 and 2: same six-rung filling solution.
+  // Exercise 2 appends only the six additional rungs shown by the user.
+  // No extra RUN/IDLE/display outputs or hidden process states.
+  if (exercise===1 || exercise===2) {
     // R0: (PB_Start OR ST_RunEnable) AND NOT PB_Stop -> ST_RunEnable.
     any("rung-1",[X("PB_Start"),X("ST_RunEnable")],
       [N("PB_Stop")],O("OTE","ST_RunEnable"));
@@ -225,6 +226,36 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
     rung("bm-full-lamp",[
       X("ST_RunEnable"),X("ST_Full"),O("OTE","DO_FullLamp"),
     ]);
+    if(exercise===2){
+      // R6: TON begins while the FULL latch and RUN are TRUE.
+      rung("bm-mixing-timer",[
+        X("ST_RunEnable"),X("ST_Full"),O("TON","TMR_Mixing"),
+      ]);
+      // R7: mixer only runs while TON.TT indicates active timing.
+      rung("bm-mixer",[
+        X("ST_RunEnable"),X("ST_Full"),X("TMR_Mixing.TT"),
+        O("OTE","DO_Mixer"),
+      ]);
+      // R8: TON.DN unlatches FULL and simultaneously latches drain.
+      rung("bm-start-drain",[
+        X("ST_RunEnable"),X("ST_Full"),X("TMR_Mixing.DN"),
+        O("OTU","ST_Full"),O("OTL","ST_Draining"),
+      ]);
+      // R9: energize drain pump during the drain stage.
+      rung("bm-drain-pump",[
+        X("ST_RunEnable"),X("ST_Draining"),O("OTE","DO_Pump3"),
+      ]);
+      // R10: flowmeter FM3 decrements the SAME CNT_Volume counter.
+      rung("bm-ctd-volume",[
+        X("ST_RunEnable"),X("ST_Draining"),X("DI_Flowmeter3"),
+        O("CTD","CNT_Volume"),
+      ]);
+      // R11: completed discharge unlatches draining at ACC <= 0.
+      rung("bm-stop-drain",[
+        X("ST_RunEnable"),X("ST_Draining"),
+        C("LEQ","CNT_Volume.ACC",0),O("OTU","ST_Draining"),
+      ]);
+    }
     return p;
   }
 
@@ -242,7 +273,7 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
   const init=[X("PB_Start"),N("DI_LowLevel"),N("ST_Filling"),
     N("ST_Mixing"),N("ST_Draining")];
   if(advanced) init.push(X(exercise===4?"DI_ModeA":"DI_ModeB"));
-  if(exercise===2||exercise===4||exercise===5) init.push(N("ST_BatchDone"));
+  if(advanced) init.push(N("ST_BatchDone"));
   rung("bm-start-fill",[...init,O("OTL","ST_Filling")]);
 
   // FM1 produces one pulse per 0.1% of the tank. An INT HMI percentage
@@ -260,7 +291,7 @@ export function createBatchSolution(exercise: BatchExercise): PracticeProject {
     rung("bm-ctu-level",[X("DI_Flowmeter1"),O("CTU","CNT_Volume")]);
   }
 
-  // Exercises 2–5: progressive mixing, heating and discharge sequence.
+  // Exercises 3–5: progressive mixing, heating and discharge sequence.
   {
     rung("bm-to-mix",[X("ST_Filling"),endCondition,O("OTE","ST_ToMix")]);
     rung("bm-leave-fill",[X("ST_ToMix"),O("OTU","ST_Filling")]);
