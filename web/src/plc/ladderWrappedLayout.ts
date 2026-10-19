@@ -70,7 +70,7 @@ export function getWrappedRungLayout(
   // Timer and counter blocks need identical horizontal clearance.
   const hasStructuredOutput = rung.instructions.some((item) =>
     (isTimerKind(item.kind) && item.kind !== "RES") ||
-    isCounterKind(item.kind) || isMathKind(item.kind));
+    isCounterKind(item.kind) || isMathKind(item.kind) || item.kind==="GEAR_SEQ");
   const hasComparison = [...rung.instructions,
     ...(rung.parallelBranches ?? []).flatMap((branch) => branch.instructions)]
     .some((item) => isCompareKind(item.kind));
