@@ -451,7 +451,7 @@ export default function App() {
             result=changePracticeScanProject(result,
               setTagValue(result.project,name,sensor[name]));
         }
-        for(const name of ["_310_SQS_2561","_310_LSL"] as const){
+        for(const name of ["_310_SQS_2561","DI_PDB","_310_LSL"] as const){
           const tag=result.project.tags.find(t=>t.name===name);
           if(tag?.type==="BOOL"&&tag.value!==sensor[name])
             result=applySceneSensorBoolInput(result,name,sensor[name]);
@@ -515,7 +515,13 @@ export default function App() {
   const setGearDigitalInput=useCallback((tag:GearDigitalInput,value:boolean)=>{
     if(activeControllerScene.current!=="gear")return;
     if(gearPhysicalRef.current.enabled&&tag!=="_310_PLC104_YI_MillRun")return;
-    changeScan(state=>applySceneSensorBoolInput(state,tag,value));
+    changeScan(state=>{
+      const sampled=applySceneSensorBoolInput(state,tag,value);
+      // SQS is the physical terminal. DI_PDB is the cycle counter input.
+      // DI_PDB_2 was a discarded test tag; never register or sample it.
+      return tag==="_310_SQS_2561"&&sampled.project.tags.some(t=>t.name==="DI_PDB")
+        ?applySceneSensorBoolInput(sampled,"DI_PDB",value):sampled;
+    });
   },[changeScan]);
   const setGearNumber=useCallback((tag:GearAnalogInput|GearSetpoint,value:number)=>{
     if(activeControllerScene.current!=="gear")return;
