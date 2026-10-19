@@ -191,15 +191,12 @@ test("P02 AUTO lock-in is not artificially gated by earlier helper OTE",()=>{
   assert.equal(gearBool(p.project,"ST_Man_Mode"),true);
 });
 
-test("Phase 3A loader is reversible and mutually exclusive with Stage B FAT",()=>{
+test("Gear Spray is dedicated P01-P07 on first entry, with a manual reset",()=>{
   const app=source("../src/App.tsx");
   const scene=source("../src/components/ide/GearSprayScene.tsx");
-  assert.match(app,/createGearCompleteProject/);
-  assert.match(app,/gearPhase3Backup.current=scanRef.current.project/);
-  assert.match(app,/gearPhase3Backup.current=null/);
-  assert.match(app,/gearPhase3Loaded\|\|gearFatLoaded/);
-  assert.match(scene,/Cargar P01–P07 \(FAT integrado\)/);
-  assert.match(scene,/onClick=\{onRestorePhase3\}/);
-  assert.match(scene,/disabled=\{mode!=="stopped"\|\|fatLoaded\}/);
-  assert.match(scene,/P04 presión de bomba/);
+  assert.match(app,/gear: initialPracticeScanState\(createGearCompleteProject\(\)\)/);
+  assert.match(app,/const resetGearProgram=useCallback/);
+  assert.match(scene,/Reiniciar programa/);
+  assert.doesNotMatch(scene,/onRestorePhase3/);
+  assert.doesNotMatch(scene,/Banco de pruebas FAT/);
 });
