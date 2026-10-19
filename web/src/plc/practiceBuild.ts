@@ -161,9 +161,9 @@ export function buildPracticeProject(project: PracticeProject): LadderBuildResul
         ["SM_Cycle_Blocked","BOOL"],["SM_Cycle_RearmHold","BOOL"],
         ["SM_Cycle_BlockLatched","BOOL"],
         ["ST_Run_Rly","BOOL"],["DO_LS_Healthy","BOOL"],
-        ["ST_Man_Mode","BOOL"],["TMR_Freq_Dn","BOOL"],
-        ["TMR_Startup_Cycle_Dn","BOOL"],["PB_Extra","BOOL"],
-        ["CNT_Lubeflo_Dn","BOOL"],["TMR_Purge_Dn","BOOL"],
+        ["ST_Man_Mode","BOOL"],["TMR_Freq","TIMER"],
+        ["TMR_Startup_Cycle","TIMER"],["PB_Extra","BOOL"],
+        ["CTN_Lubeflo","COUNTER"],["TMR_Purge","TIMER"],
         ["PB_Reset","BOOL"],["ST_General_Trip_Rly","BOOL"],
       ] as const){
         if(tags.get(name)?.type!==type)
