@@ -99,5 +99,6 @@ export function gearSprayIsActive(
 ):boolean {
   return state.enabled&&outputs.atomizationSolenoid&&
     outputs.lubricantSolenoid&&state.airPressure>40 &&
-    state.lubePressure>=400&&!state.doserBlocked;
+    state.lubePressure>=400&&state.drumPercent>0&&
+    !state.filterBlocked&&!state.doserBlocked;
 }
