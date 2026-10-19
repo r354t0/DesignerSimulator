@@ -17,7 +17,9 @@ const run=()=>startPracticeScans(initialPracticeScanState(proj()));
 const tick=(p,n=1)=>{for(let i=0;i<n;i++)p=tickPracticeScan(p);return p;};
 const btn=(p,name)=>applyMomentaryBoolInput(
   applyMomentaryBoolInput(p,name,true,true),name,false,true);
-const field=(p,tag,value)=>applySceneSensorBoolInput(p,tag,value);
+const field=(p,tag,value)=>typeof value==="number"?
+  changePracticeScanProject(p,setTagValue(p.project,tag,value)):
+  applySceneSensorBoolInput(p,tag,value);
 const val=(p,tag)=>p.project.tags.find(t=>t.name===tag)?.value;
 const set=(p,tag,value)=>changePracticeScanProject(
   p,setTagValue(p.project,tag,value));
