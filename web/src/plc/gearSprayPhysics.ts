@@ -83,12 +83,13 @@ export function stepGearPhysical(
     totalPulses:state.totalPulses+pulses,drumPercent};
 }
 
-/** Sensor identity is exact, no implicit bridge from DI_PDB_2 to DI_PDB. */
+/** SQS-2561 is the physical pickup. DI_PDB is the operative pulse read by P03. */
 export function gearPhysicalSensors(state:GearPhysicalState) {
   return {
     _310_PI_2561:state.airPressure,
     _310_PI_2560:state.lubePressure,
     _310_SQS_2561:state.pulseHigh,
+    DI_PDB:state.pulseHigh,
     // Assumption for phase 2: TRUE means the level is LOW.
     _310_LSL:state.drumPercent<=GEAR_LOW_DRUM_PERCENT,
   };
