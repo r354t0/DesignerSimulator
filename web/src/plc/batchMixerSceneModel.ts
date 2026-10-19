@@ -112,6 +112,30 @@ const additional: Record<BatchExercise, readonly string[]> = {
 export function batchSolutionTags(exercise: BatchExercise): BatchTagSpec[] {
   return BATCH_INTERNAL_TAGS.filter(tag => additional[exercise].includes(tag.name));
 }
+/** The information table for Lab 01 mirrors the tags that actually occur
+ * in the recommended rungs (including SCADA I/O and internal declarations).
+ * Timer/counter member references are listed under their parent tag. */
+export function batchSolutionUsedTags(exercise: 1 | 2): BatchTagSpec[] {
+  const solution=createBatchSolution(exercise);
+  const used=new Set<string>();
+  const include=(operand?:string)=>{
+    if(operand)used.add(operand.split(".")[0]);
+  };
+  for(const rung of solution.rungs){
+    for(const item of [
+      ...rung.instructions,
+      ...(rung.parallelBranches??[]).flatMap(branch=>branch.instructions),
+    ]){
+      include(item.tag);
+      if(item.compareA?.mode==="tag")include(item.compareA.tag);
+      if(item.compareB?.mode==="tag")include(item.compareB.tag);
+      if(item.preset?.mode==="tag")include(item.preset.tag);
+    }
+  }
+  return [...BATCH_IO_TAGS,...BATCH_INTERNAL_TAGS]
+    .filter(spec=>used.has(spec.name));
+}
+
 export function prepareBatchTags(project: PracticeProject): PracticeProject {
   // Install only physical SCADA-facing tags. Never secretly add solution tags.
   let result=project;
