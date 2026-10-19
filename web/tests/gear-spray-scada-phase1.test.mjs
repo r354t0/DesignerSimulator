@@ -152,5 +152,5 @@ test("Source distinctions from CCW have not been silently reconciled",()=>{
   assert.match(scene,/P01 copia _310_SQS_2561/);
   assert.match(scene,/a DI_PDB_2, pero P03 cuenta DI_PDB/);
   assert.match(scene,/AFI para la alarma de alta presión/);
-  assert.match(scene,/pendientes de escalamiento/);
+  assert.match(scene,/falta confirmar la equivalencia en CCW/);
 });
