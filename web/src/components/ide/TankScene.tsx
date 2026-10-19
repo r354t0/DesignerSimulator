@@ -302,7 +302,7 @@ export function TankScene({
                 icon={<RotateCcw size={15} aria-hidden="true"/>}>RESET</MomentaryPushButton>
             </div>
           </section>
-          <section className="sort-panel min-w-0 rounded-lg border border-[#344c5e] p-3"
+          <section className="sort-panel scada-led-panel min-w-0 rounded-lg border border-[#344c5e] p-3"
             aria-label="Pilotos LED y nivel">
             <h3 className="mb-2 text-xs font-semibold">Pilotos LED y nivel</h3>
             <div className="space-y-3">
