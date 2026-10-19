@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { buildPracticeProject } from "../src/plc/practiceBuild.ts";
 import {
- BATCH_EXERCISES,BATCH_IO_TAGS,batchSolutionTags,
+ BATCH_EXERCISES,BATCH_IO_TAGS,batchSolutionTags,batchSolutionUsedTags,
  initialBatchProject,prepareBatchTags,createBatchSolution,
  initialBatchState,batchDigitalSensors,stepBatchPhysics,resetBatchProgramState,
  batchBool,batchInt,batchCounter,
@@ -58,9 +58,13 @@ test("five recommended solutions build independently and introduce only their ow
     const added=p.tags.filter(t=>!BATCH_IO_TAGS.some(io=>io.name===t.name));
     assert.deepEqual(added.map(x=>x.name),batchSolutionTags(ex).map(x=>x.name));
     if(ex===1) assert.equal(p.rungs.length,6);
+    else if(ex===2) assert.equal(p.rungs.length,12);
     else assert.ok(p.rungs.length>=8);
     assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="CTU")));
-    if(ex!==1) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="RTO")));
+    if(ex===2) {
+      assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="TON" && i.tag==="TMR_Mixing")));
+      assert.equal(p.tags.find(t=>t.name==="TMR_Mixing").value.PRE,8000);
+    } else if(ex>2) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="RTO")));
     if(ex===2||ex===3) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="CTD")));
     if(ex>=4)assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="LES")));
     if(ex>=4){
@@ -68,7 +72,7 @@ test("five recommended solutions build independently and introduce only their ow
         i.tag==="ST_P1PulseTarget"&&i.compareB?.mode==="literal"&&i.compareB.value===10)));
       assert.equal(p.tags.find(t=>t.name==="ST_P1PulseTarget").type,"INT");
     }
-    if(ex!==1) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="MOV")));
+    if(ex>2) assert.ok(p.rungs.some(r=>r.instructions.some(i=>i.kind==="MOV")));
     const display=p.tags.find(t=>t.name==="INT_DisplayValue");
     assert.equal(display.type,"INT");
   }
@@ -106,6 +110,76 @@ test("Ejercicio 1: six rungs exactly match reference, with two parallel output c
   assert.ok(!project.rungs.some(rung=>rung.instructions.some(item=>
     ["RTO","TON","CTD","MOV"].includes(item.kind))),"no extra solution rungs");
   assert.equal(buildPracticeProject(project).success,true);
+});
+
+test("Ejercicio 2: twelve rungs replicate both reference images with TON TT/DN and CTD",()=>{
+  const one=createBatchSolution(1);
+  const two=createBatchSolution(2);
+  assert.equal(two.rungs.length,12);
+  for(let n=0;n<6;n++) {
+    assert.deepEqual(two.rungs[n].instructions.map(i=>[i.kind,i.tag]),
+      one.rungs[n].instructions.map(i=>[i.kind,i.tag]),"same initial rung "+n);
+    assert.deepEqual((two.rungs[n].parallelBranches??[]).map(b=>
+      b.instructions.map(i=>[i.kind,i.tag])),
+      (one.rungs[n].parallelBranches??[]).map(b=>
+        b.instructions.map(i=>[i.kind,i.tag])),"same OR branch "+n);
+  }
+  const expected=[
+    [["XIC","ST_RunEnable"],["XIC","ST_Full"],["TON","TMR_Mixing"]],
+    [["XIC","ST_RunEnable"],["XIC","ST_Full"],["XIC","TMR_Mixing.TT"],
+      ["OTE","DO_Mixer"]],
+    [["XIC","ST_RunEnable"],["XIC","ST_Full"],["XIC","TMR_Mixing.DN"],
+      ["OTU","ST_Full"],["OTL","ST_Draining"]],
+    [["XIC","ST_RunEnable"],["XIC","ST_Draining"],["OTE","DO_Pump3"]],
+    [["XIC","ST_RunEnable"],["XIC","ST_Draining"],
+      ["XIC","DI_Flowmeter3"],["CTD","CNT_Volume"]],
+    [["XIC","ST_RunEnable"],["XIC","ST_Draining"],
+      ["LEQ",""],["OTU","ST_Draining"]],
+  ];
+  expected.forEach((items,offset)=>{
+    assert.deepEqual(two.rungs[6+offset].instructions.map(i=>[i.kind,i.tag]),items,
+      "exercise 2 rung "+(6+offset));
+  });
+  assert.deepEqual(two.rungs[11].instructions[2].compareA,
+    {mode:"tag",tag:"CNT_Volume.ACC"});
+  assert.deepEqual(two.rungs[11].instructions[2].compareB,
+    {mode:"literal",value:0});
+  assert.equal(two.tags.find(t=>t.name==="TMR_Mixing").value.PRE,8000);
+  assert.equal(two.tags.find(t=>t.name==="CNT_Volume").value.PRE,900);
+  assert.equal(batchSolutionTags(2).length,6);
+  assert.deepEqual(batchSolutionTags(2).map(t=>t.name),
+    ["ST_RunEnable","ST_Filling","ST_Full","ST_Draining","CNT_Volume","TMR_Mixing"]);
+  assert.ok(!two.rungs.some(r=>r.instructions.some(i=>
+    ["RTO","RES","MOV"].includes(i.kind))));
+  assert.equal(buildPracticeProject(two).success,true);
+});
+
+test("Ejercicios 1 y 2: information lists only tags actually referenced in Ladder",()=>{
+  for(const exercise of [1,2]){
+    const program=createBatchSolution(exercise);
+    const used=batchSolutionUsedTags(exercise);
+    const names=used.map(t=>t.name);
+    assert.equal(names.length,new Set(names).size);
+    const actual=new Set();
+    for(const rung of program.rungs){
+      for(const item of [...rung.instructions,
+        ...(rung.parallelBranches??[]).flatMap(b=>b.instructions)]){
+        if(item.tag)actual.add(item.tag.split(".")[0]);
+        for(const operand of [item.compareA,item.compareB,item.preset])
+          if(operand?.mode==="tag")actual.add(operand.tag.split(".")[0]);
+      }
+    }
+    assert.deepEqual(new Set(names),actual);
+    assert.deepEqual(new Set(names.filter(t=>t.startsWith("ST_")||
+      t.startsWith("TMR_")||t.startsWith("CNT_"))),
+      new Set(batchSolutionTags(exercise).map(t=>t.name)));
+    for(const unused of ["PB_Enter","DO_RunLamp","DO_IdleLamp","INT_DisplayValue",
+      "DI_HighLevel","DI_LowLevel","ST_ToMix","ST_Mixing","ST_BatchDone"]) {
+      assert.equal(names.includes(unused),false,exercise+" should omit "+unused);
+    }
+  }
+  const info=source("../src/components/ide/BatchMixerSceneInfoDialog.tsx");
+  assert.match(info,/batchSolutionUsedTags\(exercise\)/);
 });
 
 test("Ejercicio 1: STOP pauses pump and FULL pilot until run is reenabled",()=>{
