@@ -38,7 +38,7 @@ import {
   createGearFatProject, GEAR_FAT_COMMANDS, clearGearFatCommands,
   type GearFatCommand,
 } from "./plc/gearSprayFatProgram";
-import {createGearPhase3AProject} from "./plc/gearSprayPhase3Program";
+import {createGearPhase3Project} from "./plc/gearSprayP03Program";
 import {
   initialBatchProject, createBatchSolution, prepareBatchTags,
   initialBatchState, stepBatchPhysics, batchDigitalSensors, resetBatchProgramState,
@@ -866,13 +866,13 @@ export default function App() {
     if(scanRef.current.mode!=="stopped"){
       window.alert("Detén primero el PLC antes de cargar P01 y P02.");return;
     }
-    if(!window.confirm("Cargar la primera plantilla editable de Fase 3 " +
-      "(P01 mapeo de señales y P02 gestión de modos)? " +
+    if(!window.confirm("Cargar Fase 3B con P01, P02 y los 11 rungs P03 " +
+      "(temporizadores, contador y FB_GearSpray_Sequence)? " +
       "Se conservará una copia temporal de tu programa actual. " +
-      "P03–P07 aún no están implementadas."))return;
+      "P04–P07 aún no están implementadas."))return;
     gearPhase3Backup.current=scanRef.current.project;
     changeScan(state=>({
-      ...initialPracticeScanState(createGearPhase3AProject()),
+      ...initialPracticeScanState(createGearPhase3Project()),
       scanPeriodMs:state.scanPeriodMs,
     }));
     setGearPhase3Loaded(true);
