@@ -76,6 +76,11 @@ function Pilot({label,active,tone="green"}:{
   </div>;
 }
 
+/** Diagrama de proceso para la escena 06.
+ * Tuberías representadas como redes independientes: aire instrumental/atomización
+ * (azul) y grasa presurizada (acero/ámbar). El SCADA únicamente lee tags PLC.
+ * Los cruces sin unión entre redes se muestran con un puente blanco.
+ */
 function ProcessGraphic({project}: {project:PracticeProject}){
   const v=(name:string)=>gearBool(project,name);
   const pump=v("_310_SV_2560");
@@ -85,112 +90,204 @@ function ProcessGraphic({project}: {project:PracticeProject}){
   const dosing=v("_310_SQS_2561");
   const low=v("_310_LSL");
   const atomizing=air&&grease;
-  const valve=(cx:number,cy:number,on:boolean,color:string,code:string)=>(
-    <g>
-      <path d={`M${cx-17} ${cy-16} L${cx+17} ${cy+16} L${cx+17} ${cy-16} L${cx-17} ${cy+16}Z`}
-        fill={on?color:"#e2e8f0"} stroke="#334155" strokeWidth="2"/>
-      <rect x={cx-8} y={cy-37} width="16" height="17" rx="3"
-        fill={on?color:"#94a3b8"} stroke="#475569"/>
-      <path d={`M${cx} ${cy-20} V${cy-16}`} stroke="#334155" strokeWidth="2"/>
-      <text x={cx} y={cy-48} textAnchor="middle" fill="#334155" fontSize="12" fontWeight="700">{code}</text>
+  const nozzleYs=[246,290,334,378,422,466];
+
+  // Dos capas para que el contorno del conducto quede visible aun en reposo.
+  const pipe=(d:string,kind:"air"|"lube",flow:boolean)=>(
+    <g fill="none" strokeLinecap="square" strokeLinejoin="round">
+      <path d={d} stroke="#f8fafc" strokeWidth="15"/>
+      <path d={d} stroke={kind==="air"?"#294657":"#334155"} strokeWidth="11"/>
+      <path d={d} stroke={kind==="air"?"#1198e3":"#94a3b8"} strokeWidth="6"/>
+      {flow&&<path d={d} stroke={kind==="air"?"#a5e8ff":"#f6ad42"}
+        strokeWidth="2.5" strokeDasharray="9 9" opacity=".95"/>}
     </g>
   );
-  return <svg viewBox="0 0 970 552" role="img"
-    aria-label="Proceso Gear Spray: circuito de aire, circuito de lubricación y boquillas en corona del molino"
-    className="block h-auto w-full min-w-[600px] rounded-lg border border-slate-300 bg-white">
-    <rect x="0" y="0" width="970" height="552" rx="10" fill="#fff"/>
-    <text x="25" y="28" fontSize="17" fontWeight="750" fill="#0f2940">
+
+  const solenoid=(cx:number,cy:number,code:string,on:boolean,kind:"air"|"lube")=>(
+    <g>
+      <rect x={cx-19} y={cy-14} width="38" height="28" rx="5"
+        fill={on?"#c7f9da":"#e2e8f0"} stroke="#334155" strokeWidth="2"/>
+      <path d={"M"+(cx-18)+" "+(cy-12)+" L"+(cx+18)+" "+(cy+12)+
+        " M"+(cx+18)+" "+(cy-12)+" L"+(cx-18)+" "+(cy+12)}
+        stroke={on?"#047857":"#475569"} strokeWidth="2.5"/>
+      <rect x={cx-12} y={cy-33} width="24" height="15" rx="3"
+        fill={on?"#22c55e":"#94a3b8"} stroke="#334155" strokeWidth="1.5"/>
+      <path d={"M"+cx+" "+(cy-18)+" V"+(cy-14)} stroke="#334155" strokeWidth="2"/>
+      <text x={cx} y={cy-43} textAnchor="middle" fontSize="10.5" fontWeight="750"
+        fill={on?"#047857":"#64748b"}>{on?"ON":"OFF"}</text>
+      <rect x={cx-48} y={cy+21} width="96" height="20" rx="4"
+        fill="#fff" stroke="#a8bac9"/>
+      <text x={cx} y={cy+35} textAnchor="middle" fontSize="11" fontWeight="750"
+        fill="#334155">{code}</text>
+      <title>{code+" · "+(kind==="air"?"Válvula de aire":"Válvula de grasa")+" · "+(on?"Activa":"Inactiva")}</title>
+    </g>
+  );
+
+  return <svg viewBox="0 0 1060 610" role="img"
+    aria-label="Escena 06 Gear Spray: acometida de aire a SV-2560 y SV-2563, tambor y bomba a SV-2561, bloque dosificador y seis boquillas con aire de atomización"
+    className="block h-auto w-full min-w-[680px] rounded-lg border border-slate-300 bg-white">
+    <rect x="0" y="0" width="1060" height="610" rx="10" fill="#fff"/>
+    <text x="24" y="29" fontSize="17" fontWeight="750" fill="#0f2940">
       LUBRICACIÓN DE CORONA · GEAR SPRAY
     </text>
-    <text x="25" y="49" fontSize="11" fill="#64748b">
-      Esquema de proceso · Circuitos de aire y grasa · E/S físicas del Micro850
+    <text x="24" y="49" fontSize="11" fill="#64748b">
+      Escena 06 · Distribución de aire y grasa · Señales físicas del Micro850
     </text>
-    <rect x="20" y="68" width="930" height="457" rx="12" fill="#f8fafc" stroke="#d6e0ea"/>
-    {/* Air source and manifold */}
-    <text x="37" y="97" fontSize="12" fontWeight="700" fill="#0369a1">AIRE COMPRIMIDO</text>
-    <path d="M36 155 H786 V258" fill="none" stroke="#dbeafe" strokeWidth="11" strokeLinejoin="round"/>
-    <path d="M36 155 H786 V258" fill="none" stroke={surfaces.air} strokeWidth="4"
-      strokeDasharray={air?"12 7":"0"} opacity={air?1:0.45} strokeLinejoin="round"/>
-    <rect x="45" y="131" width="74" height="49" rx="6" fill="#e0f2fe" stroke="#0284c7" strokeWidth="2"/>
-    <text x="82" y="150" textAnchor="middle" fontSize="10" fontWeight="700" fill="#075985">FILTRO</text>
-    <text x="82" y="164" textAnchor="middle" fontSize="9" fill="#075985">AIRE</text>
-    {valve(252,155,pump,surfaces.active,"SV-2560 · BOMBA")}
-    {valve(560,155,air,surfaces.air,"SV-2563 · ATOMIZACIÓN")}
-    <path d="M252 172 V328" stroke="#94a3b8" strokeWidth="10"/>
-    <path d="M252 172 V328" stroke={pump?surfaces.air:"#64748b"} strokeWidth="4" opacity=".9"
-      strokeDasharray={pump?"9 6":"0"}/>
-    {/* Lubricant supply */}
-    <text x="36" y="253" fontSize="12" fontWeight="700" fill="#92400e">CIRCUITO DE GRASA</text>
-    <rect x="45" y="287" width="119" height="180" rx="13" stroke="#854d0e" strokeWidth="3" fill="#fef3c7"/>
-    <ellipse cx="104" cy="287" rx="59" ry="13" fill="#e7c58a" stroke="#854d0e" strokeWidth="2"/>
-    <rect x="52" y="382" width="104" height="75" rx="5" fill="#f59e0b" opacity=".55"/>
-    <text x="104" y="348" fontSize="13" fontWeight="700" textAnchor="middle" fill="#78350f">TAMBOR</text>
-    <text x="104" y="365" fontSize="11" textAnchor="middle" fill="#78350f">GRASA</text>
-    <text x="104" y="480" fontSize="11" fontWeight="600" textAnchor="middle" fill="#475569">
-      Nivel bajo: {low?"1":"0"}
+    <g fontSize="10.5" fill="#334155">
+      <path d="M734 24 H765" stroke="#1198e3" strokeWidth="6"/>
+      <text x="774" y="28">Aire</text>
+      <path d="M832 24 H863" stroke="#64748b" strokeWidth="7"/>
+      <text x="873" y="28">Grasa</text>
+      <circle cx="952" cy="24" r="6" fill="#16a34a"/>
+      <text x="964" y="28">Activo</text>
+    </g>
+    <rect x="18" y="65" width="1024" height="514" rx="10"
+      fill="#f5f7fa" stroke="#d7e1e9"/>
+
+    {/* Línea de suministro común y derivación a los dos circuitos neumáticos. */}
+    <text x="38" y="215" fontSize="12" fontWeight="750" fill="#0369a1">
+      AIRE INSTRUMENTAL
     </text>
-    <path d="M165 355 H300 H430 H555 H666 V329 H738 V297" fill="none"
-      stroke="#e7d9c5" strokeWidth="14" strokeLinejoin="round"/>
-    <path d="M165 355 H300 H430 H555 H666 V329 H738 V297" fill="none"
-      stroke={grease?surfaces.lube:"#64748b"} strokeWidth="5" strokeLinejoin="round"
-      strokeDasharray={grease?"10 7":"0"}/>
-    <rect x="214" y="304" width="75" height="102" rx="10"
-      fill={pump?"#c5e9e1":"#dce4ec"} stroke={pump?surfaces.active:surfaces.steel}
-      strokeWidth="3"/>
-    <circle cx="252" cy="353" r="24" fill="white" stroke="#334155" strokeWidth="2"/>
-    <path d="M238 363 L252 338 L266 363 Z" fill={pump?surfaces.active:"#94a3b8"}/>
-    <text x="252" y="426" fontSize="11" textAnchor="middle" fontWeight="700" fill="#334155">
-      BOMBA NEUMÁTICA
+    <text x="38" y="232" fontSize="10" fill="#475569">Acometida de planta</text>
+    {pipe("M43 286 H282", "air", pump||air)}
+    <path d="M43 274 L28 286 L43 298" fill="none"
+      stroke="#0284c7" strokeWidth="3"/>
+    {/* Ramal de atomización: fuente -> SV-2563 -> colector azul de boquillas. */}
+    {pipe("M282 286 V124 H909 V475", "air", air)}
+    {/* Ramal de accionamiento de bomba: fuente -> SV-2560 -> bomba. */}
+    {pipe("M282 286 H444 V370", "air", pump)}
+    <text x="584" y="101" fontSize="11" fontWeight="700" fill="#075985">
+      AIRE DE ATOMIZACIÓN
     </text>
-    <rect x="351" y="322" width="64" height="65" rx="7" fill="#f1f5f9" stroke="#64748b" strokeWidth="2"/>
-    <path d="M359 375 L408 332 M359 349 L385 332 M384 377 L408 355"
-      stroke="#94a3b8" strokeWidth="4"/>
-    <text x="383" y="405" fontSize="11" textAnchor="middle" fill="#334155">FILTRO</text>
-    {valve(502,355,grease,surfaces.lube,"SV-2561 · GRASA")}
-    <rect x="603" y="307" width="107" height="93" rx="9" fill="#edf1f4"
+    <text x="93" y="138" fontSize="11" fontWeight="700" fill="#334155">
+      PI-2561 · AIRE
+    </text>
+    <rect x="91" y="147" width="111" height="39" rx="5"
+      fill="#dbeafe" stroke="#0284c7" strokeWidth="1.5"/>
+    <text x="147" y="172" textAnchor="middle" fontSize="17" fontWeight="750"
+      fill="#075985">{gearNumber(project,"_310_PI_2561").toFixed(1)}</text>
+    <text x="209" y="172" fontSize="10" fill="#64748b">CCW</text>
+    <path d="M148 190 V279" fill="none" stroke="#64748b" strokeWidth="3"/>
+    <circle cx="148" cy="286" r="6" fill="#fff" stroke="#0284c7" strokeWidth="3"/>
+    <text x="91" y="201" fontSize="10" fill="#64748b">Transmisor de presión</text>
+    {solenoid(444,124,"SV-2563",air,"air")}
+    {solenoid(444,286,"SV-2560",pump,"air")}
+
+    {/* Línea de grasa: tambor -> bomba neumática -> filtro -> SV-2561
+        -> transmisor de presión -> entrada del bloque dosificador. */}
+    <text x="286" y="343" fontSize="11" fontWeight="750" fill="#92400e">
+      ALIMENTACIÓN DE GRASA
+    </text>
+    <rect x="332" y="426" width="102" height="115" rx="9"
+      fill="#334155" stroke="#0f172a" strokeWidth="3"/>
+    <ellipse cx="383" cy="426" rx="51" ry="11" fill="#64748b" stroke="#0f172a" strokeWidth="2"/>
+    <path d="M332 464 H434 M332 503 H434" stroke="#94a3b8" strokeWidth="3"/>
+    <text x="383" y="479" fontSize="11" fontWeight="750" fill="#fff" textAnchor="middle">
+      TAMBOR
+    </text>
+    <text x="383" y="496" fontSize="10" fill="#e2e8f0" textAnchor="middle">310-LU-003-HE</text>
+    <circle cx="421" cy="443" r="9" fill={low?"#ef4444":"#34d399"}
+      stroke="#0f172a" strokeWidth="2"/>
+    <text x="441" y="447" fontSize="10.5" fill="#334155">
+      LSL {low?"BAJO":"OK"}
+    </text>
+    {pipe("M383 427 V382 H722", "lube", grease&&pump)}
+    {/* Bomba sobre el tambor. El ramal de SV-2560 llega a su actuador. */}
+    <rect x="364" y="352" width="74" height="58" rx="8" fill={pump?"#ccf5e3":"#dce4ec"}
+      stroke={pump?surfaces.active:"#475569"} strokeWidth="3"/>
+    <circle cx="402" cy="381" r="20" fill="white" stroke="#475569" strokeWidth="2"/>
+    <path d="M390 391 L402 368 L414 391 Z"
+      fill={pump?surfaces.active:"#94a3b8"}/>
+    <rect x="436" y="364" width="18" height="14" rx="3"
+      fill={pump?"#0ea5e9":"#cbd5e1"} stroke="#475569" strokeWidth="2"/>
+    <text x="400" y="338" textAnchor="middle" fontSize="10.5" fontWeight="750"
+      fill="#334155">BOMBA NEUMÁTICA</text>
+    {/* Filtro de línea de grasa. */}
+    <rect x="480" y="365" width="58" height="35" rx="6"
+      fill="#fff" stroke="#64748b" strokeWidth="2.5"/>
+    <path d="M489 393 L528 371 M489 381 L506 371 M513 393 L529 384"
+      stroke="#94a3b8" strokeWidth="3"/>
+    <text x="509" y="356" textAnchor="middle" fontSize="10.5" fontWeight="700"
+      fill="#334155">FILTRO</text>
+    {solenoid(615,382,"SV-2561",grease,"lube")}
+
+    {/* Transmisor de grasa conectado mediante toma en T: no es una válvula. */}
+    <path d="M686 383 V453" fill="none" stroke="#64748b" strokeWidth="3.5"/>
+    <circle cx="686" cy="382" r="6" fill="#fff" stroke="#64748b" strokeWidth="3"/>
+    <circle cx="686" cy="466" r="16" fill="#dbeafe" stroke="#0369a1" strokeWidth="3"/>
+    <path d="M686 455 V466 L696 462" stroke="#0369a1" strokeWidth="2"
+      fill="none"/>
+    <text x="603" y="504" fontSize="11" fontWeight="750" fill="#334155">
+      PI-2560 · GRASA
+    </text>
+    <rect x="602" y="513" width="123" height="39" rx="5"
+      fill="#ffedd5" stroke="#d97706" strokeWidth="1.5"/>
+    <text x="663" y="538" textAnchor="middle" fontSize="17" fontWeight="750"
+      fill="#92400e">{gearNumber(project,"_310_PI_2560").toFixed(1)}</text>
+    <text x="733" y="538" fontSize="10" fill="#64748b">CCW</text>
+
+    {/* Sensor de proximidad en la parte superior del dosificador. */}
+    <circle cx="793" cy="174" r="27" fill={dosing?"#22c55e":"#e2e8f0"}
+      stroke={dosing?"#15803d":"#64748b"} strokeWidth="3"/>
+    <text x="793" y="170" textAnchor="middle" fill="#0f172a"
+      fontSize="12" fontWeight="750">SQS</text>
+    <text x="793" y="184" textAnchor="middle" fill="#0f172a"
+      fontSize="12" fontWeight="750">2561</text>
+    <rect x="787" y="204" width="12" height="21" rx="2"
+      fill="#94a3b8" stroke="#475569" strokeWidth="2"/>
+
+    {/* Bloque distribuidor y salidas individuales de grasa; no está conectado
+        hidráulicamente al colector azul de aire que pasa a su derecha. */}
+    <rect x="742" y="226" width="112" height="256" rx="9" fill="#cbd5e1"
       stroke="#475569" strokeWidth="3"/>
-    <path d="M615 338 H697 M615 357 H697 M615 376 H697" stroke="#64748b" strokeWidth="3"/>
-    <circle cx="650" cy="329" r="9" fill={dosing?"#34d399":"#cbd5e1"} stroke="#334155" strokeWidth="2"/>
-    <text x="657" y="417" textAnchor="middle" fontWeight="700" fontSize="11" fill="#334155">
-      BLOQUE DOSIFICADOR
+    <rect x="757" y="236" width="82" height="237" rx="5" fill="#e2e8f0"
+      stroke="#94a3b8" strokeWidth="2"/>
+    <path d="M798 237 V473" stroke="#94a3b8" strokeWidth="2"/>
+    {nozzleYs.map((y,i)=><g key={"dist-"+i}>
+      <path d={"M742 "+y+" h-18"} stroke="#64748b" strokeWidth="5"/>
+      <circle cx="797" cy={y} r="6" fill="#94a3b8" stroke="#475569" strokeWidth="2"/>
+      <circle cx="797" cy={y} r="2" fill="#fff"/>
+      <rect x="841" y={y-8} width="20" height="16" rx="3"
+        fill="#cbd5e1" stroke="#475569" strokeWidth="1.5"/>
+    </g>)}
+    <text x="797" y="501" textAnchor="middle" fontSize="11"
+      fontWeight="750" fill="#334155">BLOQUE DOSIFICADOR</text>
+
+    {/* El cabezal de atomización cruza las seis líneas de grasa SIN conexión.
+        Puentes claros en los cruces impiden interpretarlos como una unión. */}
+    {nozzleYs.map((y,i)=><g key={"nozzle-"+i}>
+      {pipe("M855 "+y+" H961","lube",grease&&pump)}
+      {pipe("M909 "+(y-13)+" H961","air",air)}
+      <rect x="956" y={y-15} width="42" height="30" rx="5"
+        fill={atomizing?"#c1dcee":"#d5dde5"} stroke="#475569" strokeWidth="2.5"/>
+      <ellipse cx="998" cy={y} rx="9" ry="12" fill="#cbd5e1" stroke="#475569" strokeWidth="2"/>
+      <path d={"M1006 "+y+" l22 -14 M1006 "+y+" h26 M1006 "+y+" l22 14"}
+        stroke={atomizing?"#0284c7":"#94a3b8"} strokeWidth="2.5" strokeLinecap="round"/>
+      {atomizing&&<path d={"M1015 "+y+" l25 -20 M1015 "+y+" l26 20"}
+        stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 5"/>}
+    </g>)}
+    <text x="945" y="507" fontSize="11" textAnchor="middle" fontWeight="750"
+      fill="#334155">6 BOQUILLAS</text>
+
+    {/* Estados solo de lectura: no afectan el motor Ladder ni fuerzan E/S. */}
+    <rect x="33" y="548" width="255" height="24" rx="4" fill="#e2e8f0"
+      stroke="#cbd5e1"/>
+    <circle cx="46" cy="560" r="6" fill={pump?"#16a34a":"#94a3b8"}/>
+    <text x="61" y="564" fontSize="11" fill="#334155" fontWeight="650">
+      Bomba: {pump?"ON":"OFF"}
     </text>
-    <text x="656" y="434" textAnchor="middle" fontSize="10" fill="#475569">
-      PULSO SQS-2561: {dosing?"1":"0"}
+    <circle cx="159" cy="560" r="6" fill={grease?"#16a34a":"#94a3b8"}/>
+    <text x="171" y="564" fontSize="11" fill="#334155" fontWeight="650">
+      Grasa: {grease?"ON":"OFF"}
     </text>
-    {/* Spray / ball mill */}
-    <g>
-      <circle cx="811" cy="370" r="110" fill="#e2e8f0" stroke="#475569" strokeWidth="7"/>
-      <circle cx="811" cy="370" r="91" fill="none" stroke="#64748b" strokeWidth="5" strokeDasharray="7 8"/>
-      <circle cx="811" cy="370" r="74" fill="#fff" stroke="#64748b" strokeWidth="5"/>
-      <circle cx="811" cy="370" r="28" fill="#cbd5e1" stroke="#475569" strokeWidth="3"/>
-      <path d="M737 370 H885 M811 296 V444 M759 318 L864 424 M863 318 L759 424"
-        stroke="#cbd5e1" strokeWidth="11"/>
-      <circle cx="811" cy="370" r="28" fill="#94a3b8" stroke="#475569" strokeWidth="2"/>
-      <rect x="756" y="487" width="114" height="25" rx="5"
-        fill={mill?"#d1fae5":"#e2e8f0"} stroke="#64748b"/>
-      <text x="813" y="503" fontSize="11" fontWeight="700" textAnchor="middle"
-        fill={mill?"#065f46":"#475569"}>MOLINO {mill?"RUN":"STOP"}</text>
-    </g>
-    <g strokeLinecap="round">
-      <path d="M739 259 V282 M765 255 V278 M790 255 V278" stroke="#334155" strokeWidth="7"/>
-      {atomizing&&<g stroke="#0d9488" strokeWidth="3" opacity=".9">
-        <path d="M740 282 L716 311 M740 282 L760 312 M766 278 L752 318 M766 278 L783 318 M790 278 L775 313 M790 278 L808 313"/>
-      </g>}
-    </g>
-    <text x="848" y="216" fontSize="11" fill="#334155" fontWeight="700" textAnchor="middle">
-      BOQUILLAS
+    <rect x="835" y="540" width="177" height="29" rx="5"
+      fill={mill?"#d1fae5":"#e2e8f0"} stroke="#94a3b8"/>
+    <text x="923" y="559" fontSize="11" fontWeight="750" textAnchor="middle"
+      fill={mill?"#065f46":"#475569"}>
+      MOLINO {mill?"RUN":"STOP"}
     </text>
-    {/* Status cards */}
-    <rect x="44" y="493" width="250" height="27" rx="5" fill="#e0f2fe" stroke="#bae6fd"/>
-    <text x="56" y="511" fontSize="12" fill="#075985" fontWeight="650">
-      P aire (CCW): {gearNumber(project,"_310_PI_2561").toFixed(1)}
-    </text>
-    <rect x="308" y="493" width="290" height="27" rx="5" fill="#ffedd5" stroke="#fed7aa"/>
-    <text x="320" y="511" fontSize="12" fill="#9a3412" fontWeight="650">
-      P grasa (CCW): {gearNumber(project,"_310_PI_2560").toFixed(1)}
-    </text>
-    <text x="27" y="541" fontSize="11" fill="#64748b">
-      Esquema didáctico · Animación gobernada por tags; sin física automática en fase 1
+    <text x="25" y="596" fontSize="10.5" fill="#64748b">
+      Visualización de E/S reales CCW · Presiones sin unidad verificada · sin física automática en fase 1
     </text>
   </svg>;
 }
