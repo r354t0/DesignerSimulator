@@ -247,6 +247,7 @@ export function BatchMixerScene({project,mode,state,selectedExercise,setupError,
               <div className="mt-1 font-mono font-bold text-sky-200">{value}</div>
             </div>)}
           </div>
+          <p className="mt-2 text-[10px] text-slate-300">Caudalímetros FM1 / FM2 / FM3: 1 pulso = 0,1 % del tanque (1000 pulsos = 100 %).</p>
         </section>
         <aside className="scada-scene-sidebar" aria-label="Controles e indicadores del SCADA">
           <div className="scada-dashboard-grid grid gap-3">
