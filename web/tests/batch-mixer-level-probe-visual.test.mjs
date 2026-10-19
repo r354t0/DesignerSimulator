@@ -50,7 +50,7 @@ test("all batch solutions and resets agree that DI_LowLevel TRUE means wet",()=>
     assert.equal(built.success,true,
       "exercise "+exercise+" "+JSON.stringify(built.diagnostics));
     const start=solution.rungs.find(r=>r.id==="bm-start-fill");
-    if(exercise===1){
+    if(exercise===1||exercise===2){
       assert.deepEqual(start.instructions.map(i=>[i.kind,i.tag]),[
         ["XIC","ST_RunEnable"],["XIC","PB_Start"],["OTL","ST_Filling"],
       ],"exercise 1 matches the screenshot without extra lower-level contact");
