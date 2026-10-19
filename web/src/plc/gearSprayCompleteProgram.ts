@@ -87,9 +87,6 @@ const ton=(tag:string,pre:string|number):Spec=>({
   kind:"TON",tag,preset:typeof pre==="number"?
     {mode:"literal",value:pre}:{mode:"tag",tag:pre},
 });
-const tof=(tag:string,pre:number):Spec=>({
-  kind:"TOF",tag,preset:{mode:"literal",value:pre},
-});
 const ctu=(tag:string,pre:number):Spec=>({
   kind:"CTU",tag,preset:{mode:"literal",value:pre},
 });
