@@ -185,7 +185,7 @@ function ProcessGraphic({project}: {project:PracticeProject}){
 
     {/* GRASA: succión desde el tambor, descarga de la bomba, filtro y
         válvula SV-2561 hasta la entrada lateral del dosificador. */}
-    <text x="529" y="368" fontSize="11.5" fontWeight="700" fill="#92400e">
+    <text x="515" y="315" fontSize="11.5" fontWeight="700" fill="#92400e">
       CIRCUITO DE GRASA
     </text>
     <rect x="352" y="483" width="103" height="109" rx="9"
@@ -222,18 +222,19 @@ function ProcessGraphic({project}: {project:PracticeProject}){
       textAnchor="middle">FILTRO</text>
     {solenoid(612,445,"SV-2561",grease,"lube")}
 
-    {/* PI-2560: toma en T del lubricante, sin confundirlo con una válvula. */}
-    <path d="M707 445 V492" stroke="#64748b" strokeWidth="4" fill="none"/>
-    {tee(707,445,"lube")}
-    <circle cx="707" cy="509" r="17" fill="#ffedd5"
+    {/* PI-2560: presión de lubricante en la toma entre el FILTRO y SV-2561.
+        Derivación vertical conectada al mismo tramo continuo de grasa. */}
+    <path d="M575 445 V416" stroke="#64748b" strokeWidth="4" fill="none"/>
+    {tee(575,445,"lube")}
+    <circle cx="575" cy="402" r="14" fill="#ffedd5"
       stroke="#d97706" strokeWidth="3"/>
-    <path d="M707 509 L717 502" stroke="#92400e" strokeWidth="2.5"/>
-    <text x="651" y="546" fontSize="11.5" fontWeight="750" fill="#334155">
+    <path d="M575 402 L583 396" stroke="#92400e" strokeWidth="2.5"/>
+    <text x="520" y="337" fontSize="11.5" fontWeight="750" fill="#334155">
       PI-2560 · GRASA
     </text>
-    <rect x="651" y="555" width="113" height="34" rx="5"
+    <rect x="517" y="345" width="121" height="34" rx="5"
       fill="#ffedd5" stroke="#d97706" strokeWidth="1.5"/>
-    <text x="708" y="577" textAnchor="middle" fontSize="17" fontWeight="750"
+    <text x="577" y="367" textAnchor="middle" fontSize="17" fontWeight="750"
       fill="#92400e">{gearNumber(project,"_310_PI_2560").toFixed(1)}</text>
 
     {/* Sensor de proximidad colocado encima del bloque. */}
