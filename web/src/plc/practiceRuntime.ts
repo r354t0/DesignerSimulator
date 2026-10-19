@@ -105,8 +105,9 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
       if (source.mode === "literal") pre = source.value;
       else if (source.mode === "tag") {
         const tag = project.tags.find((item) => item.name === source.tag);
-        if (tag?.type !== "DINT" || typeof tag.value !== "number") {
-          throw new Error("PRE del contador requiere una variable DINT: " + source.tag);
+        if (!tag || (tag.type !== "INT" && tag.type !== "DINT") ||
+            typeof tag.value !== "number") {
+          throw new Error("PRE del contador requiere una variable INT o DINT: " + source.tag);
         }
         pre = tag.value;
       }
@@ -153,8 +154,9 @@ export function evaluateSeriesScan(project: PracticeProject, elapsedMs = 0): Ser
     if (kind !== "RES" && source?.mode === "literal") pre = source.value;
     if (kind !== "RES" && source?.mode === "tag") {
       const external = project.tags.find((item) => item.name === source.tag);
-      if (!external || external.type !== "DINT" || typeof external.value !== "number") {
-        throw new Error("PRE debe referenciar un DINT válido: " + source.tag);
+      if (!external || (external.type !== "INT" && external.type !== "DINT") ||
+          typeof external.value !== "number") {
+        throw new Error("PRE debe referenciar un INT o DINT válido: " + source.tag);
       }
       pre = external.value;
     }
