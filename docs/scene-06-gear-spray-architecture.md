@@ -113,9 +113,9 @@ Mantener **separación estricta** entre:
 - Se añadió `web/src/plc/gearSprayPhase3Program.ts` con `createGearPhase3AProject()`: proyecto Ladder optativo e independiente de la plantilla FAT, que registra sus propios tags de proceso y rungs editables.
 - **P01**: copia de presiones de aire/lubricante (`MOV`), límites aire **>40**, lubricante alto **>1500** y bajo **<400** habilitado por marcha; entrada física de molino, proximidad y copia a `DI_PDB`, nivel bajo; puente entre variables internas de mando y salidas de campo.
 - **P02**: selección retenida AUTO/MANUAL/MANT y condición `ST_Run_Rly`; cada ecuación y cada enclavamiento están en **un único rung Ladder** con contactos y ramas OR reales, sin auxiliares que introduzcan dependencia entre scans. La expresión de marcha usa distribución booleana equivalente para representar tres caminos paralelos en un rung. El estado de marcha alimenta `_310_YI_LubricationSystemRunning`.
-- **Evolución de plantillas:** Fase 3A abarcaba P01/P02, Fase 3B añadió P03. La plantilla cargable **actual** incluye P01–P07 con P04–P07 en `gearSprayCompleteProgram.ts`; las suites históricas se conservan para regresión.
+- **Evolución de plantillas:** Fase 3A abarcaba P01/P02, Fase 3B añadió P03. La escena dedicada **inicializa P01–P07 automáticamente al entrar**, mediante `createGearCompleteProject()` en `sceneSessions`; las suites históricas se conservan para regresión.
 - **Correspondencia que requiere FAT:** `Run_Rly` se alimenta de `ST_Run_Rly` como interpretación de implementación para la condición de baja presión de P01. No se asume equivalencia definitiva hasta la revisión funcional del usuario.
-- Se puede cargar con «Cargar P01–P07 (FAT integrado)» solo en STOP, después de restaurar cualquier FAT temporal. Se conserva copia local del MainRoutine previo y hay botón de restauración. No recargar el navegador hasta guardar/restaurar: las copias residen en memoria.
+- Se quitaron los dos paneles de carga FAT y restauración temporal de «Instrumentación y setpoints». El botón **«Reiniciar programa»** en **Información de la escena** pide confirmación y restaura el proyecto P01–P07 original, el estado STOP/scan inicial, tags/contadores/setpoints y el modelo físico predeterminado (simulación desmarcada). Las otras escenas y sus sesiones se conservan.
 - Pruebas de compilación/escaneo en `web/tests/gear-spray-phase3a.test.mjs`.
 
 - **Comentarios de rung:** `PracticeRung.comment` es metadato editable en el editor (`+ Añadir comentario al rung`, multilinea, hasta 240 caracteres). El inicio de P01, P02 y el regreso al mapeo P01 están marcados. El comentario persiste con el rung al reordenarlo y **no cambia la firma de compilación ni reinicia RUN**.
@@ -146,6 +146,11 @@ Mantener **separación estricta** entre:
 - El SCADA muestra el estado de la máquina y el acumulado del contador. STOP desenergiza `ST_Cycle_Rly` y salidas Q no retentivas; PAUSE conserva los estados y detiene el tiempo simulado.
 - Pruebas `web/tests/gear-spray-phase3b-p03.test.mjs` validan el orden, compilación, ciclos, conteo, purga 30 s, bloqueo/rearme y STOP. El FAT visual sigue pendiente de aprobación.
 
+## Escena dedicada: programa por defecto y panel analógico conmutado
+- Al elegir «Gear Spray · Molino de bolas», MainRoutine utiliza una sesión propia cuyo proyecto inicial es `createGearCompleteProject()`. Cambiar de escena detiene el scan de Gear Spray y conserva las modificaciones de esa sesión hasta que el usuario solicite reiniciar.
+- «Instrumentación y setpoints» ya no incluye «Banco de pruebas FAT – Etapa B» ni botones de carga o restauración P01–P07. En **«Entradas analógicas»**, el checkbox **«Simulación física automática»** (desmarcado al reiniciar) muestra alternativamente entradas de presión manuales o el panel físico de Fase 2, incluidos niveles, velocidad de pérdida de presión, inyección de fallas y reset físico.
+- «Información de la escena» incluye **«Reiniciar programa»** con confirmación de pérdida de cambios: recarga P01–P07, pone PLC en STOP y restablece todos los valores de programa, diagnósticos y planta. No afecta las otras escenas.
+
 ## Plantilla unificada P01–P07 — estado actual
 
 - Archivo: `web/src/plc/gearSprayCompleteProgram.ts`. La escena 06 lo carga desde `createGearCompleteProject()` con copia temporal reversible del proyecto anterior.
@@ -170,4 +175,4 @@ Mantener **separación estricta** entre:
 - `web/src/App.tsx`: nueva opción `gear`, sesión Ladder independiente, lectura/escritura a través del motor compartido, manteniendo las salidas de campo exclusivamente bajo el control de la lógica programada.
 - `web/src/components/ide/ControllerTags.tsx`: alcance independiente de Gear Spray.
 - `web/tests/gear-spray-scada-phase1.test.mjs`: FAT de inventario, comandos, bloqueo de escritura de salidas, independencia de sesión, referencias originales y aviso explícito de limitaciones.
-- **Limitaciones intencionales:** no se ejecutan aún P01–P07 ni la UDFB. Las presiones y entradas pueden ingresarse manualmente o mediante el modelo físico opcional. La salida de programa por defecto es FALSE porque MainRoutine aún está vacío. No declarar equivalencia con CCW antes de portar su lógica y realizar FAT.
+- **Estado actual:** P01–P07 y la UDFB están disponibles por defecto en la escena 06. El PLC inicia en STOP hasta pulsar RUN, y la física automática es opcional. La simulación virtual todavía requiere FAT visual y no constituye validación para operación real.
