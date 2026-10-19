@@ -10,7 +10,7 @@ import {
   applyMomentaryBoolInput,applySceneSensorBoolInput,
   changePracticeScanProject,stopPracticeScans,
 } from "../src/plc/practiceScanCycle.ts";
-import {setTagValue} from "../src/plc/practiceDocument.ts";
+import {setTagValue,createTag,initialPracticeProject,insertInstruction} from "../src/plc/practiceDocument.ts";
 
 const proj=()=>createGearCompleteProject();
 const run=()=>startPracticeScans(initialPracticeScanState(proj()));
@@ -141,6 +141,33 @@ test("P07 arithmetic reads current timer/counter members and exposes HMI values"
     assert.ok(p.project.rungs.some(r=>r.instructions.some(i=>
       i.compareA?.mode==="tag"&&i.compareA.tag===t||
       i.compareB?.mode==="tag"&&i.compareB.tag===t)),t);
+});
+
+test("CTD LOAD counts down from preset to zero with native DN and reload",()=>{
+  let p={...initialPracticeProject(),tags:[]};
+  p=createTag(p,"Pulse","BOOL");
+  p=createTag(p,"Load","BOOL");
+  p=createTag(p,"Down","COUNTER");
+  p=insertInstruction(p,"rung-1",0,
+    {id:"load-pulse",kind:"XIC",tag:"Pulse"});
+  p=insertInstruction(p,"rung-1",1,
+    {id:"load-ctd",kind:"CTD",tag:"Down",
+      preset:{mode:"literal",value:3},loadTag:"Load"});
+  assert.equal(buildPracticeProject(p).success,true);
+  p=setTagValue(p,"Load",true);
+  let state=startPracticeScans(initialPracticeScanState(p));
+  assert.equal(val(state,"Down").ACC,3);
+  assert.equal(val(state,"Down").DN,false);
+  state=field(state,"Load",false);
+  for(let i=0;i<3;i++){
+    state=field(state,"Pulse",true);
+    assert.equal(val(state,"Down").ACC,2-i);
+    state=field(state,"Pulse",false);
+  }
+  assert.equal(val(state,"Down").DN,true);
+  state=field(state,"Load",true);
+  assert.equal(val(state,"Down").ACC,3);
+  assert.equal(val(state,"Down").DN,false);
 });
 
 test("STOP de-energizes pump, alarm and atomizer; no hidden SCADA logic",()=>{
