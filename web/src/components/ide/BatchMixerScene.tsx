@@ -164,7 +164,8 @@ function BatchProcessGraphic({state,outputs,sp}:{state:BatchMixerState;
       <text x="554" y="211" fontSize="16" fontWeight="700"
         fill="#075985">{state.temperature.toFixed(1)} °C</text>
       <text x="554" y="228" fontSize="11" fill="#334155">
-        SP {sp} °C · {state.temperature>=sp?"ALCANZADO":"CALENTANDO"}
+        SP {sp} °C · {out3?"ENFRIANDO":outputs.heater?"CALENTANDO":
+          state.temperature>=sp?"ALCANZADO":"EN ESPERA"}
       </text>
     </svg>
   </div>;
