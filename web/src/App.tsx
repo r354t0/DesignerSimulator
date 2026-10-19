@@ -24,6 +24,12 @@ import { SortScene } from "./components/ide/SortScene";
 import { TankScene } from "./components/ide/TankScene";
 import { TrafficScene } from "./components/ide/TrafficScene";
 import { BatchMixerScene } from "./components/ide/BatchMixerScene";
+import { GearSprayScene } from "./components/ide/GearSprayScene";
+import {
+  initialGearSprayProject, prepareGearSprayTags, writeGearScadaInput,
+  type GearPushButton, type GearDigitalInput, type GearAnalogInput,
+  type GearSetpoint,
+} from "./plc/gearSpraySceneModel";
 import {
   initialBatchProject, createBatchSolution, prepareBatchTags,
   initialBatchState, stepBatchPhysics, batchDigitalSensors, resetBatchProgramState,
@@ -88,8 +94,8 @@ const layoutConfig: IJsonModel = {
   },
 };
 
-type SimulationTab = "conveyor" | "sorting" | "tank" | "traffic" | "batch" | "motor";
-type ProgrammingScene = "conveyor" | "sorting" | "tank" | "traffic" | "batch";
+type SimulationTab = "conveyor" | "sorting" | "tank" | "traffic" | "batch" | "gear" | "motor";
+type ProgrammingScene = "conveyor" | "sorting" | "tank" | "traffic" | "batch" | "gear";
 
 interface DemoMachineState {
   inputs: DemoInputs;
@@ -125,6 +131,7 @@ export default function App() {
     tank: initialPracticeScanState(initialTankProject()),
     traffic: initialPracticeScanState(initialTrafficProject()),
     batch: initialPracticeScanState(initialBatchProject()),
+    gear: initialPracticeScanState(initialGearSprayProject()),
   });
   const activeControllerScene = useRef<ProgrammingScene>("conveyor");
   // Each scene keeps the learner's program immediately before inserting
@@ -194,6 +201,7 @@ export default function App() {
     }
   }, []);
 
+  const [gearSetupError, setGearSetupError] = useState<string | null>(null);
   const [batchSetupError, setBatchSetupError] = useState<string | null>(null);
   const [batchExercise, setBatchExercise] = useState<BatchExercise | null>(null);
   const [batchState, setBatchState] = useState<BatchMixerState>(initialBatchState);
@@ -438,6 +446,35 @@ export default function App() {
   const handlePracticeChange = useCallback((next: PracticeProject) =>
     changeScan((state) => changePracticeScanProject(state, next)), [changeScan]);
 
+  // Scene 06: only documented physical inputs and HMI commands are writable.
+  // No independently generated PLC outputs, alarms, UDFB transitions or
+  // pressure physics are implied by this first stage of implementation.
+  const setGearPushButton=useCallback((tag:GearPushButton,value:boolean)=>{
+    if(activeControllerScene.current!=="gear")return;
+    changeScan(state=>applyMomentaryBoolInput(state,tag,value,true));
+  },[changeScan]);
+  const setGearDigitalInput=useCallback((tag:GearDigitalInput,value:boolean)=>{
+    if(activeControllerScene.current!=="gear")return;
+    changeScan(state=>applySceneSensorBoolInput(state,tag,value));
+  },[changeScan]);
+  const setGearNumber=useCallback((tag:GearAnalogInput|GearSetpoint,value:number)=>{
+    if(activeControllerScene.current!=="gear")return;
+    changeScan(state=>changePracticeScanProject(state,
+      writeGearScadaInput(state.project,tag,value)));
+  },[changeScan]);
+  const prepareGear=useCallback(()=>{
+    try{
+      changeScan(state=>{
+        const next=prepareGearSprayTags(state.project);
+        return next===state.project?state:changePracticeScanProject(state,next);
+      });
+      setGearSetupError(null);
+    }catch(error){
+      setGearSetupError(error instanceof Error?error.message:
+        "No se pudieron registrar las E/S de Gear Spray.");
+    }
+  },[changeScan]);
+
   const setBatchInput = useCallback((tag:"PB_Start"|"PB_Stop"|"PB_Enter",
     pressed:boolean) => {
     if(activeControllerScene.current!=="batch")return;
@@ -632,7 +669,8 @@ export default function App() {
     else if (simulationTab === "tank") prepareTank();
     else if (simulationTab === "traffic") prepareTraffic();
     else if (simulationTab === "batch") prepareBatch();
-  }, [simulationTab, prepareConveyor, prepareSort, prepareTank, prepareTraffic, prepareBatch]);
+    else if (simulationTab === "gear") prepareGear();
+  }, [simulationTab, prepareConveyor, prepareSort, prepareTank, prepareTraffic, prepareBatch, prepareGear]);
 
   const startPractice = useCallback(() =>
     changeScan(startPracticeScans), [changeScan]);
@@ -770,7 +808,8 @@ export default function App() {
     const initial = scene === "conveyor" ? initialConveyorProject()
       : scene === "sorting" ? initialSortProject()
       : scene === "tank" ? initialTankProject()
-      : scene === "traffic" ? initialTrafficProject() : initialBatchProject();
+      : scene === "traffic" ? initialTrafficProject()
+      : scene === "gear" ? initialGearSprayProject() : initialBatchProject();
     changeScan(state => ({
       ...initialPracticeScanState(saved ?? initial),
       scanPeriodMs: state.scanPeriodMs,
@@ -780,7 +819,7 @@ export default function App() {
     else if (scene === "sorting") changeSort(() => initialSortState());
     else if (scene === "tank") changeTank(() => initialTankState());
     else if (scene === "traffic") changeTraffic(() => initialTrafficState());
-    else {
+    else if(scene==="batch") {
       changeBatch(()=>initialBatchState());
       setBatchExercise(null);
     }
@@ -849,6 +888,7 @@ export default function App() {
                   <option value="tank">Sistema de llenado de tanques</option>
                   <option value="traffic">Intersección semaforizada</option>
                   <option value="batch">Batch Mixer · Mezcla por lotes</option>
+                  <option value="gear">Gear Spray · Molino de bolas</option>
                   <option value="motor">Motor · DEMO</option>
                 </select>
               </div>
@@ -905,6 +945,15 @@ export default function App() {
                           onOpenTags={() => openEditorView("tags")}
                           onLoadSolution={loadBatchSolution}
                           onResetSolution={() => resetRecommendedSolution("batch")}/>
+                    : simulationTab === "gear"
+                      ? <GearSprayScene project={practice} mode={practiceMode}
+                          setupError={gearSetupError}
+                          onPushButton={setGearPushButton}
+                          onDigitalInput={setGearDigitalInput}
+                          onAnalogInput={setGearNumber}
+                          onSetpoint={setGearNumber}
+                          onPrepareTags={prepareGear}
+                          onOpenTags={() => openEditorView("tags")}/>
                       : <SimulationScene online={online} inputs={inputs} values={values}
                         onTagChange={handleTagChange}/>}
               </div>
@@ -926,7 +975,8 @@ export default function App() {
       prepareTank, tankSetupError, loadTankExample, trafficState, changeTraffic,
       setTrafficInput, resetTraffic, prepareTraffic, trafficSetupError,
       loadTrafficExample, batchState, batchExercise, batchSetupError,
-      setBatchInput, setBatchMode, setBatchIntegers, resetBatch, prepareBatch, loadBatchSolution],
+      setBatchInput, setBatchMode, setBatchIntegers, resetBatch, prepareBatch, loadBatchSolution,
+      gearSetupError, setGearPushButton, setGearDigitalInput, setGearNumber, prepareGear],
   );
 
   const syncTabSelection = useCallback((updatedModel: Model) => {
@@ -998,7 +1048,8 @@ export default function App() {
         <span className="text-slate-600">|</span>
         <span>{online ? "Monitoreo DEMO · Sin controlador físico" : "Sin conexión a controlador"}</span>
         <span className="ml-auto">
-          {simulationTab === "batch" ? "Escena 05 · Batch Mixer"
+          {simulationTab === "gear" ? "Escena 06 · Gear Spray"
+            : simulationTab === "batch" ? "Escena 05 · Batch Mixer"
             : simulationTab === "traffic" ? "Escena 04 · Intersección semaforizada"
             : simulationTab === "tank" ? "Escena 03 · Tanque por lotes"
             : simulationTab === "sorting" ? "Escena 02 · Clasificación de cajas"
