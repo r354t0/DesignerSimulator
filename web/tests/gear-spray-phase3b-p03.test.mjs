@@ -173,9 +173,9 @@ test("P03 program stays visible inside native Ladder while P04-P07 remain unport
   const scene=read("../src/components/ide/GearSprayScene.tsx");
   const editor=read("../src/components/ide/PracticeEditor.tsx");
   assert.match(app,/createGearCompleteProject/);
-  assert.match(scene,/Cargar P01–P07 \(FAT integrado\)/);
+  assert.match(scene,/Fase 3 · P01–P07 cargadas/);
   assert.match(editor,/FB_GearSpray_Sequence/);
   assert.match(editor,/GEAR_SEQ/);
   assert.ok(createGearPhase3Project().rungs.some(r=>r.id==="gear-p03-r11"&&r.instructions.some(i=>i.kind==="RES")));
-  assert.match(scene,/P04 presión de bomba/);
+  assert.match(scene,/P01–P07 cargados: estados, presión, alarmas/);
 });
