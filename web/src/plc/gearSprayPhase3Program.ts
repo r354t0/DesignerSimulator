@@ -21,8 +21,6 @@ export const GEAR_PHASE3A_TAGS=[
   ["Run_Rly","BOOL","P01: relé de habilitación desde P02"],
   ["DI_Mill_Run","BOOL","P01: estado externo de molino en marcha"],
   ["PDB","BOOL","P01: pulso físico de dosificador"],
-  ["PDB_RisingTrig","BOOL","P01: flanco positivo del dosificador"],
-  ["P01_PDB_EdgeMemory","BOOL","P01: memoria de flanco dosificador"],
   ["Low_Level","BOOL","P01: nivel bajo de lubricante"],
   ["ST_Auto_Mode","BOOL","P02: selección modo AUTO"],
   ["ST_Man_Mode","BOOL","P02: selección modo MANUAL"],
@@ -127,8 +125,6 @@ export function createGearPhase3AProject():PracticeProject {
     x("_310_SQS_2561"),o("PDB")]);
   make("gear3a-p01-di-pdb",[
     x("PDB"),o("DI_PDB")]);
-  make("gear3a-p01-pulse-rise",[
-    x("PDB"),{kind:"ONS",tag:"P01_PDB_EdgeMemory"},o("PDB_RisingTrig")]);
   make("gear3a-p01-level",[
     x("_310_LSL"),o("Low_Level")]);
 
