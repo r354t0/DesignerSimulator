@@ -377,9 +377,10 @@ function InfoModal({onClose,onOpenTags}:{
       <p className="text-xs leading-relaxed text-slate-300">
         Control de lubricación de corona de molino de bolas · Proyecto
         PLC_107_Molino_Bolas_SM · Rutinas P01–P07 y FB_GearSpray_Sequence.
-        La pantalla de esta primera etapa está conectada al motor de tags
-        y MainRoutine de DesignerSimulator. Todavía no se ha traducido el
-        programa CCW ni implementado el modelo físico.
+        La pantalla está conectada al motor de tags y MainRoutine de
+        DesignerSimulator. Fase 2: modelo físico determinista opcional de
+        presiones, depósito, pulsos y fallas de proceso. Aún no se ha traducido
+        la lógica del programa CCW (rutinas P01–P07 y UDFB).
       </p>
       <div className="mt-3 rounded border border-amber-700/70 bg-amber-950/40 p-3 text-xs text-amber-100">
         <strong>Correspondencias pendientes:</strong> P01 copia _310_SQS_2561
@@ -415,8 +416,9 @@ function InfoModal({onClose,onOpenTags}:{
   </div>;
 }
 
-/** Phase 1: industrial presentation + manual field stimuli ONLY.
- * This component has NO independent PLC sequence, interlocking or physics.
+/** Phase 2: SCADA only reads real PLC outputs. The optional independent plant
+ * model publishes physical input measurements, never a PLC interlock or command.
+ * The CCW application logic remains pending for phase 3.
  */
 export function GearSprayScene({project,mode,physics,onPhysicsChange,onPhysicsReset,
   setupError,onPushButton,onDigitalInput,onAnalogInput,onSetpoint,
@@ -434,7 +436,12 @@ export function GearSprayScene({project,mode,physics,onPhysicsChange,onPhysicsRe
     window.addEventListener("keydown",listener);
     return ()=>window.removeEventListener("keydown",listener);
   },[]);
-  const processActive=v("_310_SV_2561")&&v("_310_SV_2563");
+  const processActive=physics.enabled?
+    gearSprayIsActive(physics,{
+      pumpSolenoid:v("_310_SV_2560"),
+      lubricantSolenoid:v("_310_SV_2561"),
+      atomizationSolenoid:v("_310_SV_2563"),
+    }):v("_310_SV_2561")&&v("_310_SV_2563");
   const diagnostics:{label:string;value:ReactNode}[]=[
     {label:"Presión de aire (valor CCW)",
       value:gearNumber(project,"_310_PI_2561").toFixed(1)},
