@@ -22,11 +22,13 @@ test("Phase 3A Ladder compiles and is isolated from blank default/FAT template",
   const p=createGearPhase3AProject();
   assert.equal(original.tags.length,22);
   assert.equal(original.rungs[0].instructions.length,0);
-  assert.equal(p.rungs.length,24);
+  assert.equal(p.rungs.length,23);
   assert.ok(p.tags.some(x=>x.name==="ST_Run_Rly"));
   assert.ok(p.tags.some(x=>x.name==="AirPressure_In_Scaled"));
-  assert.ok(p.tags.some(x=>x.name==="PDB_RisingTrig"));
+  assert.ok(!p.tags.some(x=>x.name==="PDB_RisingTrig"));
+  assert.ok(!p.tags.some(x=>x.name==="P01_PDB_EdgeMemory"));
   assert.ok(!p.tags.some(x=>x.name==="DI_PDB_2"));
+  assert.ok(!p.rungs.some(r=>r.id==="gear3a-p01-pulse-rise"));
   assert.ok(!p.tags.some(x=>x.name==="FAT_CMD_Pump"));
   const build=buildPracticeProject(p);
   assert.equal(build.success,true,build.diagnostics.map(d=>d.message).join("\n"));
@@ -71,7 +73,7 @@ test("P01 level and physical SQS pulse drive PDB and DI_PDB on native Ladder",()
   assert.equal(gearBool(p.project,"DI_PDB"),true);
   p=applySceneSensorBoolInput(p,"_310_SQS_2561",false);
   assert.equal(gearBool(p.project,"DI_PDB"),false);
-  assert.ok(p.project.tags.some(x=>x.name==="P01_PDB_EdgeMemory"));
+  assert.ok(!p.project.tags.some(x=>x.name==="P01_PDB_EdgeMemory"));
 });
 
 test("P02 AUTO latches, requires Mill_Run for ST_Run_Rly and drives running lamp",()=>{
