@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Boxes, CircleAlert, CircleHelp, Gauge, Pause, Play, RotateCcw, ScanLine } from "lucide-react";
 import { MomentaryPushButton } from "./MomentaryPushButton";
+import { ScadaLedGroup } from "./ScadaLedGroup";
 import { ConveyorSceneInfoDialog } from "./ConveyorSceneInfoDialog";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
@@ -258,13 +259,25 @@ export function ConveyorScene({
           <section className="sort-panel min-w-0 rounded-lg border border-[#344c5e] p-3"
             aria-label="Pilotos LED">
             <div className="mb-2 text-xs font-semibold text-slate-200">Pilotos LED</div>
-            <div className="scada-pilot-grid grid grid-cols-2 gap-2">
-              <PilotLed label="EN MARCHA" lit={motorOn} tone="green"/>
-              <PilotLed label="DETENIDA" lit={!motorOn} tone="red"/>
-              <PilotLed label="PE-01 · CAJA" lit={sensor} tone="amber"/>
-              {resetAvailable && (
-                <PilotLed label="LOTE COMPLETO" lit={batchDone} tone="amber"/>
-              )}
+            <div className="space-y-3">
+              <ScadaLedGroup kind="status">
+                <PilotLed label="EN MARCHA" lit={motorOn} tone="green"/>
+                <PilotLed label="DETENIDA" lit={!motorOn} tone="red"/>
+                {resetAvailable && (
+                  <PilotLed label="LOTE COMPLETO" lit={batchDone} tone="amber"/>
+                )}
+              </ScadaLedGroup>
+              <ScadaLedGroup kind="inputs">
+                <PilotLed label="PB START" lit={start} tone="amber"/>
+                <PilotLed label="PB STOP" lit={stop} tone="amber"/>
+                {resetAvailable && (
+                  <PilotLed label="PB RESET" lit={reset} tone="amber"/>
+                )}
+                <PilotLed label="PE-01 · CAJA" lit={sensor} tone="amber"/>
+              </ScadaLedGroup>
+              <ScadaLedGroup kind="outputs">
+                <PilotLed label="MOTOR" lit={motorOn} tone="green"/>
+              </ScadaLedGroup>
             </div>
             <div className="mt-3 flex items-center justify-between border-t border-slate-700 pt-2 text-[11px]">
               <span className="text-slate-400">Cajas detectadas</span>
