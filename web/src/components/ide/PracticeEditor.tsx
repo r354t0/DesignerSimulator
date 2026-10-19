@@ -1297,11 +1297,12 @@ export function PracticeEditor({
                                               typeof assignedTag.value === "object" && assignedTag.value.UN === true}
                                             selected={selected === output.id}
                                             online={running} live={rungLive}/>
-                                          {(output.doneTag||output.resetTag)&&
+                                          {(output.doneTag||output.resetTag||output.loadTag)&&
                                             <text x={coilX - 112} y={coilRowY + 54} fontSize="9"
                                               fontFamily="monospace" fill="#0f3654">
                                               {output.doneTag?"Q → "+output.doneTag:""}
                                               {output.resetTag?"  RESET ← "+output.resetTag:""}
+                                              {output.loadTag?"   LOAD ← "+output.loadTag:""}
                                             </text>}
                                           <Wire x1={coilX + 16} y1={coilRowY}
                                             x2={width - 30} y2={coilRowY} live={rungLive}/>
@@ -1332,11 +1333,12 @@ export function PracticeEditor({
                                               assignedTag.value.DN === true}
                                             selected={selected === output.id}
                                             online={running} live={rungLive}/>
-                                          {(output.doneTag||output.resetTag)&&
+                                          {(output.doneTag||output.resetTag||output.loadTag)&&
                                             <text x={coilX - 112} y={coilRowY + 54} fontSize="9"
                                               fontFamily="monospace" fill="#0f3654">
                                               {output.doneTag?"Q → "+output.doneTag:""}
                                               {output.resetTag?"  RESET ← "+output.resetTag:""}
+                                              {output.loadTag?"   LOAD ← "+output.loadTag:""}
                                             </text>}
                                           <Wire x1={coilX + 16} y1={coilRowY}
                                             x2={width - 30} y2={coilRowY} live={rungLive}/>
