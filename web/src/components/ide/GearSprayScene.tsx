@@ -21,6 +21,9 @@ interface Props {
   project: PracticeProject;
   mode: ScanMode;
   fatLoaded:boolean;
+  phase3Loaded:boolean;
+  onLoadPhase3:()=>void;
+  onRestorePhase3:()=>void;
   onLoadFat:()=>void;
   onRestoreFat:()=>void;
   onFatCommand:(tag:GearFatCommand,value:boolean)=>void;
@@ -431,7 +434,8 @@ function InfoModal({onClose,onOpenTags}:{
  * model publishes physical input measurements, never a PLC interlock or command.
  * The CCW application logic remains pending for phase 3.
  */
-export function GearSprayScene({project,mode,fatLoaded,onLoadFat,onRestoreFat,
+export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3,
+  onRestorePhase3,onLoadFat,onRestoreFat,
   onFatCommand,physics,onPhysicsChange,onPhysicsReset,
   setupError,onPushButton,onDigitalInput,onAnalogInput,onSetpoint,
   onPrepareTags,onOpenTags}:Props){
@@ -478,7 +482,8 @@ export function GearSprayScene({project,mode,fatLoaded,onLoadFat,onRestoreFat,
           {modeLabel}
         </span>
         <span className="rounded border border-amber-700 bg-amber-950/60 px-2 py-1 text-[10px] text-amber-200">
-          {physics.enabled?"Fase 2 · Física activa":"Fase 2 · Física manual"}
+          {phase3Loaded?"Fase 3A · P01/P02 cargadas":
+            physics.enabled?"Fase 2 · Física activa":"Fase 2 · Física manual"}
         </span>
         <button type="button" onClick={()=>setOpenInfo(true)}
           className="flex items-center gap-1 rounded border border-slate-600 px-2 py-1.5 text-[11px] hover:bg-slate-700">
@@ -523,7 +528,7 @@ export function GearSprayScene({project,mode,fatLoaded,onLoadFat,onRestoreFat,
             </p>
             <div className="flex flex-wrap items-center gap-2">
               {!fatLoaded?
-                <button type="button" disabled={mode!=="stopped"}
+                <button type="button" disabled={mode!=="stopped"||phase3Loaded}
                   onClick={onLoadFat}
                   className="rounded border border-amber-600 px-3 py-1.5 text-[11px] font-semibold text-amber-100 hover:bg-amber-950 disabled:cursor-not-allowed disabled:opacity-40">
                   Cargar Ladder temporal FAT
@@ -559,6 +564,34 @@ export function GearSprayScene({project,mode,fatLoaded,onLoadFat,onRestoreFat,
               Activa las salidas por separado en PLC RUN. Desmarca las
               tres antes de detener el programa.
             </p>}
+          </div>
+          <div className="mb-3 rounded border border-sky-800/70 bg-[#102633] p-3">
+            <h4 className="text-[11px] font-semibold text-sky-200">
+              Fase 3A · P01 Mapeo y P02 Modos de operación
+            </h4>
+            <p className="my-2 text-[10px] leading-snug text-slate-300">
+              Primera migración de CCW a Ladder: señales y umbrales de P01,
+              selección AUTO/MANUAL/MANT y habilitación ST_Run_Rly de P02.
+              P03–P07, bombeo automático y alarmas todavía pendientes.
+            </p>
+            {phase3Loaded&&<p className="mb-2 text-[10px] text-amber-200">
+              Programa P01/P02 cargado. Las salidas de bomba y electroválvulas
+              permanecerán sin mando hasta implementar P03/P04.
+            </p>}
+            {!phase3Loaded?
+              <button type="button" onClick={onLoadPhase3}
+                disabled={mode!=="stopped"||fatLoaded}
+                className="rounded border border-sky-600 px-3 py-1.5 text-[11px] font-semibold text-sky-100 hover:bg-sky-900 disabled:cursor-not-allowed disabled:opacity-40">
+                Cargar P01 + P02 (Fase 3A)
+              </button>:
+              <button type="button" onClick={onRestorePhase3}
+                disabled={mode!=="stopped"}
+                className="rounded border border-slate-500 px-3 py-1.5 text-[11px] font-semibold text-slate-100 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40">
+                Restaurar programa anterior a Fase 3A
+              </button>}
+            {fatLoaded&&<span className="mt-2 block text-[10px] text-slate-400">
+              Restaura primero el programa anterior desde el banco FAT.
+            </span>}
           </div>
           <div className="mb-3 rounded border border-sky-900 bg-[#0c1d2a] p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
