@@ -145,9 +145,9 @@ test("P07 arithmetic reads current timer/counter members and exposes HMI values"
 
 test("CTD LOAD counts down from preset to zero with native DN and reload",()=>{
   let p={...initialPracticeProject(),tags:[]};
-  p=createTag(p,"Pulse","BOOL");
-  p=createTag(p,"Load","BOOL");
-  p=createTag(p,"Down","COUNTER");
+  p=createTag(p,"Pulse","Entrada de flanco","BOOL");
+  p=createTag(p,"Load","Entrada LOAD","BOOL");
+  p=createTag(p,"Down","Contador descendente","COUNTER");
   p=insertInstruction(p,"rung-1",0,
     {id:"load-pulse",kind:"XIC",tag:"Pulse"});
   p=insertInstruction(p,"rung-1",1,
