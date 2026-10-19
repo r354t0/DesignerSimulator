@@ -1,7 +1,7 @@
 import {
   addParallelContact, createIndependentParallelBranch, createRung, createTag,
   insertInstruction, insertIntoIndependentOrUpper,
-  type EditableKind, type PracticeInstruction, type PracticeProject,
+  type PracticeInstruction, type PracticeProject,
 } from "./practiceDocument.ts";
 import {initialGearSprayProject} from "./gearSpraySceneModel.ts";
 
@@ -21,6 +21,7 @@ export const GEAR_PHASE3A_TAGS=[
   ["DI_Mill_Run","BOOL","P01: estado externo de molino en marcha"],
   ["PDB","BOOL","P01: pulso físico de dosificador"],
   ["PDB_RisingTrig","BOOL","P01: flanco positivo del dosificador"],
+  ["P01_PDB_EdgeMemory","BOOL","P01: memoria de flanco dosificador"],
   ["Low_Level","BOOL","P01: nivel bajo de lubricante"],
   ["ST_Auto_Mode","BOOL","P02: selección modo AUTO"],
   ["ST_Man_Mode","BOOL","P02: selección modo MANUAL"],
@@ -52,7 +53,6 @@ const reg=(kind:"LES"|"GRT",tag:string,threshold:number):Spec=>({
 const mov=(from:string,to:string):Spec=>({
   kind:"MOV",tag:to,compareA:{mode:"tag",tag:from},
 });
-const MAX_OUT=3 as const;
 
 export function createGearPhase3AProject():PracticeProject {
   let p=initialGearSprayProject();
@@ -103,7 +103,7 @@ export function createGearPhase3AProject():PracticeProject {
   make("gear3a-p01-di-pdb",[
     x("PDB"),o("DI_PDB")]);
   make("gear3a-p01-pulse-rise",[
-    x("PDB"),{kind:"ONS",tag:"PDB_RisingTrig"},o("PDB_RisingTrig")]);
+    x("PDB"),{kind:"ONS",tag:"P01_PDB_EdgeMemory"},o("PDB_RisingTrig")]);
   make("gear3a-p01-level",[
     x("_310_LSL"),o("Low_Level")]);
 
