@@ -1,5 +1,5 @@
 # Escena 06 — Gear Spray / Lubricación de molino de bolas
-**Estado:** especificación técnica para implementación progresiva (NO es aún una escena funcional).  
+**Estado:** Fase 1 implementada en la rama `feature/ide-workspace-v1`. SCADA y E/S conectadas al motor existente; física y lógica CCW todavía pendientes.  
 **Origen:** `PLC_107_Molino_Bolas_SM.rar`; rutinas P01–P07, `FB_GearSpray_Sequence`, `Maintance_Duration` y capacitación Gear Spray Cerro Corona.
 
 ## Objetivo y alcance
@@ -91,3 +91,11 @@ Mantener **separación estricta** entre:
 - **Fase 4:** FAT por modo, estado, alarma y recuperación; ajuste de parámetros y verificación en GitHub Actions.
 
 > Criterio de aceptación: **la lógica, no el SVG, controla las salidas**; los sensores responden a la física simulada; las discrepancias se reportan antes de proclamar equivalencia con CCW.
+
+## Registro de implementación — Fase 1
+- `web/src/plc/gearSpraySceneModel.ts`: 21 tags iniciales, exactamente 5 entradas físicas P01, 6 salidas, 6 PB y 4 consignas HMI. El proyecto comienza con MainRoutine vacío; no hereda tags del demo.
+- `web/src/components/ide/GearSprayScene.tsx`: esquema SVG industrial, tarjetas de instrumentación y control de entradas manuales; grupos LED Estado / Entradas / Salidas; diálogo de información.
+- `web/src/App.tsx`: nueva opción `gear`, sesión Ladder independiente, lectura/escritura a través del motor compartido, manteniendo las salidas de campo exclusivamente bajo el control de la lógica programada.
+- `web/src/components/ide/ControllerTags.tsx`: alcance independiente de Gear Spray.
+- `web/tests/gear-spray-scada-phase1.test.mjs`: FAT de inventario, comandos, bloqueo de escritura de salidas, independencia de sesión, referencias originales y aviso explícito de limitaciones.
+- **Limitaciones intencionales:** no se ejecutan aún P01–P07 ni la UDFB; la presión y DI se ingresan manualmente (sin modelo físico); la salida de programa por defecto es FALSE porque MainRoutine aún está vacío. No anunciar pruebas de secuencia, presión, flujo ni alarmas como aprobadas hasta fases siguientes.
