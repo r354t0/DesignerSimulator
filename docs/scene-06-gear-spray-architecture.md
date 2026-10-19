@@ -1,5 +1,5 @@
 # Escena 06 — Gear Spray / Lubricación de molino de bolas
-**Estado:** Fases 1 y 2 (modelo físico opcional) implementadas en la rama `feature/ide-workspace-v1`. SCADA y sensores físicos conectados al motor existente; lógica original P01–P07 y UDFB pendientes de portar.  
+**Estado:** Fases 1–2 implementadas y **Fase 3A P01/P02 disponible como plantilla Ladder optativa** en `feature/ide-workspace-v1`. P03–P07 y FB_GearSpray_Sequence están pendientes; no existe aún equivalencia funcional con todo el programa CCW.  
 **Origen:** `PLC_107_Molino_Bolas_SM.rar`; rutinas P01–P07, `FB_GearSpray_Sequence`, `Maintance_Duration` y capacitación Gear Spray Cerro Corona.
 
 ## Objetivo y alcance
@@ -103,6 +103,20 @@ Mantener **separación estricta** entre:
 - **Compatibilidad con fase 1**: modelo físico desactivado inicialmente; el operador conserva las entradas manuales numéricas/slider y las casillas. Al activar la física, las entradas de presión, SQS y LSL se vuelven de solo lectura y la configuración del ambiente/fallas se realiza en el panel bajo la vista de proceso. `_310_PLC104_YI_MillRun` continúa siendo una entrada externa operable.
 - Las salidas **nunca** se generan mediante simulación: requieren una MainRoutine válida que las active. Sin P01–P07 portadas, la fase 2 permite FAT de la planta frente a programas Ladder desarrollados en DesignerSimulator, pero **no** declara equivalencia con CCW.
 - Las pruebas de `web/tests/gear-spray-phase2-physics.test.mjs` cubren determinismo, presión, pulsos, nivel y fallas.
+
+## Ajuste Fase 2 — velocidad de caída de presión
+- En **Simulación física automática** se añadió «Velocidad de pérdida de presión» de **0.25× a 4×**, con 1× predeterminado y pasos de 0.25.
+- El multiplicador `pressureDecayFactor` acelera o desacelera **solo la despresurización** del aire cuando existe pérdida de suministro y del lubricante cuando baja su presión objetivo. La presurización sigue a la tasa original. Su efecto pertenece al modelo físico simplificado, no a la calibración real del sistema.
+- `Restablecer física` retorna el multiplicador a 1×. La simulación conserva la retención de PAUSE/STOP.
+
+## Inicio Fase 3A — P01 y P02 en Ladder editable
+- Se añadió `web/src/plc/gearSprayPhase3Program.ts` con `createGearPhase3AProject()`: proyecto Ladder optativo e independiente de la plantilla FAT, que registra sus propios tags de proceso y rungs editables.
+- **P01**: copia de presiones de aire/lubricante (`MOV`), límites aire **>40**, lubricante alto **>1500** y bajo **<400** habilitado por marcha; entrada física de molino, proximidad, copia a `DI_PDB` y memoria de flanco (`ONS`), nivel bajo; puente entre variables internas de mando y salidas de campo.
+- **P02**: selección retenida AUTO/MANUAL/MANT y condición `ST_Run_Rly`; se preserva la lógica de condiciones del PDF CCW con uniones OR explícitas descompuestas en rungs auxiliares. El estado de marcha alimenta el piloto `_310_YI_LubricationSystemRunning`.
+- **Límite deliberado:** P03–P07, secuencia UDFB, control automático de bomba, dosificación y alarmas **todavía no están portados**. En esta plantilla, las tres electroválvulas y la sirena siguen desenergizadas. No interpretar los modos AUTO/MANUAL/MANT como un sistema de lubricación funcional completo.
+- **Correspondencia que requiere FAT:** `Run_Rly` se alimenta de `ST_Run_Rly` como interpretación de implementación para la condición de baja presión de P01. No se asume equivalencia definitiva hasta la revisión funcional del usuario.
+- Se puede cargar con «Cargar P01 + P02 (Fase 3A)» solo en STOP, después de restaurar cualquier FAT temporal. Se conserva copia local del MainRoutine previo y hay botón «Restaurar programa anterior a Fase 3A». No recargar el navegador hasta guardar o restaurar: ambas copias residen en memoria.
+- Pruebas de compilación/escaneo en `web/tests/gear-spray-phase3a.test.mjs`.
 
 ## Implementación por entregables
 - **Fase 1:** SCADA industrial SVG y tags físicos/setpoints; animación física desacoplada, estructura de escena e información.
