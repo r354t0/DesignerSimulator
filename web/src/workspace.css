@@ -170,3 +170,41 @@ button.ide-tree-row:hover {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+/* Scene 05 has a detailed 760-unit Batch Mixer process graphic. Let its
+   canvas grow when the SCADA dock is widened; only start the right sidebar
+   after the graphic has room to reach its useful size. Other scenes keep
+   their previous 800px cap and responsive breakpoints. */
+.batch-scada-shell .scada-process-panel {
+  max-width: 1120px;
+}
+@container scada (min-width: 1000px) {
+  .batch-scada-shell .scada-scene-workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .batch-scada-shell .scada-dashboard-grid {
+    grid-template-columns: minmax(185px, 205px) minmax(0, 1fr);
+  }
+  .batch-scada-shell .batch-led-group {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@container scada (min-width: 1400px) {
+  .batch-scada-shell .scada-scene-workspace {
+    grid-template-columns: minmax(0, 1120px) minmax(260px, 1fr);
+  }
+  .batch-scada-shell .scada-dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .batch-scada-shell .batch-led-group {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container scada (min-width: 1760px) {
+  .batch-scada-shell .scada-dashboard-grid {
+    grid-template-columns: 205px minmax(0, 1fr);
+  }
+  .batch-scada-shell .batch-led-group {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
