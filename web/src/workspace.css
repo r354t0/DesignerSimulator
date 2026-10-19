@@ -208,3 +208,24 @@ button.ide-tree-row:hover {
     grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 }
+
+
+/* LED categories shared by scenes 1–4. Use the actual width of each LED
+   panel (rather than the browser/dock width), keeping labels readable in
+   narrow FlexLayout mosaics and adding columns only when there is room. */
+.scada-led-panel {
+  container: scada-leds / inline-size;
+}
+.scada-led-panel .scada-pilot-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@container scada-leds (max-width: 340px) {
+  .scada-led-panel .scada-pilot-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@container scada-leds (min-width: 680px) {
+  .scada-led-panel .scada-pilot-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
