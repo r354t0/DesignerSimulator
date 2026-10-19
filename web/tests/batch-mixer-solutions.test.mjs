@@ -376,7 +376,7 @@ test("scene 5 and all five solutions are presented in App and info dialog",()=>{
   assert.match(scada,/INT_BatchTarget/);
   assert.match(scada,/BatchProcessGraphic/);
   assert.match(info,/BATCH_EXERCISES\.map/);
-  assert.match(info,/batchSolutionTags\(exercise\)/);
+  assert.match(info,/batchSolutionUsedTags\(exercise\)/);
   assert.match(info,/Implementar Solución Recomendada/);
   assert.match(info,/Reiniciar programación para practicar/);
 });
