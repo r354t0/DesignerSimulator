@@ -6,20 +6,15 @@ import {
 } from "./practiceDocument.ts";
 import {createGearPhase3AProject} from "./gearSprayPhase3Program.ts";
 
-/** Port of the 11 current CCW P03_Cycle_Manager rungs.
+/** Port of P03_Cycle_Manager, with requested conversion rung removed.
  * FB_GearSpray_Sequence runs in rung 5 via the executable GEAR_SEQ block,
  * never as an unobservable SCADA-side automation.
  * Note: P04/P05/P06/P07 remain unported.
  */
 export const GEAR_P03_TAGS=[
-  ["TMR_Freq_SP_Time","DINT","P03 R1: consigna de frecuencia en ms"],
   ["TMR_Freq","TIMER","P03 R2: TON entre lubricaciones"],
-  ["TMR_Freq_Dn","BOOL","P03 R2: Q de frecuencia"],
   ["TMR_Startup_Cycle","TIMER","P03 R3: TON de arranque (1000 ms)"],
-  ["TMR_Startup_Cycle_Dn","BOOL","P03 R3: Q del arranque"],
   ["CTN_Lubeflo","COUNTER","P03 R4: pulsos de lubricante"],
-  ["CNT_Lubeflo_Rst","BOOL","P03 R11: reset de conteo"],
-  ["CNT_Lubeflo_Dn","BOOL","P03 R4: Q por pulsos completados"],
   ["DO_LS_Healthy","BOOL","Permiso de sistema saludable (P05 pendiente)"],
   ["ST_General_Trip_Rly","BOOL","Falla general (P05 pendiente)"],
   ["SM_Cycle_State","DINT","P03 R5: 0/10/20/30/90"],
@@ -30,12 +25,11 @@ export const GEAR_P03_TAGS=[
   ["DO_Lubecon_Sol","BOOL","P03 R6: mando de válvula de lubricante"],
   ["ST_Pump_Rly","BOOL","P03 R7: solicitud de bomba (P04 pendiente)"],
   ["TMR_Purge","TIMER","P03 R8: TOF de purga"],
-  ["TMR_Purge_Dn","BOOL","P03 R8: purga activa"],
   ["ST_Airsol_Rly","BOOL","P03 R9: habilitación aire atomizador"],
 ] as const;
 
 type Spec=Partial<Pick<PracticeInstruction,
-  "kind"|"tag"|"preset"|"compareA"|"doneTag"|"resetTag">> &
+  "kind"|"tag"|"preset"|"compareA">> &
   Pick<PracticeInstruction,"kind"|"tag">;
 const x=(tag:string):Spec=>({kind:"XIC",tag});
 const nx=(tag:string):Spec=>({kind:"XIO",tag});
@@ -90,26 +84,19 @@ export function createGearPhase3Project():PracticeProject {
     }
   }
 
-  // EXACT ORDER OF P03 — Rungs 1 through 11 (original CCW PDF).
-  add("gear-p03-r01",[{
-    kind:"MOV",tag:"TMR_Freq_SP_Time",
-    compareA:{mode:"tag",tag:"TMR_Freq_SP"},
-  }],"P03 — CYCLE MANAGER | Rung 1: conversión de consigna TIME (ms).");
+  // Original P03 rung 2 becomes the first P03 rung (MOV conversion deleted).
   add("gear-p03-r02",[
     x("ST_Run_Rly"),nx("ST_Cycle_Rly"),nx("ST_Maint_Mode"),
     nx("SM_Cycle_Blocked"),nx("SM_Cycle_RearmHold"),
-    {kind:"TON",tag:"TMR_Freq",preset:{mode:"tag",tag:"TMR_Freq_SP_Time"},
-      doneTag:"TMR_Freq_Dn"},
-  ]);
+    {kind:"TON",tag:"TMR_Freq",preset:{mode:"tag",tag:"TMR_Freq_SP"}},
+  ],"P03 — CYCLE MANAGER | Inicio: frecuencia (TMR_Freq_SP).");
   add("gear-p03-r03",[
     x("ST_Run_Rly"),nx("PB_Reset"),
-    {kind:"TON",tag:"TMR_Startup_Cycle",preset:{mode:"literal",value:1000},
-      doneTag:"TMR_Startup_Cycle_Dn"},
+    {kind:"TON",tag:"TMR_Startup_Cycle",preset:{mode:"literal",value:1000}},
   ]);
   add("gear-p03-r04",[
     x("ST_Run_Rly"),x("DI_PDB"),
-    {kind:"CTU",tag:"CTN_Lubeflo",preset:{mode:"tag",tag:"CNT_LubeFlo_SP"},
-      resetTag:"CNT_Lubeflo_Rst",doneTag:"CNT_Lubeflo_Dn"},
+    {kind:"CTU",tag:"CTN_Lubeflo",preset:{mode:"tag",tag:"CNT_LubeFlo_SP"}},
   ]);
   add("gear-p03-r05",[
     x("ST_Run_Rly"),{kind:"GEAR_SEQ",tag:"ST_Cycle_Rly"},
@@ -126,18 +113,18 @@ export function createGearPhase3Project():PracticeProject {
   ],o("ST_Pump_Rly"));
   add("gear-p03-r08",[
     x("ST_Run_Rly"),x("ST_Cycle_Rly"),
-    {kind:"TOF",tag:"TMR_Purge",preset:{mode:"literal",value:30000},
-      doneTag:"TMR_Purge_Dn"},
+    {kind:"TOF",tag:"TMR_Purge",preset:{mode:"literal",value:30000}},
   ]);
   add("gear-p03-r09",[
-    x("ST_Run_Rly"),x("TMR_Purge_Dn"),o("ST_Airsol_Rly"),
+    x("ST_Run_Rly"),x("TMR_Purge.DN"),o("ST_Airsol_Rly"),
   ]);
   add("gear-p03-r10",[
     x("ST_Run_Rly"),x("ST_Airsol_Rly"),o("Air_Sol"),
   ]);
-  // R11: NOT purge-active OR NOT Run. Reset is read at next R4 scan.
+  // R11: reset the CTU with a native RES output on this SAME original rung.
+  // The counter was already evaluated in R4, so reset executes at R11.
   logic("gear-p03-r11",[
-    {or:[[nx("TMR_Purge_Dn")],[nx("ST_Run_Rly")]]},
-  ],o("CNT_Lubeflo_Rst"));
+    {or:[[nx("TMR_Purge.DN")],[nx("ST_Run_Rly")]]},
+  ],{kind:"RES",tag:"CTN_Lubeflo"});
   return p;
 }
