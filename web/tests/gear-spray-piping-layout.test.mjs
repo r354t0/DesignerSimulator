@@ -81,7 +81,7 @@ test("La cadena de lubricación ocupa también el sector izquierdo de la escena"
 });
 
 test("El nombre del circuito está debajo de la tubería y no aparece GRASA en el SCADA",()=>{
-  assert.ok(graphic.includes('<text x="433" y="506" fontSize="11.5" fontWeight="700"'));
+  assert.ok(graphic.includes('<text x="433" y="491" fontSize="11.5" fontWeight="700"'));
   assert.ok(graphic.includes('CIRCUITO DE LUBRICANTE'));
   assert.ok(graphic.includes('PI-2560 · LUBRICANTE'));
   assert.ok(graphic.includes('Lubricante: {grease?"ON":"OFF"}'));
