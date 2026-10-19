@@ -87,7 +87,7 @@ export function gearNumber(project:PracticeProject,name:string):number {
 }
 
 export function initialGearSprayProject():PracticeProject {
-  let project={...initialPracticeProject(),tags:[]};
+  let project:PracticeProject={...initialPracticeProject(),tags:[]};
   for(const tag of GEAR_SCADA_TAGS)
     project=createTag(project,tag.name,tag.description,tag.type);
   return project;
