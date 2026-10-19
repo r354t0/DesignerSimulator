@@ -120,6 +120,14 @@ Mantener **separación estricta** entre:
 
 - **Comentarios de rung:** `PracticeRung.comment` es metadato editable en el editor (`+ Añadir comentario al rung`, multilinea, hasta 240 caracteres). El inicio de P01, P02 y el regreso al mapeo P01 están marcados. El comentario persiste con el rung al reordenarlo y **no cambia la firma de compilación ni reinicia RUN**.
 
+## Corrección de orden P01 y avance P03
+- **Posición invariable:** `LubePress_Lo` permanece en el **rung 5 de P01**, inmediatamente después de `LubePress_Hi` y antes de la entrada `DI_Mill_Run`. La condición dentro de ese mismo rung sigue siendo `Run_Rly AND (LubePressure_In_Scaled < 400)`; no se cambia por otra expresión ni se trasladan contactos.
+- **Orden de evaluación:** el adaptador `Run_Rly ← ST_Run_Rly` queda al final del ensamblado P01/P02 y alimenta el valor observado por el rung 5 en el siguiente scan. Esta latencia deriva del orden secuencial de estas plantillas y se conserva deliberadamente hasta revisar el cableado CCW original.
+- **P03 — primera subetapa (modelo ST independiente):** `web/src/plc/gearSpraySequence.ts` implementa `FB_GearSpray_Sequence` como una **función pura por scan**, conservando los estados `0` inactivo, `10` espera, `20` lubricación, `30` purga y `90` bloqueo, los permisos, solicitud de ciclo, prioridad del trip, `BlockLatched`, `RecoveryHold` y criterio de rearme.
+- Se añadieron pruebas automatizadas en `web/tests/gear-spray-sequence.test.mjs` para arranque, solicitud por frecuencia/arranque, secuencia lubricación→purga, modo manual, trip, bloqueo retenido, reset y rearme.
+- **Todavía no se ejecuta el bloque de P03 dentro del motor Ladder ni controla actuadores**: falta conectar este modelo por scan a un UDFB visible en su rung original 5, y conectar timers, contadores y salidas de P03 con sus rungs originales. Por ello no se considera aprobado el FAT P03.
+- El documento CCW seleccionado es la versión de P03 con `FB_GearSpray_Sequence`, no el exportado antiguo sin UDFB que comparte nombre en la biblioteca.
+
 ## Implementación por entregables
 - **Fase 1:** SCADA industrial SVG y tags físicos/setpoints; animación física desacoplada, estructura de escena e información.
 - **Fase 2:** física determinista (presión de aire/lubricante, dosificador, depósito, molino, inyección de fallas) conectada a E/S.
