@@ -191,7 +191,7 @@ function ProcessGraphic({project}: {project:PracticeProject}){
     <text x="441" y="447" fontSize="10.5" fill="#334155">
       LSL {low?"BAJO":"OK"}
     </text>
-    {pipe("M383 427 V382 H722", "lube", grease&&pump)}
+    {pipe("M383 427 V382 H743", "lube", grease&&pump)}
     {/* Bomba sobre el tambor. El ramal de SV-2560 llega a su actuador. */}
     <rect x="364" y="352" width="74" height="58" rx="8" fill={pump?"#ccf5e3":"#dce4ec"}
       stroke={pump?surfaces.active:"#475569"} strokeWidth="3"/>
