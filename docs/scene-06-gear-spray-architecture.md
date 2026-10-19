@@ -90,8 +90,10 @@ Mantener **separación estricta** entre:
   - Presión de lubricante: señal de entrada **6900–32000** escalada a **0–1480**.
 - El PDF CCW `P01_Mapping.pdf` solo copia `_310_PI_2561` a `AI_AirPressure_Scaled` y `_310_PI_2560` a `AI_LubePressure_Scaled`, sin mostrar los parámetros del escalamiento previo. Los deslizadores de escena 06 usan **rangos del Cscape original como referencia**, pendientes de validar en el proyecto CCW. No se presume una unidad física confirmada.
 - La lógica CCW evalúa presión alta de lubricante en `>1500`, fuera de la referencia de 1480: **discrepancia que requiere validación**. Por eso el campo numérico permite valores fuera del rango del deslizador para inyección de fallas en pruebas FAT, con aviso visual.
-- Los cuatro setpoints son `DINT` sin máximos operativos verificados. Sus deslizadores utilizan una ventana de navegación local ampliable; el campo numérico conserva validación `0..2147483647`. No representar esa ventana como escalamiento del programa.
+- Los cuatro setpoints son `DINT` sin máximos operativos verificados. **Se editan exclusivamente con campo numérico** (sin barra deslizante), conservando validación `0..2147483647`; los deslizadores se reservan para las dos entradas analógicas.
 - Etiquetas en pantalla: nombre descriptivo arriba y tag real abajo; las DI mantienen checkbox y agregan descripción seguida del tag entre paréntesis.
+
+- **Disposición de escena 06:** el panel completo «Instrumentación y setpoints» aparece bajo «Vista de proceso» y sus tarjetas de diagnóstico, en la columna izquierda. El panel derecho mantiene mandos, pilotos y alarmas.
 
 ## Implementación por entregables
 - **Fase 1:** SCADA industrial SVG y tags físicos/setpoints; animación física desacoplada, estructura de escena e información.
