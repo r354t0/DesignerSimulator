@@ -1,5 +1,5 @@
 import {
-  createRung, createTag, insertInstruction,
+  createRung, createTag, insertInstruction, setTagValue,
   type PracticeProject,
 } from "./practiceDocument.ts";
 import {initialGearSprayProject} from "./gearSpraySceneModel.ts";
@@ -31,6 +31,20 @@ export function createGearFatProject():PracticeProject {
     });
   }
   return p;
+}
+
+/** Disarm only temporary FAT inputs, never ordinary project I/O.
+ * Outputs are switched OFF separately by stopPracticeScans.
+ * Prevents unintended motor / solenoid restart after STOP and scene change.
+ */
+export function clearGearFatCommands(project:PracticeProject):PracticeProject {
+  let result=project;
+  for(const command of GEAR_FAT_COMMANDS){
+    const tag=result.tags.find(t=>t.name===command.name);
+    if(tag?.type==="BOOL"&&tag.value===true)
+      result=setTagValue(result,command.name,false);
+  }
+  return result;
 }
 
 export function isGearFatCommand(value:string):value is GearFatCommand {
