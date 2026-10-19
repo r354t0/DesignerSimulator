@@ -527,7 +527,7 @@ export default function App() {
   // Scene 06: retain manual FAT inputs when physical simulation is disabled.
   // Physical mode owns PI-2561, PI-2560, SQS-2561 and LSL, never PLC outputs.
   const setGearPhysicalConfig=useCallback((patch:Partial<Pick<GearPhysicalState,
-    "enabled"|"airSupply"|"drumPercent"|"airLoss"|"filterBlocked"|"doserBlocked">>)=>{
+    "enabled"|"airSupply"|"drumPercent"|"pressureDecayFactor"|"airLoss"|"filterBlocked"|"doserBlocked">>)=>{
     if(activeControllerScene.current!=="gear")return;
     changeGearPhysical(state=>configureGearPhysical(state,patch));
   },[changeGearPhysical]);
