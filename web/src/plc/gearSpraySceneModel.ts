@@ -34,7 +34,7 @@ export const GEAR_FIELD_OUTPUTS: readonly GearTagSpec[] = [
   {name:"_310_SV_2563",type:"BOOL",direction:"Salida",
     description:"DO solenoide de aire de atomización"},
   {name:"_310_SV_2561",type:"BOOL",direction:"Salida",
-    description:"DO solenoide de grasa hacia dosificador"},
+    description:"DO solenoide de lubricante hacia dosificador"},
   {name:"_310_UY_2560",type:"BOOL",direction:"Salida",
     description:"DO alarma audible"},
   {name:"_310_YI_SystemHealthy",type:"BOOL",direction:"Salida",
