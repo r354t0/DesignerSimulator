@@ -114,8 +114,8 @@ export function BatchMixerSceneInfoDialog({open,project,selectedExercise,onClose
           {exercise<=3?"Variables utilizadas en la solución":"Variables adicionales"} · Ejercicio {exercise}
         </h4>
         <SceneTagTable
-          specs={exercise<=3
-            ? batchSolutionUsedTags(exercise as 1|2|3) : batchSolutionTags(exercise)}
+          specs={exercise===1||exercise===2||exercise===3
+            ? batchSolutionUsedTags(exercise) : batchSolutionTags(exercise)}
           project={project} preview/>
         {exercise<=3&&<p className="mt-1.5 text-[10px] text-slate-400">
           Solo aparecen los tags referenciados en los rungs de este ejercicio.
