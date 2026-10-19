@@ -361,7 +361,7 @@ function ProcessGraphic({project,physics}: {project:PracticeProject;physics:Gear
       MOLINO {mill?"RUN":"STOP"}
     </text>
     <text x="25" y="679" fontSize="11" fill="#64748b">
-      Visualización CCW · Física FAT · Fase 3A P01/P02 disponible; P03–P07 pendientes
+      Visualización CCW · Física FAT · Fase 3B P01/P02/P03 disponible; P04–P07 pendientes
     </text>
   </svg>;
 }
@@ -395,8 +395,8 @@ function InfoModal({onClose,onOpenTags,phase3Loaded}:{
         DesignerSimulator. Fase 2: modelo físico determinista opcional de
         presiones, depósito, pulsos y fallas de proceso.
         {phase3Loaded?
-          " Fase 3A: P01 y P02 están portadas a Ladder editable; P03–P07 y UDFB pendientes.":
-          " P01–P07 y UDFB pendientes mientras no se cargue la plantilla de Fase 3A."}
+          " Fase 3B: P01/P02 y 11 rungs de P03, incluido el FB de estados, ejecutables; P04–P07 pendientes.":
+          " P01/P02/P03 disponibles al cargar Fase 3B; P04–P07 pendientes."}
       </p>
       <div className="mt-3 rounded border border-amber-700/70 bg-amber-950/40 p-3 text-xs text-amber-100">
         <strong>Asignación del dosificador:</strong> _310_SQS_2561 es la señal
@@ -484,7 +484,7 @@ export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3
           {modeLabel}
         </span>
         <span className="rounded border border-amber-700 bg-amber-950/60 px-2 py-1 text-[10px] text-amber-200">
-          {phase3Loaded?"Fase 3A · P01/P02 cargadas":
+          {phase3Loaded?"Fase 3B · P01/P02/P03 cargadas":
             physics.enabled?"Fase 2 · Física activa":"Fase 2 · Física manual"}
         </span>
         <button type="button" onClick={()=>setOpenInfo(true)}
@@ -569,27 +569,27 @@ export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3
           </div>
           <div className="mb-3 rounded border border-sky-800/70 bg-[#102633] p-3">
             <h4 className="text-[11px] font-semibold text-sky-200">
-              Fase 3A · P01 Mapeo y P02 Modos de operación
+              Fase 3B · P01, P02 y P03 Cycle Manager
             </h4>
             <p className="my-2 text-[10px] leading-snug text-slate-300">
-              Primera migración de CCW a Ladder: señales y umbrales de P01,
-              selección AUTO/MANUAL/MANT y habilitación ST_Run_Rly de P02.
-              P03–P07, bombeo automático y alarmas todavía pendientes.
+              P01 señales y umbrales, P02 modos y 11 rungs originales de P03:
+              temporizadores, contador, máquina de estados y purga.
+              P04–P07 y la lógica completa de alarmas todavía pendientes.
             </p>
             {phase3Loaded&&<p className="mb-2 text-[10px] text-amber-200">
-              Programa P01/P02 cargado. Las salidas de bomba y electroválvulas
-              permanecerán sin mando hasta implementar P03/P04.
+              Programa P01/P02/P03 cargado. La solicitud de bomba ST_Pump_Rly
+              aún requiere P04 para energizar la electroválvula de bomba.
             </p>}
             {!phase3Loaded?
               <button type="button" onClick={onLoadPhase3}
                 disabled={mode!=="stopped"||fatLoaded}
                 className="rounded border border-sky-600 px-3 py-1.5 text-[11px] font-semibold text-sky-100 hover:bg-sky-900 disabled:cursor-not-allowed disabled:opacity-40">
-                Cargar P01 + P02 (Fase 3A)
+                Cargar P01 + P02 + P03 (Fase 3B)
               </button>:
               <button type="button" onClick={onRestorePhase3}
                 disabled={mode!=="stopped"}
                 className="rounded border border-slate-500 px-3 py-1.5 text-[11px] font-semibold text-slate-100 hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-40">
-                Restaurar programa anterior a Fase 3A
+                Restaurar programa anterior a Fase 3B
               </button>}
             {fatLoaded&&<span className="mt-2 block text-[10px] text-slate-400">
               Restaura primero el programa anterior desde el banco FAT.
@@ -791,7 +791,7 @@ export function GearSprayScene({project,mode,fatLoaded,phase3Loaded,onLoadPhase3
           </h3>
           <div className="mb-2 rounded border border-amber-700/60 bg-amber-950/40 p-2 text-[11px] text-amber-200">
             <AlertTriangle size={13} className="mr-1 inline"/>
-            {phase3Loaded?"P01 y P02 incorporadas al Ladder. P03–P07 y FB_GearSpray_Sequence pendientes de portar.":
+            {phase3Loaded?"P01, P02 y P03 incorporados al Ladder. FB_GearSpray_Sequence ejecutable; P04–P07 pendientes.":
               "P01–P07 y FB_GearSpray_Sequence pendientes de portar."}
             Las alarmas y secuencias CCW aún no se calculan automáticamente.
           </div>
