@@ -2,7 +2,7 @@ import { getCoilVisualState } from "../../plc/ladderCoilVisual";
 import type { ReactNode } from "react";
 import { getInstructionSelectionFrame, LADDER_SELECTION_BLUE } from "../../plc/ladderSelection";
 
-export type Instruction = "XIC" | "XIO" | "ONS" | "OTE" | "OTL" | "OTU" | "TON" | "TOF" | "RTO" | "RES" | "TONOFF" | "CTU" | "CTD" | "EQU" | "NEQ" | "LES" | "LEQ" | "GRT" | "GEQ" | "MOV" | "ADD" | "SUB" | "MUL" | "DIV" | "OR_JUNCTION";
+export type Instruction = "XIC" | "XIO" | "ONS" | "OTE" | "OTL" | "OTU" | "TON" | "TOF" | "RTO" | "RES" | "TONOFF" | "CTU" | "CTD" | "EQU" | "NEQ" | "LES" | "LEQ" | "GRT" | "GEQ" | "MOV" | "ADD" | "SUB" | "MUL" | "DIV" | "GEAR_SEQ" | "OR_JUNCTION";
 
 export const INSTRUCTIONS: { id: Instruction; label: string }[] = [
   { id: "XIC", label: "Examine If Closed" },
