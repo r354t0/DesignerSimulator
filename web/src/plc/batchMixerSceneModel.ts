@@ -97,7 +97,7 @@ export const BATCH_EXERCISES: readonly {
     criteria: ["Selector B habilita la producción de varios lotes",
       "INT_BatchTarget define el número de lotes (1–99)",
       "INT_RatioP1 define el porcentaje del producto 1 (0–100)",
-      "CNT_Lotes se muestra en el display INT_DisplayValue",
+      "El SCADA muestra CNT_Lotes.ACC como número de lotes completados",
       "Al cumplir el objetivo, las bombas y el mezclador se detienen"] },
 ];
 
