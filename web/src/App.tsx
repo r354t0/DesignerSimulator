@@ -165,11 +165,11 @@ export default function App() {
   }, []);
   useEffect(() => {
     if (practiceMode !== "running"||
-      (activeControllerScene.current==="gear"&&!gearVirtualScan))return;
+      (activeControllerScene.current==="gear"&&gearControllerSourceRef.current==="opcua"))return;
     const id = window.setInterval(() => changeScan(tickPracticeScan),
       scanState.scanPeriodMs);
     return () => window.clearInterval(id);
-  }, [practiceMode, scanState.scanPeriodMs, changeScan, gearVirtualScan]);
+  }, [practiceMode, scanState.scanPeriodMs, changeScan]);
   const practiceIdCounter = useRef(1);
   const nextPracticeId = useCallback((prefix: string) => `${prefix}-${++practiceIdCounter.current}`, []);
   const [online, setOnline] = useState(false);
@@ -226,8 +226,7 @@ export default function App() {
   const gearOpcOutputsRef=useRef<Record<string,boolean>>({});
   const gearOpcInputsSent=useRef<Record<string,boolean|number>>({});
   const gearOpcStatusRef=useRef<GearOpcStatus>(initialGearOpcStatus());
-  const gearVirtualScan=gearControllerSource==="virtual";
-  const setOpcStatus=useCallback((next:GearOpcStatus)=>{
+    const setOpcStatus=useCallback((next:GearOpcStatus)=>{
     gearOpcStatusRef.current=next;
     setGearOpcStatus(next);
   },[]);
@@ -245,6 +244,44 @@ export default function App() {
       setGearPhysical(next);
     }
   },[]);
+  // A real PLC owns the outputs. Only a verified gateway snapshot can
+  // update field output tags; no local Ladder scan occurs in OPC UA mode.
+  const setGearController=useCallback((source:GearControllerSource)=>{
+    if(activeControllerScene.current!=="gear")return;
+    disconnectGearOpc();
+    changeScan(stopPracticeScans);
+    gearControllerSourceRef.current=source;
+    setGearControllerSource(source);
+  },[changeScan,disconnectGearOpc]);
+
+  const connectGearOpc=useCallback(()=>{
+    if(activeControllerScene.current!=="gear"||
+      gearControllerSourceRef.current!=="opcua")return;
+    disconnectGearOpc();
+    const client=new GearOpcUaClient(setOpcStatus,message=>{
+      if(activeControllerScene.current!=="gear"||
+        gearControllerSourceRef.current!=="opcua")return;
+      const outputs:Record<string,boolean>={};
+      for(const name of GEAR_OPC_OUTPUT_TAGS){
+        outputs[name]=message.outputs[name]===true;
+      }
+      gearOpcOutputsRef.current=outputs;
+      changeScan(state=>{
+        let project=state.project;
+        for(const name of GEAR_OPC_OUTPUT_TAGS){
+          const tag=project.tags.find(t=>t.name===name);
+          if(tag?.type==="BOOL"&&tag.value!==outputs[name])
+            project=setTagValue(project,name,outputs[name]);
+        }
+        return project===state.project?state:{...state,project};
+      });
+    });
+    gearOpcClientRef.current=client;
+    client.connect(gearOpcSocketUrl);
+  },[changeScan,disconnectGearOpc,gearOpcSocketUrl,setOpcStatus]);
+
+  useEffect(()=>()=>{gearOpcClientRef.current?.disconnect();},[]);
+
   const [batchSetupError, setBatchSetupError] = useState<string | null>(null);
   const [batchExercise, setBatchExercise] = useState<BatchExercise | null>(null);
   const [batchState, setBatchState] = useState<BatchMixerState>(initialBatchState);
