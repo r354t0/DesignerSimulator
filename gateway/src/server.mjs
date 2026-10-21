@@ -13,7 +13,7 @@ import {WebSocket,WebSocketServer} from "ws";
 import {
   OPCUAClient,AttributeIds,DataType,MessageSecurityMode,SecurityPolicy,
 } from "node-opcua";
-import {parseConfig,writeValueForTag,parseOutputs,normaliseInput}
+import {parseConfig,writeValueForTag,parseOutputs,normaliseInput,OBSERVE_TYPES}
   from "./validation.mjs";
 
 const configPath=process.env.GEAR_OPCUA_CONFIG ||
@@ -135,11 +135,24 @@ async function connect(){
 async function readOnePass(){
   if(!session||!live)return;
   const outputNames=Object.keys(config.read);
-  const values=await session.read(outputNames.map(name=>({
-    nodeId:config.read[name],attributeId:AttributeIds.Value,
+  const observed=Object.entries(config.observe??{}).filter(([,nodeId])=>nodeId);
+  const nodes=[
+    ...outputNames.map(name=>config.read[name]),
+    ...observed.map(([,nodeId])=>nodeId),
+  ];
+  const values=await session.read(nodes.map(nodeId=>({
+    nodeId,attributeId:AttributeIds.Value,
   })));
-  const outputs=parseOutputs(outputNames,values);
-  report({type:"snapshot",outputs,quality:"Good",ts:Date.now()});
+  const outputs=parseOutputs(outputNames,values.slice(0,outputNames.length));
+  const diagnostics={};
+  observed.forEach(([name],i)=>{
+    const reading=values[outputNames.length+i];
+    if(String(reading?.statusCode??"Bad").startsWith("Good")&&
+      typeof reading?.value?.value===OBSERVE_TYPES[name]){
+      diagnostics[name]=reading.value.value;
+    }
+  });
+  report({type:"snapshot",outputs,diagnostics,quality:"Good",ts:Date.now()});
 }
 async function main(){
   while(!closed){
