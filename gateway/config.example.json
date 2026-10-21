@@ -36,5 +36,13 @@
     "CNT_LubeFlo_SP": "",
     "TMR_LubeFlo_SP": "",
     "Maint_Duration_Min": ""
+  },
+  "observe": {
+    "SM_Cycle_State": "",
+    "Fault_Code": "",
+    "ST_Cycle_Rly": "",
+    "ST_General_Trip_Rly": "",
+    "DO_LS_Healthy": "",
+    "CTN_Lubeflo.ACC": ""
   }
 }
