@@ -14,6 +14,11 @@ export const INPUT_INT_TAGS=[
   "TMR_Freq_SP","CNT_LubeFlo_SP","TMR_LubeFlo_SP","Maint_Duration_Min",
 ];
 export const INPUT_TAGS=[...ANALOG_TAGS,...INPUT_BOOL_TAGS,...INPUT_INT_TAGS];
+export const OBSERVE_TYPES={
+  SM_Cycle_State:"number",Fault_Code:"number",
+  ST_Cycle_Rly:"boolean",ST_General_Trip_Rly:"boolean",
+  DO_LS_Healthy:"boolean","CTN_Lubeflo.ACC":"number",
+};
 const assert= (condition,message)=>{
   if(!condition)throw new Error(message);
 };
@@ -45,6 +50,15 @@ export function parseConfig(raw){
     "Falta el mapa write");
   for(const key of Object.keys(raw.write))
     assert(INPUT_TAGS.includes(key),"Escritura OPC UA no permitida: "+key);
+  if(raw.observe!==undefined){
+    assert(raw.observe&&typeof raw.observe==="object",
+      "observe debe ser un mapa de NodeIds");
+    for(const [name,nodeId]of Object.entries(raw.observe)){
+      assert(name in OBSERVE_TYPES,"Tag de diagnóstico no autorizado: "+name);
+      assert(nodeId===""||validNodeId(nodeId),
+        "NodeId de observación inválido: "+name);
+    }
+  }
   if(raw.allowWrites)
     assert(INPUT_TAGS.every(name=>validNodeId(raw.write[name])),
       "Antes de habilitar escrituras configura los 15 NodeIds de entrada reales");
