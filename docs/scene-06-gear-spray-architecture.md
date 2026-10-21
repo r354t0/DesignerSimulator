@@ -151,6 +151,15 @@ Mantener **separación estricta** entre:
 - «Instrumentación y setpoints» ya no incluye «Banco de pruebas FAT – Etapa B» ni botones de carga o restauración P01–P07. En **«Entradas analógicas»**, el checkbox **«Simulación física automática»** (desmarcado al reiniciar) muestra alternativamente entradas de presión manuales o el panel físico de Fase 2, incluidos niveles, velocidad de pérdida de presión, inyección de fallas y reset físico.
 - «Información de la escena» incluye **«Reiniciar programa»** con confirmación de pérdida de cambios: recarga P01–P07, pone PLC en STOP y restablece todos los valores de programa, diagnósticos y planta. No afecta las otras escenas.
 
+## HIL opcional — Micro850 real mediante OPC UA
+
+- La escena 06 ofrece **PLC virtual** y **Micro850 real · OPC UA**. No se ejecuta el Ladder virtual mientras el controlador real gobierna la planta. Los mandos RUN/STOP del PLC físico se realizan en CCW y el WebSocket se utiliza solamente como puente de datos.
+- **Topología:** Micro850, instrumentos y PC con FactoryTalk Linx Gateway conectados mediante un switch Ethernet. FactoryTalk Linx Gateway expone el controlador vía servidor OPC UA. El componente local `gateway/src/server.mjs` abre la sesión UA y envía snapshots al navegador por WebSocket restringido a `127.0.0.1`.
+- **Direcciones:** el gateway lee seis salidas BOOL de P01 y solo puede escribir las dos presiones REAL, tres entradas digitales BOOL, seis pulsadores BOOL y cuatro consignas DINT definidas. En `gateway/config.example.json` se dejan NodeIds vacíos a propósito: se deben reemplazar por NodeIds de variables reales comprobados en el navegador OPC UA. La escritura está **deshabilitada inicialmente**.
+- **Diagnósticos opcionales:** se pueden observar `SM_Cycle_State`, `Fault_Code`, `ST_Cycle_Rly`, `ST_General_Trip_Rly`, `DO_LS_Healthy` y `CTN_Lubeflo.ACC`; en modo real la interfaz no inventa estados si no tienen NodeId mapeado.
+- El cliente verifica calidad `Good`; ante pérdida de conexión o antigüedad de lectura mayor a 1,8 s, deshabilita escrituras y borra estados ON remotos mostrados. Esto **no es un sistema de parada de seguridad**; se necesita watchdog y lógica a estado seguro implementados en el Micro850 y aislamiento de actuadores físicos durante FAT.
+- **Puesta en servicio, pruebas y certificados:** ver `gateway/README.md`. Los tests `gateway/tests/validation.test.mjs` y `web/tests/gear-spray-opcua.test.mjs` se ejecutan en CI, pero la comunicación con PLC físico exige validación local.
+
 ## Plantilla unificada P01–P07 — estado actual
 
 - Archivo: `web/src/plc/gearSprayCompleteProgram.ts`. La escena 06 lo carga desde `createGearCompleteProject()` con copia temporal reversible del proyecto anterior.
