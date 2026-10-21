@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, CircleHelp, Gauge,
   Play, ShieldAlert, Wrench, RotateCcw, Settings2, Droplets } from "lucide-react";
 import type { PracticeProject } from "../../plc/practiceDocument";
 import type { ScanMode } from "../../plc/practiceScanCycle";
+import type {GearControllerSource,GearOpcStatus} from "../../plc/gearOpcUaBridge.ts";
 import {
   gearSprayIsActive, type GearPhysicalState,
 } from "../../plc/gearSprayPhysics";
@@ -20,6 +21,13 @@ interface Props {
   project: PracticeProject;
   mode: ScanMode;
   onResetProgram:()=>void;
+  controllerSource:GearControllerSource;
+  onControllerSourceChange:(source:GearControllerSource)=>void;
+  opcStatus:GearOpcStatus;
+  opcSocketUrl:string;
+  onOpcSocketUrlChange:(url:string)=>void;
+  onOpcConnect:()=>void;
+  onOpcDisconnect:()=>void;
   physics:GearPhysicalState;
   onPhysicsChange:(patch:Partial<Pick<GearPhysicalState,
     "enabled"|"airSupply"|"drumPercent"|"pressureDecayFactor"|"airLoss"|"filterBlocked"|"doserBlocked">>)=>void;
@@ -435,6 +443,8 @@ function InfoModal({onClose,onOpenTags,onResetProgram}:{
  * The CCW application logic remains pending for phase 3.
  */
 export function GearSprayScene({project,mode,onResetProgram,
+  controllerSource,onControllerSourceChange,opcStatus,opcSocketUrl,
+  onOpcSocketUrlChange,onOpcConnect,onOpcDisconnect,
   physics,onPhysicsChange,onPhysicsReset,
   setupError,onPushButton,onDigitalInput,onAnalogInput,onSetpoint,
   onPrepareTags,onOpenTags}:Props){
@@ -442,8 +452,11 @@ export function GearSprayScene({project,mode,onResetProgram,
   const phase3Loaded=true; // Dedicated scene always has the P01–P07 controller
   const sceneRef=useRef<HTMLDivElement>(null);
   const v=(name:string)=>gearBool(project,name);
-  const modeLabel=mode==="running"?"PLC RUN":
+  const modeLabel=controllerSource==="opcua"?
+    "MICRO850 REAL · OPC UA":mode==="running"?"PLC RUN":
     mode==="paused"?"PLC PAUSE":"PLC STOP";
+  const opcReady=controllerSource==="opcua"&&opcStatus.connected;
+  const opcWritable=opcReady&&opcStatus.writable;
   useEffect(()=>{
     const listener=(event:KeyboardEvent)=>{
       if(event.key==="Escape")setOpenInfo(false);
@@ -498,6 +511,69 @@ export function GearSprayScene({project,mode,onResetProgram,
       {setupError}
       <button type="button" className="ml-3 underline" onClick={onPrepareTags}>Reintentar</button>
     </div>}
+    <section aria-label="Conexión PLC Gear Spray"
+      className="mb-3 rounded-lg border border-[#34586a] bg-[#0f2434] p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-xs font-semibold text-sky-200">
+            Origen del controlador · Gear Spray
+          </h3>
+          <p className="mt-1 text-[10px] text-slate-400">
+            El switch Ethernet conecta el Micro850 y los instrumentos.
+            OPC UA se obtiene desde FactoryTalk Linx Gateway u otro servidor compatible.
+          </p>
+        </div>
+        <div className="flex gap-2 text-[11px]">
+          <button type="button" aria-pressed={controllerSource==="virtual"}
+            onClick={()=>onControllerSourceChange("virtual")}
+            className={"rounded border px-3 py-1.5 "+
+              (controllerSource==="virtual"?"border-sky-500 bg-sky-900 text-white":
+              "border-slate-600 text-slate-300 hover:bg-slate-700")}>
+            PLC virtual
+          </button>
+          <button type="button" aria-pressed={controllerSource==="opcua"}
+            onClick={()=>onControllerSourceChange("opcua")}
+            className={"rounded border px-3 py-1.5 "+
+              (controllerSource==="opcua"?"border-sky-500 bg-sky-900 text-white":
+              "border-slate-600 text-slate-300 hover:bg-slate-700")}>
+            Micro850 real · OPC UA
+          </button>
+        </div>
+      </div>
+      {controllerSource==="opcua"&&<div className="mt-3 space-y-2 border-t border-[#34586a] pt-3">
+        <label className="block text-[11px] text-slate-300">
+          WebSocket del gateway local
+          <input type="text" value={opcSocketUrl}
+            onChange={e=>onOpcSocketUrlChange(e.target.value)}
+            spellCheck={false} aria-label="URL gateway OPC UA"
+            className="mt-1 block w-full rounded border border-slate-600 bg-[#071824] px-2 py-1.5 font-mono text-[11px] text-sky-200"/>
+        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={onOpcConnect}
+            className="rounded border border-emerald-600 px-3 py-1.5 text-[11px] font-medium text-emerald-200 hover:bg-emerald-950">
+            Conectar OPC UA
+          </button>
+          <button type="button" onClick={onOpcDisconnect}
+            className="rounded border border-slate-600 px-3 py-1.5 text-[11px] text-slate-300 hover:bg-slate-700">
+            Desconectar
+          </button>
+          <span role="status" className={"text-[11px] "+
+            (opcReady?"text-emerald-300":"text-amber-300")}>
+            {opcReady?"● Conectado":"○ Sin comunicación"} · {opcStatus.detail}
+          </span>
+        </div>
+        <div className="text-[10px] text-slate-400">
+          Mapeos: {opcStatus.mappedInputs} entradas · {opcStatus.mappedOutputs} salidas.
+          {" "}Escritura: {opcWritable?"HABILITADA":"DESHABILITADA"}.
+          {" "}Última lectura: {opcStatus.lastUpdate?new Date(opcStatus.lastUpdate).toLocaleTimeString():"—"}.
+        </div>
+        <p className="text-[10px] text-amber-200">
+          RUN/STOP del Micro850 se opera desde CCW, no desde el editor.
+          Los mandos HMI requieren conexión con escritura habilitada.
+          Probar con actuadores físicos aislados y watchdog de comunicación en el PLC.
+        </p>
+      </div>}
+    </section>
     <div className="scada-scene-workspace">
       <section className="scada-process-panel min-w-0">
         <h3 className="mb-2 text-xs font-semibold">Vista de proceso</h3>
@@ -675,7 +751,8 @@ export function GearSprayScene({project,mode,onResetProgram,
             Los botones escriben entradas PB momentáneas. Solo el programa PLC
             gobierna las salidas.
           </p>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <fieldset disabled={controllerSource==="opcua"&&!opcWritable}
+            className="grid grid-cols-2 gap-2 sm:grid-cols-3 disabled:opacity-50">
             {GEAR_HMI_PUSHBUTTONS.map((tag,index)=>{
               const glyph=[<Play size={14}/>,<Wrench size={14}/>,
                 <Wrench size={14}/>,<Droplets size={14}/>,
@@ -688,7 +765,7 @@ export function GearSprayScene({project,mode,onResetProgram,
                 {tag.name.replace("PB_","").replace("_"," ")}
               </MomentaryPushButton>;
             })}
-          </div>
+          </fieldset>
         </section>
 
         <section className="sort-panel scada-led-panel min-w-0 rounded-lg border border-[#344c5e] p-3">
