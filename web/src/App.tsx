@@ -1152,6 +1152,13 @@ export default function App() {
                     : simulationTab === "gear"
                       ? <GearSprayScene project={practice} mode={practiceMode}
                           onResetProgram={resetGearProgram}
+                          controllerSource={gearControllerSource}
+                          onControllerSourceChange={setGearController}
+                          opcStatus={gearOpcStatus}
+                          opcSocketUrl={gearOpcSocketUrl}
+                          onOpcSocketUrlChange={setGearOpcSocketUrl}
+                          onOpcConnect={connectGearOpc}
+                          onOpcDisconnect={disconnectGearOpc}
                           physics={gearPhysical}
                           onPhysicsChange={setGearPhysicalConfig}
                           onPhysicsReset={resetGearPhysical}
@@ -1185,6 +1192,8 @@ export default function App() {
       loadTrafficExample, batchState, batchExercise, batchSetupError,
       setBatchInput, setBatchMode, setBatchIntegers, resetBatch, prepareBatch, loadBatchSolution,
       gearSetupError, gearPhysical, resetGearProgram,
+      gearControllerSource, setGearController,gearOpcStatus,gearOpcSocketUrl,
+      connectGearOpc,disconnectGearOpc,
       setGearPhysicalConfig, resetGearPhysical,
       setGearPushButton, setGearDigitalInput, setGearNumber, prepareGear],
   );
