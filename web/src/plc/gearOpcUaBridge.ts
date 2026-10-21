@@ -18,14 +18,20 @@ export const GEAR_OPC_ANALOG_TAGS=GEAR_FIELD_INPUTS
   .filter(x=>x.type==="REAL").map(x=>x.name);
 export type GearOpcStatus={
   connected:boolean; writable:boolean; lastUpdate:number;
-  detail:string; mappedInputs:number; mappedOutputs:number;
+  detail:string; mappedInputs:number; mappedOutputs:number;observedTags:string[];
 };
 export const initialGearOpcStatus=():GearOpcStatus=>({
   connected:false,writable:false,lastUpdate:0,detail:"Desconectado",
-  mappedInputs:0,mappedOutputs:0,
+  mappedInputs:0,mappedOutputs:0,observedTags:[],
 });
+export const GEAR_OPC_OBSERVE_TAGS={
+  SM_Cycle_State:"number",Fault_Code:"number",
+  ST_Cycle_Rly:"boolean",ST_General_Trip_Rly:"boolean",
+  DO_LS_Healthy:"boolean","CTN_Lubeflo.ACC":"number",
+} as const;
 export type GearOpcSnapshot={
-  type:"snapshot";outputs:Record<string,GearOpcValue>;quality:"Good";ts:number;
+  type:"snapshot";outputs:Record<string,GearOpcValue>;
+  diagnostics?:Record<string,GearOpcValue>;quality:"Good";ts:number;
 };
 export function validGearOpcOutputSnapshot(data:unknown):data is GearOpcSnapshot{
   if(!data||typeof data!=="object")return false;
@@ -34,7 +40,12 @@ export function validGearOpcOutputSnapshot(data:unknown):data is GearOpcSnapshot
     typeof x.ts!=="number"||!Number.isFinite(x.ts)||
     !x.outputs||typeof x.outputs!=="object")return false;
   const values=x.outputs as Record<string,unknown>;
-  return GEAR_OPC_OUTPUT_TAGS.every(name=>typeof values[name]==="boolean");
+  if(!GEAR_OPC_OUTPUT_TAGS.every(name=>typeof values[name]==="boolean"))return false;
+  if(x.diagnostics===undefined)return true;
+  if(!x.diagnostics||typeof x.diagnostics!=="object")return false;
+  return Object.entries(x.diagnostics).every(([name,value])=>
+    name in GEAR_OPC_OBSERVE_TAGS&&
+    typeof value===GEAR_OPC_OBSERVE_TAGS[name as keyof typeof GEAR_OPC_OBSERVE_TAGS]);
 }
 export function validGearOpcInput(tag:string,value:unknown):value is GearOpcValue{
   const spec=[...GEAR_FIELD_INPUTS,...GEAR_HMI_PUSHBUTTONS,
