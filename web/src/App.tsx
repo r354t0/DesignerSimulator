@@ -229,7 +229,20 @@ export default function App() {
     const setOpcStatus=useCallback((next:GearOpcStatus)=>{
     gearOpcStatusRef.current=next;
     setGearOpcStatus(next);
-  },[]);
+    // Fail closed: on stale/offline UA, never display last known ON as current.
+    if(!next.connected&&gearControllerSourceRef.current==="opcua"){
+      gearOpcOutputsRef.current={};
+      changeScan(state=>{
+        let project=state.project;
+        for(const name of GEAR_OPC_OUTPUT_TAGS){
+          const tag=project.tags.find(t=>t.name===name);
+          if(tag?.type==="BOOL"&&tag.value===true)
+            project=setTagValue(project,name,false);
+        }
+        return project===state.project?state:{...state,project};
+      });
+    }
+  },[changeScan]);
   const disconnectGearOpc=useCallback(()=>{
     gearOpcClientRef.current?.disconnect();
     gearOpcOutputsRef.current={};
@@ -272,6 +285,20 @@ export default function App() {
           const tag=project.tags.find(t=>t.name===name);
           if(tag?.type==="BOOL"&&tag.value!==outputs[name])
             project=setTagValue(project,name,outputs[name]);
+        }
+        for(const [name,value] of Object.entries(message.diagnostics??{})){
+          if(name==="CTN_Lubeflo.ACC"&&typeof value==="number"){
+            project={...project,tags:project.tags.map(t=>t.name!=="CTN_Lubeflo"||
+              t.type!=="COUNTER"?t:{...t,value:{
+                ...(t.value as Record<string,number|boolean>),ACC:value,
+              }})};
+          }else{
+            const tag=project.tags.find(t=>t.name===name);
+            if(tag&&tag.value!==value&&(
+              (tag.type==="BOOL"&&typeof value==="boolean")||
+              (["INT","DINT","REAL"].includes(tag.type)&&typeof value==="number")))
+              project=setTagValue(project,name,value);
+          }
         }
         return project===state.project?state:{...state,project};
       });
