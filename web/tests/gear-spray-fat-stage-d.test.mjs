@@ -86,8 +86,8 @@ test("D08: changing scenes stops controllers and retains individual programs",()
   const app=read("../src/App.tsx");
   assert.match(app,/sceneSessions\.current\[previous\] = stopPracticeScans\(current\)/);
   assert.match(app,/return stopPracticeScans\(sceneSessions\.current\[next\]\)/);
-  assert.match(app,/if\(practiceMode!=="running"\|\|activeControllerScene\.current!=="gear"\)return/);
-  assert.match(app,/if\(plc\.mode!=="running"\|\|activeControllerScene\.current!=="gear"\|\|!physical\.enabled\)return/);
+  assert.match(app,/if\(activeControllerScene\.current!=="gear"\)return/);
+  assert.match(app,/if\(!real&&plc\.mode!=="running"\)return/);
   assert.match(app,/changeScan\(stopPracticeScans\)/);
 });
 
