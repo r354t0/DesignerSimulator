@@ -457,6 +457,8 @@ export function GearSprayScene({project,mode,onResetProgram,
     mode==="paused"?"PLC PAUSE":"PLC STOP";
   const opcReady=controllerSource==="opcua"&&opcStatus.connected;
   const opcWritable=opcReady&&opcStatus.writable;
+  const observed=(name:string)=>controllerSource==="virtual"||
+    opcStatus.observedTags.includes(name);
   useEffect(()=>{
     const listener=(event:KeyboardEvent)=>{
       if(event.key==="Escape")setOpenInfo(false);
@@ -564,6 +566,7 @@ export function GearSprayScene({project,mode,onResetProgram,
         </div>
         <div className="text-[10px] text-slate-400">
           Mapeos: {opcStatus.mappedInputs} entradas · {opcStatus.mappedOutputs} salidas.
+          {" "}Diagnósticos observados: {opcStatus.observedTags.length}.
           {" "}Escritura: {opcWritable?"HABILITADA":"DESHABILITADA"}.
           {" "}Última lectura: {opcStatus.lastUpdate?new Date(opcStatus.lastUpdate).toLocaleTimeString():"—"}.
         </div>
@@ -808,11 +811,13 @@ export function GearSprayScene({project,mode,onResetProgram,
           </div>
           <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-200">
             <div className="rounded bg-[#0c1b28] p-2">
-              Máquina de estados: <strong> {phase3Loaded?cycleState+" · "+cycleName:"no disponible"}</strong>
+              Máquina de estados: <strong> {observed("SM_Cycle_State")?
+              cycleState+" · "+cycleName:"Sin NodeId de lectura"}</strong>
             </div>
             <div className="rounded bg-[#0c1b28] p-2">
-              Código de falla (Fault_Code): <strong>{phase3Loaded?gearNumber(project,"Fault_Code"):"no disponible"}</strong>
-              {phase3Loaded&&<span className="block text-[10px] text-slate-400">
+              Código de falla (Fault_Code): <strong>{observed("Fault_Code")?
+                gearNumber(project,"Fault_Code"):"Sin NodeId de lectura"}</strong>
+              {observed("Fault_Code")&&<span className="block text-[10px] text-slate-400">
                 {({0:"Sin falla priorizada",1:"Falta de aire",2:"Flujo bajo",
                   3:"Presión baja",4:"Presión alta",5:"Nivel bajo"} as Record<number,string>)[gearNumber(project,"Fault_Code")]??"Desconocido"}
               </span>}
@@ -822,11 +827,11 @@ export function GearSprayScene({project,mode,onResetProgram,
               <strong> {v("DI_PDB")?"ACTIVO":"INACTIVO"}</strong>
             </div>
             <div className="rounded bg-[#0c1b28] p-2">
-              {phase3Loaded?"Pulsos (CTN_Lubeflo)":"Alarmas CCW"}:
-              <strong> {phase3Loaded?
+              Pulsos (CTN_Lubeflo):
+              <strong> {observed("CTN_Lubeflo.ACC")?
                 String((project.tags.find(t=>t.name==="CTN_Lubeflo")?.value as
                   Record<string,number|boolean>|undefined)?.ACC??0):
-                "no disponibles"}</strong>
+                "Sin NodeId de lectura"}</strong>
             </div>
           </div>
           {phase3Loaded&&<div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-200">
