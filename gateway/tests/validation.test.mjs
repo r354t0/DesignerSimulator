@@ -24,6 +24,18 @@ test("Fails closed for unset OPC UA NodeIds and insecure gateway settings",()=>{
     {...good,allowedOrigins:["https://malicious.example"]},
   ])assert.throws(()=>parseConfig(entry));
 });
+test("Only whitelisted optional OPC UA diagnostics may be observed",()=>{
+  const c=config();
+  c.observe={SM_Cycle_State:"ns=2;s=Gear.State",
+    Fault_Code:"ns=2;s=Gear.Fault","CTN_Lubeflo.ACC":"ns=2;s=Gear.Counter"};
+  assert.doesNotThrow(()=>parseConfig(c));
+  c.observe.UnknownTag="ns=2;s=Other";
+  assert.throws(()=>parseConfig(c),/no autorizado/);
+  delete c.observe.UnknownTag;
+  c.observe.Fault_Code="garbled";
+  assert.throws(()=>parseConfig(c),/NodeId de observación inválido/);
+});
+
 test("Explicit write arming checks all mapped inputs",()=>{
   const c=config();
   c.allowWrites=true;
