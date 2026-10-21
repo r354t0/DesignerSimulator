@@ -496,13 +496,18 @@ export default function App() {
   // No CCW routines/UDFB are simulated here. PAUSE, STOP and other scenes freeze
   // this plant model. Changes to sensors are fed to the existing scan adapter.
   useEffect(()=>{
-    if(practiceMode!=="running"||activeControllerScene.current!=="gear")return;
+    if(activeControllerScene.current!=="gear")return;
+    if(gearControllerSourceRef.current==="virtual"&&practiceMode!=="running")return;
     const id=window.setInterval(()=>{
       const plc=scanRef.current;
       const physical=gearPhysicalRef.current;
-      if(plc.mode!=="running"||activeControllerScene.current!=="gear"||!physical.enabled)return;
-      const getOutput=(name:string)=>plc.project.tags.some(t=>
-        t.name===name&&t.type==="BOOL"&&t.value===true);
+      if(activeControllerScene.current!=="gear"||!physical.enabled)return;
+      const real=gearControllerSourceRef.current==="opcua";
+      if(real&&!gearOpcStatusRef.current.connected)return;
+      if(!real&&plc.mode!=="running")return;
+      const getOutput=(name:string)=>real?
+        gearOpcOutputsRef.current[name]===true:plc.project.tags.some(t=>
+          t.name===name&&t.type==="BOOL"&&t.value===true);
       const next=stepGearPhysical(physical,{
         pumpSolenoid:getOutput("_310_SV_2560"),
         lubricantSolenoid:getOutput("_310_SV_2561"),
@@ -510,6 +515,25 @@ export default function App() {
       },50);
       if(next!==physical)changeGearPhysical(()=>next);
       const sensor=gearPhysicalSensors(next);
+      if(real){
+        for(const name of ["_310_PI_2561","_310_PI_2560",
+          "_310_SQS_2561","_310_LSL"] as const){
+          const value=sensor[name];
+          if(gearOpcInputsSent.current[name]!==value&&
+            gearOpcClientRef.current?.sendInput(name,value))
+            gearOpcInputsSent.current[name]=value;
+        }
+        changeScan(state=>{
+          let project=state.project;
+          for(const name of ["_310_PI_2561","_310_PI_2560",
+            "_310_SQS_2561","DI_PDB","_310_LSL"] as const){
+            if(project.tags.find(t=>t.name===name)?.value!==sensor[name])
+              project=setTagValue(project,name,sensor[name]);
+          }
+          return project===state.project?state:{...state,project};
+        });
+        return;
+      }
       changeScan(state=>{
         if(state.mode!=="running"||activeControllerScene.current!=="gear")return state;
         let result=state;
@@ -528,7 +552,7 @@ export default function App() {
       });
     },50);
     return ()=>window.clearInterval(id);
-  },[practiceMode,simulationTab,changeGearPhysical,changeScan]);
+  },[practiceMode,simulationTab,gearControllerSource,changeGearPhysical,changeScan]);
 
   // Advance the five fixed demo rungs with elapsed milliseconds, independent of
   // React render frequency. This is NOT a controller-quality real-time scan.
@@ -578,11 +602,27 @@ export default function App() {
   },[changeGearPhysical]);
   const setGearPushButton=useCallback((tag:GearPushButton,value:boolean)=>{
     if(activeControllerScene.current!=="gear")return;
+    if(gearControllerSourceRef.current==="opcua"){
+      if(!gearOpcClientRef.current?.sendInput(tag,value))return;
+      changeScan(state=>({
+        ...state,project:setTagValue(state.project,tag,value),
+      }));
+      return;
+    }
     changeScan(state=>applyMomentaryBoolInput(state,tag,value,true));
   },[changeScan]);
   const setGearDigitalInput=useCallback((tag:GearDigitalInput,value:boolean)=>{
     if(activeControllerScene.current!=="gear")return;
     if(gearPhysicalRef.current.enabled&&tag!=="_310_PLC104_YI_MillRun")return;
+    if(gearControllerSourceRef.current==="opcua"){
+      if(!gearOpcClientRef.current?.sendInput(tag,value))return;
+      changeScan(state=>{
+        let project=setTagValue(state.project,tag,value);
+        if(tag==="_310_SQS_2561")project=setTagValue(project,"DI_PDB",value);
+        return {...state,project};
+      });
+      return;
+    }
     changeScan(state=>{
       const sampled=applySceneSensorBoolInput(state,tag,value);
       // SQS is the physical terminal. DI_PDB is the cycle counter input.
@@ -595,6 +635,8 @@ export default function App() {
     if(activeControllerScene.current!=="gear")return;
     if(gearPhysicalRef.current.enabled&&
       (tag==="_310_PI_2561"||tag==="_310_PI_2560"))return;
+    if(gearControllerSourceRef.current==="opcua"&&
+      !gearOpcClientRef.current?.sendInput(tag,value))return;
     changeScan(state=>changePracticeScanProject(state,
       writeGearScadaInput(state.project,tag,value)));
   },[changeScan]);
@@ -808,8 +850,14 @@ export default function App() {
     else if (simulationTab === "gear") prepareGear();
   }, [simulationTab, prepareConveyor, prepareSort, prepareTank, prepareTraffic, prepareBatch, prepareGear]);
 
-  const startPractice = useCallback(() =>
-    changeScan(startPracticeScans), [changeScan]);
+  const startPractice = useCallback(()=>{
+    if(activeControllerScene.current==="gear"&&
+      gearControllerSourceRef.current==="opcua"){
+      window.alert("En modo OPC UA, RUN/STOP corresponden al Micro850 real. No se puede ejecutar Ladder virtual.");
+      return;
+    }
+    changeScan(startPracticeScans);
+  },[changeScan]);
   const stopPractice = useCallback(() =>
     changeScan(stopPracticeScans),[changeScan]);
   const pausePractice = useCallback(() =>
@@ -860,6 +908,9 @@ export default function App() {
       "Se detendrá el PLC y se perderán los cambios del Ladder, tags, "+
       "alarmas, contadores y modelo físico de esta escena."
     ))return;
+    disconnectGearOpc();
+    gearControllerSourceRef.current="virtual";
+    setGearControllerSource("virtual");
     changeScan(state=>({
       ...initialPracticeScanState(createGearCompleteProject()),
       scanPeriodMs:state.scanPeriodMs,
@@ -867,7 +918,7 @@ export default function App() {
     changeGearPhysical(()=>initialGearPhysicalState());
     setGearSetupError(null);
     openEditorView("practice");
-  },[changeScan,changeGearPhysical,openEditorView]);
+  },[changeScan,changeGearPhysical,openEditorView,disconnectGearOpc]);
 
   const loadBatchSolution=useCallback((exercise:BatchExercise)=>{
     if(activeControllerScene.current!=="batch")return;
