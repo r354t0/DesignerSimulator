@@ -56,7 +56,8 @@ export class GearOpcUaClient {
         });
       }else if(validGearOpcOutputSnapshot(message)){
         this.lastSnapshotTs=Date.now();
-        this.update({lastUpdate:this.lastSnapshotTs,connected:true});
+        this.update({lastUpdate:this.lastSnapshotTs,connected:true,
+          observedTags:Object.keys(message.diagnostics??{})});
         this.onSnapshot(message);
       }else if(value.type==="error"){
         this.update({detail:typeof value.message==="string"?value.message:"Error OPC UA"});
