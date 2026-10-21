@@ -26,6 +26,11 @@ import { TrafficScene } from "./components/ide/TrafficScene";
 import { BatchMixerScene } from "./components/ide/BatchMixerScene";
 import { GearSprayScene } from "./components/ide/GearSprayScene";
 import {
+  GEAR_OPC_OUTPUT_TAGS, GEAR_OPC_DEFAULT_SOCKET, initialGearOpcStatus,
+  type GearControllerSource,type GearOpcStatus,
+} from "./plc/gearOpcUaBridge.ts";
+import {GearOpcUaClient} from "./plc/gearOpcUaClient.ts";
+import {
   prepareGearSprayTags, writeGearScadaInput,
   type GearPushButton, type GearDigitalInput, type GearAnalogInput,
   type GearSetpoint,
@@ -159,11 +164,12 @@ export default function App() {
     }
   }, []);
   useEffect(() => {
-    if (practiceMode !== "running") return;
+    if (practiceMode !== "running"||
+      (activeControllerScene.current==="gear"&&!gearVirtualScan))return;
     const id = window.setInterval(() => changeScan(tickPracticeScan),
       scanState.scanPeriodMs);
     return () => window.clearInterval(id);
-  }, [practiceMode, scanState.scanPeriodMs, changeScan]);
+  }, [practiceMode, scanState.scanPeriodMs, changeScan, gearVirtualScan]);
   const practiceIdCounter = useRef(1);
   const nextPracticeId = useCallback((prefix: string) => `${prefix}-${++practiceIdCounter.current}`, []);
   const [online, setOnline] = useState(false);
@@ -209,6 +215,29 @@ export default function App() {
   const [gearSetupError, setGearSetupError] = useState<string | null>(null);
   const [gearPhysical,setGearPhysical]=useState<GearPhysicalState>(initialGearPhysicalState);
   const gearPhysicalRef=useRef(gearPhysical);
+  const [gearControllerSource,setGearControllerSource]=
+    useState<GearControllerSource>("virtual");
+  const gearControllerSourceRef=useRef<GearControllerSource>("virtual");
+  const [gearOpcStatus,setGearOpcStatus]=
+    useState<GearOpcStatus>(initialGearOpcStatus);
+  const [gearOpcSocketUrl,setGearOpcSocketUrl]=
+    useState(GEAR_OPC_DEFAULT_SOCKET);
+  const gearOpcClientRef=useRef<GearOpcUaClient|null>(null);
+  const gearOpcOutputsRef=useRef<Record<string,boolean>>({});
+  const gearOpcInputsSent=useRef<Record<string,boolean|number>>({});
+  const gearOpcStatusRef=useRef<GearOpcStatus>(initialGearOpcStatus());
+  const gearVirtualScan=gearControllerSource==="virtual";
+  const setOpcStatus=useCallback((next:GearOpcStatus)=>{
+    gearOpcStatusRef.current=next;
+    setGearOpcStatus(next);
+  },[]);
+  const disconnectGearOpc=useCallback(()=>{
+    gearOpcClientRef.current?.disconnect();
+    gearOpcOutputsRef.current={};
+    gearOpcInputsSent.current={};
+    setOpcStatus(initialGearOpcStatus());
+  },[setOpcStatus]);
+
   const changeGearPhysical=useCallback((operation:(state:GearPhysicalState)=>GearPhysicalState)=>{
     const next=operation(gearPhysicalRef.current);
     if(next!==gearPhysicalRef.current){
@@ -238,6 +267,7 @@ export default function App() {
       return;
     }
     if (next !== activeControllerScene.current) {
+      if(activeControllerScene.current==="gear")disconnectGearOpc();
       changeScan((current) => {
         const previous = activeControllerScene.current;
         // Switching stops the previous controller, but saves its Ladder,
@@ -248,7 +278,7 @@ export default function App() {
       });
     }
     setSimulationTab(next);
-  }, [simulationTab, changeScan]);
+  }, [simulationTab, changeScan,disconnectGearOpc]);
   const [conveyorTagSetupError, setConveyorTagSetupError] = useState<string | null>(null);
   const [conveyor, setConveyor] = useState<ConveyorState>(initialConveyorState);
   const conveyorRef = useRef(conveyor);
