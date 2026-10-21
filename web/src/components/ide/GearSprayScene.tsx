@@ -367,8 +367,9 @@ function ProcessGraphic({project,physics}: {project:PracticeProject;physics:Gear
   </svg>;
 }
 
-function InfoModal({onClose,onOpenTags,onResetProgram}:{
+function InfoModal({onClose,onOpenTags,onResetProgram,controllerSource}:{
   onClose:()=>void;onOpenTags:()=>void;onResetProgram:()=>void;
+  controllerSource:GearControllerSource;
 }){
   const headings:{title:string;content:readonly typeof GEAR_SCADA_TAGS[number][]}[]=[
     {title:"Entradas de campo",content:GEAR_FIELD_INPUTS},
@@ -423,6 +424,11 @@ function InfoModal({onClose,onOpenTags,onResetProgram}:{
           </div>
         </section>)}
       </div>
+      {controllerSource==="opcua"&&<p className="mt-3 rounded border border-sky-800 bg-[#0f2434] p-2 text-[11px] text-sky-100">
+        El modo Micro850 real lee y escribe mediante OPC UA. El botón
+        «Reiniciar programa» solo reinicia la copia virtual y desconecta el gateway;
+        NO modifica el Ladder, RUN/STOP ni la memoria del PLC físico.
+      </p>}
       <div className="mt-4 flex flex-wrap items-center gap-2">
         <button type="button" onClick={()=>{onClose();onOpenTags();}}
           className="rounded border border-sky-600 px-3 py-2 text-xs text-sky-200 hover:bg-sky-900">
@@ -853,6 +859,7 @@ export function GearSprayScene({project,mode,onResetProgram,
       </aside>
     </div>
     {openInfo&&<InfoModal onClose={()=>setOpenInfo(false)}
-      onResetProgram={onResetProgram} onOpenTags={onOpenTags}/>} 
+      onResetProgram={onResetProgram} controllerSource={controllerSource}
+      onOpenTags={onOpenTags}/>} 
   </div>;
 }
