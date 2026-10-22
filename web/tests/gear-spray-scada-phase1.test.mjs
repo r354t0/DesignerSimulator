@@ -146,8 +146,10 @@ test("App adds Gear Spray as independent programming scene and restores its scan
   assert.match(app,/<GearSprayScene project=\{practice\} mode=\{practiceMode\}/);
   assert.match(app,/prepareGearSprayTags\(state\.project\)/);
   assert.match(app,/changeScan\(state=>applyMomentaryBoolInput\(state,tag,value,true\)\)/);
-  assert.match(app,/const sampled=applySceneSensorBoolInput\(state,tag,value\)/);
-  assert.match(app,/applySceneSensorBoolInput\(sampled,"DI_PDB",value\)/);
+  assert.match(app,/changeScan\(state=>applySceneSensorBoolInput\(state,tag,value\)\)/);
+  assert.match(app,/applySceneSensorBoolInput\(sampled,"DI_PDB",true\)/);
+  assert.match(app,/applySceneSensorBoolInput\(sampled,"DI_PDB",false\)/);
+  assert.match(app,/gearSqsPulseTimer\.current=setTimeout/);
   assert.match(app,/writeGearScadaInput\(state\.project,tag,value\)/);
   const tags=source("../src/components/ide/ControllerTags.tsx");
   assert.match(tags,/activeScene === "gear" \? "MainRoutine · Gear Spray"/);
