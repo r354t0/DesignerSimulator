@@ -697,20 +697,12 @@ export default function App() {
     }
     if(gearControllerSourceRef.current==="opcua"){
       if(!gearOpcClientRef.current?.sendInput(tag,value))return;
-      changeScan(state=>{
-        let project=setTagValue(state.project,tag,value);
-        if(tag==="_310_SQS_2561")project=setTagValue(project,"DI_PDB",value);
-        return {...state,project};
-      });
+      changeScan(state=>({
+        ...state,project:setTagValue(state.project,tag,value),
+      }));
       return;
     }
-    changeScan(state=>{
-      const sampled=applySceneSensorBoolInput(state,tag,value);
-      // SQS is the physical terminal. DI_PDB is the cycle counter input.
-      // DI_PDB_2 was a discarded test tag; never register or sample it.
-      return tag==="_310_SQS_2561"&&sampled.project.tags.some(t=>t.name==="DI_PDB")
-        ?applySceneSensorBoolInput(sampled,"DI_PDB",value):sampled;
-    });
+    changeScan(state=>applySceneSensorBoolInput(state,tag,value));
   },[changeScan]);
   const setGearNumber=useCallback((tag:GearAnalogInput|GearSetpoint,value:number)=>{
     if(activeControllerScene.current!=="gear")return;
