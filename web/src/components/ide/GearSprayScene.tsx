@@ -743,7 +743,7 @@ export function GearSprayScene({project,mode,onResetProgram,
                   className="mt-0.5 accent-sky-500"/>
                 <span className="min-w-0 break-words text-slate-200">
                   {x.name==="_310_PLC104_YI_MillRun"?"Confirmación de molino en marcha":
-                    x.name==="_310_SQS_2561"?"Pulso del dosificador":
+                    x.name==="_310_SQS_2561"?"Pulso del dosificador (100 ms)":
                     "Sensor de nivel bajo de lubricante"}{" "}
                   <span className="font-mono text-sky-300">({x.name})</span>
                 </span>
