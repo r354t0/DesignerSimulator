@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import {readFileSync} from "node:fs";
 import {
   initialGearPhysicalState, configureGearPhysical, stepGearPhysical,
-  gearPhysicalSensors, gearSprayIsActive,
+  gearPhysicalSensors, gearSprayIsActive,GEAR_PULSE_HIGH_MS,
+  GEAR_PULSE_PERIOD_MS,
 } from "../src/plc/gearSprayPhysics.ts";
 
 const outputs={pumpSolenoid:false,lubricantSolenoid:false,atomizationSolenoid:false};
@@ -53,6 +54,45 @@ test("Lube pulses and level consumption require SV-2561 and sufficient pressure"
   state=advance(state,pumped,2);
   assert.equal(state.totalPulses,count);
   assert.equal(state.pulseHigh,false);
+});
+
+test("Each automatic SQS-2561 edge is HIGH exactly 100 ms and LOW before next 500 ms pulse",()=>{
+  assert.equal(GEAR_PULSE_HIGH_MS,100);
+  assert.equal(GEAR_PULSE_PERIOD_MS,500);
+  let state=advance(configureGearPhysical(initialGearPhysicalState(),{enabled:true}),flowing,6);
+  // Reconnect a new pumping cycle without relying on the browser scheduler.
+  state={...state,doserPhaseMs:0,pulseHigh:false,pulseRemainingMs:0,totalPulses:0};
+  const trace=[];
+  for(let t=50;t<=1200;t+=50){
+    state=stepGearPhysical(state,flowing,50);
+    trace.push({t,high:gearPhysicalSensors(state)._310_SQS_2561,
+      count:state.totalPulses});
+  }
+  for(const start of [500,1000]){
+    assert.deepEqual(trace.filter(x=>x.t>=start&&x.t<start+100).map(x=>x.high),
+      [true,true],"100 ms means TWO 50 ms physical samples");
+    assert.equal(trace.find(x=>x.t===start+100).high,false,
+      "Pulse must automatically return to LOW");
+  }
+  assert.equal(trace.at(-1).count,2);
+});
+
+test("SQS-2561 completes its 100 ms even when dosing valve closes after rising edge",()=>{
+  let state=advance(configureGearPhysical(initialGearPhysicalState(),{enabled:true}),flowing,6);
+  state={...state,doserPhaseMs:450,pulseHigh:false,pulseRemainingMs:0};
+  state=stepGearPhysical(state,flowing,50);
+  assert.equal(state.pulseHigh,true);
+  assert.equal(state.pulseRemainingMs,100);
+  state=stepGearPhysical(state,pumped,50);
+  assert.equal(state.pulseHigh,true,
+    "Falling valve edge must not truncate the already-triggered high");
+  state=stepGearPhysical(state,pumped,50);
+  assert.equal(state.pulseHigh,false);
+  assert.equal(state.pulseRemainingMs,0);
+  const off=configureGearPhysical({...state,pulseHigh:true,pulseRemainingMs:25},{
+    enabled:false,
+  });
+  assert.equal(off.pulseHigh,false,"Disabling simulation clears a held sensor");
 });
 
 test("Loss of air, clogged filter and doser jam prevent new pulses",()=>{
