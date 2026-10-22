@@ -225,6 +225,23 @@ export default function App() {
   const gearOpcClientRef=useRef<GearOpcUaClient|null>(null);
   const gearOpcOutputsRef=useRef<Record<string,boolean>>({});
   const gearOpcInputsSent=useRef<Record<string,boolean|number>>({});
+  const gearSqsPulseTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  const releaseGearSqsPulse=useCallback(()=>{
+    if(gearSqsPulseTimer.current===null)return;
+    clearTimeout(gearSqsPulseTimer.current);
+    gearSqsPulseTimer.current=null;
+    gearOpcClientRef.current?.sendInput("_310_SQS_2561",false);
+    changeScan(state=>{
+      let project=state.project;
+      for(const tag of ["_310_SQS_2561","DI_PDB"] as const){
+        if(project.tags.find(t=>t.name===tag)?.value===true)
+          project=setTagValue(project,tag,false);
+      }
+      return project===state.project?state:{...state,project};
+    });
+  },[changeScan]);
+  useEffect(()=>()=>{if(gearSqsPulseTimer.current!==null)
+    clearTimeout(gearSqsPulseTimer.current);},[]);
   const gearOpcStatusRef=useRef<GearOpcStatus>(initialGearOpcStatus());
     const setOpcStatus=useCallback((next:GearOpcStatus)=>{
     gearOpcStatusRef.current=next;
@@ -261,11 +278,12 @@ export default function App() {
   // update field output tags; no local Ladder scan occurs in OPC UA mode.
   const setGearController=useCallback((source:GearControllerSource)=>{
     if(activeControllerScene.current!=="gear")return;
+    releaseGearSqsPulse();
     disconnectGearOpc();
     changeScan(stopPracticeScans);
     gearControllerSourceRef.current=source;
     setGearControllerSource(source);
-  },[changeScan,disconnectGearOpc]);
+  },[changeScan,disconnectGearOpc,releaseGearSqsPulse]);
 
   const connectGearOpc=useCallback(()=>{
     if(activeControllerScene.current!=="gear"||
@@ -331,7 +349,10 @@ export default function App() {
       return;
     }
     if (next !== activeControllerScene.current) {
-      if(activeControllerScene.current==="gear")disconnectGearOpc();
+      if(activeControllerScene.current==="gear"){
+        releaseGearSqsPulse();
+        disconnectGearOpc();
+      }
       changeScan((current) => {
         const previous = activeControllerScene.current;
         // Switching stops the previous controller, but saves its Ladder,
@@ -342,7 +363,7 @@ export default function App() {
       });
     }
     setSimulationTab(next);
-  }, [simulationTab, changeScan,disconnectGearOpc]);
+  }, [simulationTab, changeScan,disconnectGearOpc,releaseGearSqsPulse]);
   const [conveyorTagSetupError, setConveyorTagSetupError] = useState<string | null>(null);
   const [conveyor, setConveyor] = useState<ConveyorState>(initialConveyorState);
   const conveyorRef = useRef(conveyor);
@@ -621,8 +642,9 @@ export default function App() {
   const setGearPhysicalConfig=useCallback((patch:Partial<Pick<GearPhysicalState,
     "enabled"|"airSupply"|"drumPercent"|"pressureDecayFactor"|"airLoss"|"filterBlocked"|"doserBlocked">>)=>{
     if(activeControllerScene.current!=="gear")return;
+    if(patch.enabled===true)releaseGearSqsPulse();
     changeGearPhysical(state=>configureGearPhysical(state,patch));
-  },[changeGearPhysical]);
+  },[changeGearPhysical,releaseGearSqsPulse]);
   const resetGearPhysical=useCallback(()=>{
     if(activeControllerScene.current!=="gear")return;
     changeGearPhysical(state=>({...initialGearPhysicalState(),enabled:state.enabled}));
@@ -641,6 +663,38 @@ export default function App() {
   const setGearDigitalInput=useCallback((tag:GearDigitalInput,value:boolean)=>{
     if(activeControllerScene.current!=="gear")return;
     if(gearPhysicalRef.current.enabled&&tag!=="_310_PLC104_YI_MillRun")return;
+    // SQS is an impulse sensor, not a maintained digital input.
+    // A manual activation always generates ONE 100 ms pulse, then returns LOW.
+    if(tag==="_310_SQS_2561"){
+      if(!value||gearSqsPulseTimer.current!==null)return;
+      const real=gearControllerSourceRef.current==="opcua";
+      if(real&&!gearOpcClientRef.current?.sendInput(tag,true))return;
+      changeScan(state=>{
+        if(real){
+          let project=setTagValue(state.project,tag,true);
+          project=setTagValue(project,"DI_PDB",true);
+          return {...state,project};
+        }
+        const sampled=applySceneSensorBoolInput(state,tag,true);
+        return applySceneSensorBoolInput(sampled,"DI_PDB",true);
+      });
+      gearSqsPulseTimer.current=setTimeout(()=>{
+        gearSqsPulseTimer.current=null;
+        if(activeControllerScene.current!=="gear")return;
+        if(gearControllerSourceRef.current==="opcua")
+          gearOpcClientRef.current?.sendInput(tag,false);
+        changeScan(state=>{
+          if(gearControllerSourceRef.current==="opcua"){
+            let project=setTagValue(state.project,tag,false);
+            project=setTagValue(project,"DI_PDB",false);
+            return {...state,project};
+          }
+          const sampled=applySceneSensorBoolInput(state,tag,false);
+          return applySceneSensorBoolInput(sampled,"DI_PDB",false);
+        });
+      },100);
+      return;
+    }
     if(gearControllerSourceRef.current==="opcua"){
       if(!gearOpcClientRef.current?.sendInput(tag,value))return;
       changeScan(state=>{
@@ -935,6 +989,7 @@ export default function App() {
       "Se detendrá el PLC y se perderán los cambios del Ladder, tags, "+
       "alarmas, contadores y modelo físico de esta escena."
     ))return;
+    releaseGearSqsPulse();
     disconnectGearOpc();
     gearControllerSourceRef.current="virtual";
     setGearControllerSource("virtual");
@@ -945,7 +1000,7 @@ export default function App() {
     changeGearPhysical(()=>initialGearPhysicalState());
     setGearSetupError(null);
     openEditorView("practice");
-  },[changeScan,changeGearPhysical,openEditorView,disconnectGearOpc]);
+  },[changeScan,changeGearPhysical,openEditorView,disconnectGearOpc,releaseGearSqsPulse]);
 
   const loadBatchSolution=useCallback((exercise:BatchExercise)=>{
     if(activeControllerScene.current!=="batch")return;
