@@ -15,6 +15,7 @@ import {
 } from "node-opcua";
 import {parseConfig,writeValueForTag,parseOutputs,normaliseInput,OBSERVE_TYPES}
   from "./validation.mjs";
+import {writeSqsPulse100} from "./sqsPulse.mjs";
 
 const configPath=process.env.GEAR_OPCUA_CONFIG ||
   resolve(process.cwd(),"config.json");
@@ -57,6 +58,7 @@ let live=false;
 let closed=false;
 let writing=Promise.resolve();
 let queueSize=0;
+let sqsPulseActive=false;
 
 server.on("connection",(ws)=>{
   clients.add(ws);
@@ -78,22 +80,39 @@ server.on("connection",(ws)=>{
     if(queueSize>=100){
       ws.send(JSON.stringify({type:"error",message:"Cola OPC UA saturada"}));return;
     }
+    const isSqs=m.tag==="_310_SQS_2561";
+    // One rising edge schedules HIGH -> 100 ms -> LOW in the gateway.
+    // Browser LOW updates cannot shorten the pulse; repeated HIGH is ignored.
+    if(isSqs&&sqsPulseActive)return;
+    if(isSqs&&value===true)sqsPulseActive=true;
     queueSize++;
     const sessionForWrite=session;
     writing=writing.catch(()=>{}).then(async()=>{
       if(!live||session!==sessionForWrite||
         ws.readyState!==WebSocket.OPEN)return;
-      const result=await sessionForWrite.write({
-        nodeId:config.write[m.tag],attributeId:AttributeIds.Value,
-        value:{value:writeValueForTag(m.tag,value,DataType)},
-      });
-      if(!String(result).startsWith("Good"))
-        throw Error("OPC UA escritura rechazada: "+result);
+      const write=async(nextValue)=>{
+        const result=await sessionForWrite.write({
+          nodeId:config.write[m.tag],attributeId:AttributeIds.Value,
+          value:{value:writeValueForTag(m.tag,nextValue,DataType)},
+        });
+        if(!String(result).startsWith("Good"))
+          throw Error("OPC UA escritura rechazada: "+result);
+      };
+      if(isSqs&&value===true){
+        // Pulse timing is anchored to a successful OPC UA HIGH write,
+        // independently from Vite/browser rendering or 50ms physics ticks.
+        await writeSqsPulse100(()=>write(true),()=>write(false));
+      }else{
+        await write(value);
+      }
     }).catch(err=>{
       if(ws.readyState===WebSocket.OPEN)ws.send(JSON.stringify({
         type:"error",message:"Error escribiendo "+m.tag+": "+err.message,
       }));
-    }).finally(()=>{queueSize--;});
+    }).finally(()=>{
+      queueSize--;
+      if(isSqs&&value===true)sqsPulseActive=false;
+    });
   });
   ws.on("close",()=>clients.delete(ws));
   ws.on("error",()=>clients.delete(ws));
