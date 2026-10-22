@@ -120,6 +120,30 @@ escribe solo las entradas correspondientes cuando `allowWrites=true`.
    desconexión y limpiar salidas visibles; verificar **separadamente** el
    watchdog y el estado seguro en CCW.
 
+## SQS-2561: pulso automático de 100 ms
+
+El sensor `_310_SQS_2561` es una señal momentánea (BOOL), no un interruptor
+enclavado. Su flanco de subida representa una actuación del dosificador.
+
+- **Modelo físico:** genera un pulso alto de **100 ms** por dosis, con
+  intervalo nominal de **500 ms** entre dosificaciones consecutivas. Si la
+  válvula de lubricante se cierra durante el pulso, se completa igualmente
+  el tiempo alto ya iniciado.
+- **Entrada manual:** marcar «Pulso del dosificador (100 ms)» genera
+  automáticamente `TRUE → FALSE` después de 100 ms. No es necesario
+  desmarcarlo. Reiniciar o abandonar la escena cancela ese pulso.
+- **Micro850 real por OPC UA:** el gateway transforma cada activación
+  en una escritura `TRUE`, espera **100 ms desde la confirmación de
+  escritura OPC UA**, y escribe `FALSE` sobre el NodeId configurado de
+  `_310_SQS_2561`. Ignora solicitudes de bajar o repetir el pulso
+  mientras esté activo, evitando truncamientos por el navegador.
+- Este intervalo es **nominal**: Node.js, OPC UA y Windows no son
+  temporizadores de tiempo real. Confirma el ancho observado en CCW,
+  especialmente si el PLC o FactoryTalk tienen ciclos largos. Si
+  necesitas una garantía temporal industrial, incorpora un TON/TP o un
+  contador/flanco en el Micro850 y asigna al gateway únicamente el evento
+  de activación. El pulso no constituye una señal de seguridad.
+
 ## Restricciones importantes
 
 - **READ** del PLC: `_310_SV_2560`, `_310_SV_2561`,
