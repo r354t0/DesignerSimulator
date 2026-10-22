@@ -21,6 +21,8 @@ export interface GearPhysicalState {
   lubePressure:number;
   doserPhaseMs:number;
   pulseHigh:boolean;
+  /** Remaining high time for a doser pulse; independent of valve falling edge. */
+  pulseRemainingMs:number;
   totalPulses:number;
   airLoss:boolean;
   filterBlocked:boolean;
@@ -37,7 +39,7 @@ export function initialGearPhysicalState():GearPhysicalState {
   return {
     enabled:false, airSupply:100, drumPercent:100,pressureDecayFactor:1,
     airPressure:0, lubePressure:0, doserPhaseMs:0, pulseHigh:false,
-    totalPulses:0, airLoss:false, filterBlocked:false, doserBlocked:false,
+    pulseRemainingMs:0,totalPulses:0, airLoss:false, filterBlocked:false, doserBlocked:false,
   };
 }
 const round1=(x:number)=>Math.round(x*10)/10;
@@ -51,6 +53,8 @@ export function configureGearPhysical(
 ):GearPhysicalState {
   return {...state,
     ...config,
+    ...(config.enabled===false?
+      {pulseHigh:false,pulseRemainingMs:0,doserPhaseMs:0}:{}),
     airSupply:round1(limit(config.airSupply??state.airSupply,0,GEAR_AIR_MAX)),
     drumPercent:round1(limit(config.drumPercent??state.drumPercent,0,100)),
     pressureDecayFactor:Math.round(100*limit(
@@ -86,11 +90,16 @@ export function stepGearPhysical(
   let phase=canDose?state.doserPhaseMs+ms:0;
   const pulses=canDose?Math.floor(phase/GEAR_PULSE_PERIOD_MS):0;
   phase=canDose?phase%GEAR_PULSE_PERIOD_MS:0;
-  const pulseHigh=canDose&&phase<GEAR_PULSE_HIGH_MS&&
-    (pulses>0||state.totalPulses>0||state.doserPhaseMs>0);
+  // A completed dose starts a full 100 ms high pulse. Once triggered,
+  // it finishes even if the valve drops out, the drum runs low or a
+  // fault is injected before the next physical tick.
+  const pulseRemainingMs=pulses>0
+    ?Math.max(0,GEAR_PULSE_HIGH_MS-phase)
+    :Math.max(0,state.pulseRemainingMs-ms);
+  const pulseHigh=pulseRemainingMs>0;
   const drumPercent=round1(limit(state.drumPercent-pulses*0.2,0,100));
   return {...state,airPressure,lubePressure,
-    doserPhaseMs:phase,pulseHigh,
+    doserPhaseMs:phase,pulseHigh,pulseRemainingMs,
     totalPulses:state.totalPulses+pulses,drumPercent};
 }
 
