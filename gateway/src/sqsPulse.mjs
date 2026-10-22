@@ -1,13 +1,15 @@
-/** Retain SQS-2561 HIGH for 100 ms after the UA write has completed.
- * The caller serializes this write pair. Browser LOW updates are ignored
- * while the one-shot is in flight, so UI jitter cannot truncate it.
+/** Guarantee a HIGH -> 100 ms -> LOW write sequence for SQS-2561.
+ * Calling gateway serializes each pair. The PLC sees a nominal 100 ms pulse;
+ * UA transport scheduling can introduce additional physical timing jitter.
+ * @param {() => Promise<void>} writeHigh
+ * @param {() => Promise<void>} writeLow
+ * @param {(ms:number) => Promise<void>} wait
  */
 export const SQS_PULSE_HIGH_MS=100;
 export async function writeSqsPulse100(
-  writeHigh:()=>Promise<void>,
-  writeLow:()=>Promise<void>,
-  wait:(ms:number)=>Promise<void>=ms=>new Promise(resolve=>setTimeout(resolve,ms)),
-):Promise<void>{
+  writeHigh,writeLow,
+  wait=ms=>new Promise(resolve=>setTimeout(resolve,ms)),
+){
   await writeHigh();
   try{
     await wait(SQS_PULSE_HIGH_MS);
