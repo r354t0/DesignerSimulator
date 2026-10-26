@@ -120,12 +120,46 @@ escribe solo las entradas correspondientes cuando `allowWrites=true`.
    desconexión y limpiar salidas visibles; verificar **separadamente** el
    watchdog y el estado seguro en CCW.
 
+## Física HIL sin depender del navegador
+
+**Problema resuelto:** cuando el navegador pasaba a segundo plano, Chrome podía
+reducir la frecuencia de `setInterval` y detener la producción de pulsos PDB.
+Con un Micro850 real, ahora el proceso `node src/server.mjs` mantiene el
+modelo físico y el dosificador, con su propio temporizador nominal de 50 ms.
+
+- En modo **PLC virtual**, el simulador conserva su modelo físico en el navegador.
+- En modo **Micro850 real · OPC UA**, el navegador solo envía `physical-config`
+  (encender física, nivel del tambor, aire, fallas y factor de caída) o
+  `physical-reset`. El gateway calcula presiones y nivel a partir de las
+  salidas recibidas con calidad Good desde el Micro850 y publica telemetría
+  `physical` de vuelta a DesignerSimulator.
+- El gateway crea pulsos `_310_SQS_2561` de **100 ms** por cada dosis,
+  separados nominalmente **500 ms**, y los escribe directamente al PLC.
+  No recibe órdenes de pulso desde el reloj del navegador en este modo.
+- La física sigue funcionando si cambias de pestaña **o cierras la pestaña**,
+  siempre que el proceso Node.js continúe ejecutándose, el OPC UA esté
+  conectado y `allowWrites: true` con todos los NodeIds válidos.
+- **Para detenerla**, regresa a DesignerSimulator, pulsa Conectar OPC UA
+  si es necesario y **desmarca Simulación física automática**. También
+  puedes detener Node.js con Ctrl+C; el PLC debe contar con un watchdog
+  independiente y estado seguro ante pérdida de comunicación.
+- Ante calidad Bad, error de servidor UA, pérdida de sesión o inicio sin
+  permiso de escritura, el gateway deshabilita la física y no genera
+  pulsos. Después de recuperar OPC UA debes habilitarla nuevamente.
+- Solo un controlador gobierna la planta: el motor Ladder local no genera
+  física ni pulsos cuando está seleccionado Micro850 real.
+
+**Limitación temporal:** Node.js y OPC UA sobre Windows no garantizan tiempos
+duros de 100 ms. Un contador o flanco retenido en el Micro850 sigue siendo
+recomendable para FAT industrial. Verifica en CCW que
+`CTN_Lubeflo.ACC` cuenta cada activación también con Chrome minimizado.
+
 ## SQS-2561: pulso automático de 100 ms
 
 El sensor `_310_SQS_2561` es una señal momentánea (BOOL), no un interruptor
 enclavado. Su flanco de subida representa una actuación del dosificador.
 
-- **Modelo físico:** genera un pulso alto de **100 ms** por dosis, con
+- **Modelo físico (virtual y real):** genera un pulso alto de **100 ms** por dosis, con
   intervalo nominal de **500 ms** entre dosificaciones consecutivas. Si la
   válvula de lubricante se cierra durante el pulso, se completa igualmente
   el tiempo alto ya iniciado.
