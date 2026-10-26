@@ -634,10 +634,18 @@ export default function App() {
     "enabled"|"airSupply"|"drumPercent"|"pressureDecayFactor"|"airLoss"|"filterBlocked"|"doserBlocked">>)=>{
     if(activeControllerScene.current!=="gear")return;
     if(patch.enabled===true)releaseGearSqsPulse();
+    if(gearControllerSourceRef.current==="opcua"){
+      gearOpcClientRef.current?.sendPhysicalConfig(patch);
+      return;
+    }
     changeGearPhysical(state=>configureGearPhysical(state,patch));
   },[changeGearPhysical,releaseGearSqsPulse]);
   const resetGearPhysical=useCallback(()=>{
     if(activeControllerScene.current!=="gear")return;
+    if(gearControllerSourceRef.current==="opcua"){
+      gearOpcClientRef.current?.sendPhysicalReset();
+      return;
+    }
     changeGearPhysical(state=>({...initialGearPhysicalState(),enabled:state.enabled}));
   },[changeGearPhysical]);
   const setGearPushButton=useCallback((tag:GearPushButton,value:boolean)=>{
