@@ -136,6 +136,25 @@ server.on("connection",(ws)=>{
     try{m=JSON.parse(String(raw));}catch{
       ws.send(JSON.stringify({type:"error",message:"JSON inválido"}));return;
     }
+    if(m&&(m.type==="physical-config"||m.type==="physical-reset")){
+      if(!canWrite()){
+        ws.send(JSON.stringify({type:"error",message:
+          "La física HIL requiere OPC UA conectado y escrituras autorizadas"}));
+        return;
+      }
+      try{
+        if(m.type==="physical-reset")resetHil(true);
+        else {
+          hil=configureHilPhysical(hil,m.patch);
+          if(!hil.enabled)lastSentSensors={};
+          reportHil();
+          console.log("Simulación HIL:",hil.enabled?"ACTIVA":"DETENIDA");
+        }
+      }catch(err){
+        ws.send(JSON.stringify({type:"error",message:err.message}));
+      }
+      return;
+    }
     if(!m||m.type!=="input"||typeof m.tag!=="string"){
       ws.send(JSON.stringify({type:"error",message:"Mensaje no permitido"}));return;
     }
@@ -194,6 +213,9 @@ const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
 async function disconnect(){
   live=false;session=null;
+  lastOutputs={};lastReadAt=0;
+  if(hil.enabled)resetHil();
+  // A disconnect does not fabricate any additional doser pulses.
   if(client){
     const old=client;client=null;
     try{await old.disconnect();}catch{/* Already disconnected */}
@@ -231,6 +253,8 @@ async function readOnePass(){
     nodeId,attributeId:AttributeIds.Value,
   })));
   const outputs=parseOutputs(outputNames,values.slice(0,outputNames.length));
+  lastOutputs=outputs;
+  lastReadAt=Date.now();
   const diagnostics={};
   observed.forEach(([name],i)=>{
     const reading=values[outputNames.length+i];
@@ -239,7 +263,7 @@ async function readOnePass(){
       diagnostics[name]=reading.value.value;
     }
   });
-  report({type:"snapshot",outputs,diagnostics,quality:"Good",ts:Date.now()});
+  report({type:"snapshot",outputs,diagnostics,physical:hil,quality:"Good",ts:Date.now()});
 }
 async function main(){
   while(!closed){
@@ -263,6 +287,8 @@ async function main(){
 async function stop(){
   if(closed)return;
   closed=true;live=false;
+  clearInterval(physicalTimer);
+  if(hil.enabled)resetHil();
   report(status("Gateway detenido",false));
   await disconnect();
   for(const ws of clients)ws.close();
