@@ -169,7 +169,9 @@ test("Scene 06 physics only runs under its own PLC RUN and writes input tags onl
   assert.match(scene,/Pérdida de aire/);
   assert.match(scene,/Filtro obstruido/);
   assert.match(scene,/Dosificador atascado/);
-  assert.match(scene,/disabled=\{physics.enabled\}/);
+  // Manual analog sliders are editable when HIL is disabled; only an
+  // unavailable OPC UA gateway blocks them, not an idle physics snapshot.
+  assert.match(scene,/disabled=\{controllerSource==="opcua"&&!opcWritable\}/);
   assert.match(scene,/onPhysicsReset/);
   assert.match(scene,/physics.totalPulses/);
   assert.match(scene,/gearSprayIsActive/);
