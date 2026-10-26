@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {readFileSync} from "node:fs";
 import {
  initialHilPhysical,configureHilPhysical,stepHilPhysical,
  sensorsFromHil,validatePhysicalPatch,SQS_PERIOD_MS,SQS_HIGH_MS,
@@ -49,7 +50,6 @@ test("HIL refuses unauthorized fields and invalid ranges; disable resets active 
  assert.equal(p.doserPhaseMs,0);
 });
 test("Browser is not the physical clock when OPC UA controls Gear Spray",()=>{
- const {readFileSync}=await import("node:fs");
  const app=readFileSync(new URL("../../web/src/App.tsx",import.meta.url),"utf8");
  const loop=app.slice(app.indexOf("// Gear Spray phase 2:"),app.indexOf("// Advance the five fixed demo rungs"));
  assert.match(loop,/gearControllerSourceRef.current!=="virtual"/);
