@@ -1,8 +1,9 @@
 import {
-  GEAR_OPC_DEFAULT_SOCKET, validGearOpcInput,
+  GEAR_OPC_DEFAULT_SOCKET, validGearOpcInput,validGearPhysicalTelemetry,
   validGearOpcOutputSnapshot, initialGearOpcStatus,
   type GearOpcSnapshot,type GearOpcStatus,
 } from "./gearOpcUaBridge.ts";
+import type {GearPhysicalState} from "./gearSprayPhysics.ts";
 
 /** Browser-side bridge: never opens OPC UA TCP. The only peer is a local,
  * origin-restricted WebSocket gateway. No writes when offline/read-only.
@@ -14,12 +15,15 @@ export class GearOpcUaClient {
   private lastSnapshotTs=0;
   private onStatus:(status:GearOpcStatus)=>void;
   private onSnapshot:(message:GearOpcSnapshot)=>void;
+  private onPhysical:(physical:GearPhysicalState)=>void;
 
   constructor(
     onStatus:(status:GearOpcStatus)=>void,
     onSnapshot:(message:GearOpcSnapshot)=>void,
+    onPhysical:(physical:GearPhysicalState)=>void=()=>{},
   ){
     this.onStatus=onStatus;this.onSnapshot=onSnapshot;
+    this.onPhysical=onPhysical;
   }
   private update(patch:Partial<GearOpcStatus>){
     this.status={...this.status,...patch};
@@ -59,6 +63,9 @@ export class GearOpcUaClient {
         this.update({lastUpdate:this.lastSnapshotTs,connected:true,
           observedTags:Object.keys(message.diagnostics??{})});
         this.onSnapshot(message);
+        if(message.physical)this.onPhysical(message.physical);
+      }else if(value.type==="physical"&&validGearPhysicalTelemetry(value.physical)){
+        this.onPhysical(value.physical);
       }else if(value.type==="error"){
         this.update({detail:typeof value.message==="string"?value.message:"Error OPC UA"});
       }
@@ -84,6 +91,20 @@ export class GearOpcUaClient {
       !this.status.writable||!this.socket||
       this.socket.readyState!==WebSocket.OPEN)return false;
     this.socket.send(JSON.stringify({type:"input",tag,value}));
+    return true;
+  }
+  sendPhysicalConfig(patch:Partial<Pick<GearPhysicalState,
+    "enabled"|"airSupply"|"drumPercent"|"pressureDecayFactor"|
+    "airLoss"|"filterBlocked"|"doserBlocked">>):boolean{
+    if(!this.status.connected||!this.status.writable||!this.socket||
+       this.socket.readyState!==WebSocket.OPEN)return false;
+    this.socket.send(JSON.stringify({type:"physical-config",patch}));
+    return true;
+  }
+  sendPhysicalReset():boolean{
+    if(!this.status.connected||!this.status.writable||!this.socket||
+       this.socket.readyState!==WebSocket.OPEN)return false;
+    this.socket.send(JSON.stringify({type:"physical-reset"}));
     return true;
   }
   disconnect(){
