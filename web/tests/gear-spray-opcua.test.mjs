@@ -6,6 +6,11 @@ import {
  validGearOpcOutputSnapshot,validGearOpcInput,
  initialGearOpcStatus,GEAR_OPC_DEFAULT_SOCKET,
 } from "../src/plc/gearOpcUaBridge.ts";
+import {
+ initialGearSprayProject, writeGearScadaInput, gearNumber, gearBool,
+ applyGearPhysicalTelemetry,
+} from "../src/plc/gearSpraySceneModel.ts";
+import {initialGearPhysicalState} from "../src/plc/gearSprayPhysics.ts";
 const source=path=>readFileSync(new URL(path,import.meta.url),"utf8");
 
 test("OPC UA bridge has correct physical read/write directions",()=>{
@@ -73,4 +78,49 @@ test("Gear scene has dedicated OPC UA, quality/status and read-only command bloc
   assert.match(ui,/observed\("SM_Cycle_State"\)/);
   assert.match(ui,/observed\("Fault_Code"\)/);
   assert.match(ui,/Sin NodeId de lectura/);
+});
+
+test("manual REAL inputs survive gateway idle snapshots",()=>{
+  let p=initialGearSprayProject();
+  p=writeGearScadaInput(p,"_310_PI_2561",78.5);
+  p=writeGearScadaInput(p,"_310_PI_2560",654.3);
+  p=writeGearScadaInput(p,"_310_SQS_2561",true);
+  const idle=initialGearPhysicalState();
+  assert.strictEqual(applyGearPhysicalTelemetry(p,idle,false),p);
+  assert.equal(gearNumber(p,"_310_PI_2561"),78.5);
+  assert.equal(gearNumber(p,"_310_PI_2560"),654.3);
+  assert.equal(gearBool(p,"_310_SQS_2561"),true);
+});
+
+test("automatic physical telemetry owns sensors only while HIL enabled",()=>{
+  const p=writeGearScadaInput(initialGearSprayProject(),"_310_PI_2560",200);
+  const active={...initialGearPhysicalState(),enabled:true,
+    airPressure:84.5,lubePressure:920.3,pulseHigh:true};
+  const auto=applyGearPhysicalTelemetry(p,active,false);
+  assert.equal(gearNumber(auto,"_310_PI_2561"),84.5);
+  assert.equal(gearNumber(auto,"_310_PI_2560"),920.3);
+  assert.equal(gearBool(auto,"_310_SQS_2561"),true);
+  assert.equal(gearBool(auto,"DI_PDB"),true);
+  const idle={...active,enabled:false,airPressure:0,lubePressure:0,pulseHigh:false};
+  const manual=applyGearPhysicalTelemetry(auto,idle,true);
+  assert.equal(gearNumber(manual,"_310_PI_2561"),84.5);
+  assert.equal(gearNumber(manual,"_310_PI_2560"),920.3);
+  assert.equal(gearBool(manual,"_310_SQS_2561"),false);
+  assert.equal(gearBool(manual,"DI_PDB"),false);
+  const adjusted=writeGearScadaInput(manual,"_310_PI_2561",55.1);
+  assert.strictEqual(applyGearPhysicalTelemetry(adjusted,idle,false),adjusted);
+});
+
+test("browser virtual analog model remains independent of Node HIL PDB",()=>{
+  const app=source("../src/App.tsx");
+  const scene=source("../src/components/ide/GearSprayScene.tsx");
+  assert.ok(app.includes("applyGearPhysicalTelemetry(state.project,physical,wasEnabled)"));
+  assert.ok(app.includes("changeGearPhysical(()=>initialGearPhysicalState())"));
+  const loop=app.slice(app.indexOf("// Gear Spray phase 2:"),
+    app.indexOf("// Advance the five fixed demo rungs"));
+  assert.ok(loop.includes('gearControllerSourceRef.current!=="virtual"'));
+  assert.ok(loop.includes("stepGearPhysical"));
+  assert.ok(loop.includes("gearPhysicalSensors(next)"));
+  assert.ok(scene.includes('disabled={controllerSource==="opcua"&&!opcWritable}'));
+  assert.ok(scene.includes("onAnalogInput(input.name as GearAnalogInput,value)"));
 });

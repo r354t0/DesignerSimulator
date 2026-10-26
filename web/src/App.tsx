@@ -31,7 +31,7 @@ import {
 } from "./plc/gearOpcUaBridge.ts";
 import {GearOpcUaClient} from "./plc/gearOpcUaClient.ts";
 import {
-  prepareGearSprayTags, writeGearScadaInput,
+  prepareGearSprayTags, writeGearScadaInput, applyGearPhysicalTelemetry,
   type GearPushButton, type GearDigitalInput, type GearAnalogInput,
   type GearSetpoint,
 } from "./plc/gearSpraySceneModel";
@@ -279,9 +279,12 @@ export default function App() {
     }
     disconnectGearOpc();
     changeScan(stopPracticeScans);
+    // Reset independent plant state when changing between virtual and OPC UA.
+    if(source!==gearControllerSourceRef.current)
+      changeGearPhysical(()=>initialGearPhysicalState());
     gearControllerSourceRef.current=source;
     setGearControllerSource(source);
-  },[changeScan,disconnectGearOpc,releaseGearSqsPulse]);
+  },[changeScan,changeGearPhysical,disconnectGearOpc,releaseGearSqsPulse]);
 
   const connectGearOpc=useCallback(()=>{
     if(activeControllerScene.current!=="gear"||
@@ -320,16 +323,10 @@ export default function App() {
     },physical=>{
       if(activeControllerScene.current!=="gear"||
         gearControllerSourceRef.current!=="opcua")return;
+      const wasEnabled=gearPhysicalRef.current.enabled;
       changeGearPhysical(()=>physical);
-      const sensor=gearPhysicalSensors(physical);
       changeScan(state=>{
-        let project=state.project;
-        for(const name of ["_310_PI_2561","_310_PI_2560",
-          "_310_SQS_2561","DI_PDB","_310_LSL"] as const){
-          const tag=project.tags.find(t=>t.name===name);
-          if(tag&&tag.value!==sensor[name])
-            project=setTagValue(project,name,sensor[name]);
-        }
+        const project=applyGearPhysicalTelemetry(state.project,physical,wasEnabled);
         return project===state.project?state:{...state,project};
       });
     });

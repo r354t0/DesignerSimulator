@@ -2,6 +2,7 @@ import {
   createTag, initialPracticeProject, setTagValue,
   type PracticeProject, type TagType,
 } from "./practiceDocument.ts";
+import {gearPhysicalSensors, type GearPhysicalState} from "./gearSprayPhysics.ts";
 
 /** Phase 1 of the CCW Gear Spray scene.
  * These are ONLY physical I/O and HMI-operated values, never fabricated
@@ -91,6 +92,29 @@ export function gearNumber(project:PracticeProject,name:string):number {
   const tag=project.tags.find(tag=>tag.name===name);
   return tag&&["INT","DINT","REAL"].includes(tag.type)&&
     typeof tag.value==="number" ? tag.value : 0;
+}
+
+/** Gateway snapshots with physics disabled must not override manual analogs.
+ * After physical HIL stops, release the remaining SQS/PDB pulse only.
+ */
+export function applyGearPhysicalTelemetry(
+  project:PracticeProject,physical:GearPhysicalState,wasEnabled:boolean,
+):PracticeProject {
+  if(!physical.enabled&&!wasEnabled)return project;
+  const sensors=gearPhysicalSensors(physical);
+  const names=physical.enabled?
+    (["_310_PI_2561","_310_PI_2560","_310_SQS_2561","DI_PDB","_310_LSL"] as const):
+    (["_310_SQS_2561","DI_PDB"] as const);
+  let next=project;
+  for(const name of names){
+    const tag=next.tags.find(t=>t.name===name);
+    const value=sensors[name];
+    if(tag&&tag.value!==value&&
+       ((typeof value==="number"&&tag.type==="REAL")||
+        (typeof value==="boolean"&&tag.type==="BOOL")))
+      next=setTagValue(next,name,value);
+  }
+  return next;
 }
 
 export function initialGearSprayProject():PracticeProject {

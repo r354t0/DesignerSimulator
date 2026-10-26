@@ -721,7 +721,7 @@ export function GearSprayScene({project,mode,onResetProgram,
               return <NumberSetting key={input.name} name={input.name}
                 label={isAir?"Presión de aire":"Presión de lubricante"}
                 min={0} max={isAir?148:1480} step={0.1}
-                disabled={physics.enabled}
+                disabled={controllerSource==="opcua"&&!opcWritable}
                 caption={isAir?"Referencia original: 0–148":
                   "Referencia original: 0–1480"}
                 value={gearNumber(project,input.name)}
