@@ -16,6 +16,7 @@ import {
 import {parseConfig,writeValueForTag,parseOutputs,normaliseInput,OBSERVE_TYPES}
   from "./validation.mjs";
 import {writeSqsPulse100} from "./sqsPulse.mjs";
+import {initialHilPhysical,configureHilPhysical,stepHilPhysical,sensorsFromHil} from "./physicalPlant.mjs";
 
 const configPath=process.env.GEAR_OPCUA_CONFIG ||
   resolve(process.cwd(),"config.json");
@@ -59,10 +60,77 @@ let closed=false;
 let writing=Promise.resolve();
 let queueSize=0;
 let sqsPulseActive=false;
+let hil=initialHilPhysical();
+let lastOutputs={};
+let lastReadAt=0;
+let lastSensorWriteAt=0;
+let lastSentSensors={};
+let lastHilTick=Date.now();
+const canWrite=()=>live&&config.allowWrites&&
+  Object.values(config.write).every(id=>typeof id==="string"&&id.length>0);
+const reportHil=()=>report({type:"physical",physical:hil,ts:Date.now()});
+function resetHil(keepEnabled=false){
+  hil={...initialHilPhysical(),enabled:keepEnabled&&hil.enabled};
+  lastSentSensors={};
+  reportHil();
+}
+function enqueueHilWrite(tag,value){
+  if(!canWrite()||!session||queueSize>=100)return false;
+  if(tag==="_310_SQS_2561"&&sqsPulseActive)return false;
+  if(tag==="_310_SQS_2561"&&value===true)sqsPulseActive=true;
+  const owner=session;
+  queueSize++;
+  writing=writing.catch(()=>{}).then(async()=>{
+    if(!live||owner!==session)return;
+    const write=async v=>{
+      const result=await owner.write({nodeId:config.write[tag],
+        attributeId:AttributeIds.Value,
+        value:{value:writeValueForTag(tag,v,DataType)}});
+      if(!String(result).startsWith("Good"))
+        throw Error("Escritura HIL "+tag+": "+result);
+    };
+    if(tag==="_310_SQS_2561"&&value===true)
+      await writeSqsPulse100(()=>write(true),()=>write(false));
+    else await write(value);
+  }).catch(err=>{
+    console.error("Error escribiendo físico:",err.message);
+    report({type:"error",message:err.message});
+  }).finally(()=>{
+    queueSize--;
+    if(tag==="_310_SQS_2561"&&value===true)sqsPulseActive=false;
+  });
+  return true;
+}
+const physicalTimer=setInterval(()=>{
+  const now=Date.now();
+  const dt=Math.min(200,Math.max(0,now-lastHilTick));
+  lastHilTick=now;
+  // Never simulate using missing/stale PLC outputs or when write is disabled.
+  if(!hil.enabled||!canWrite()||now-lastReadAt>1800)return;
+  const before=hil;
+  hil=stepHilPhysical(hil,{
+    pumpSolenoid:lastOutputs._310_SV_2560===true,
+    lubricantSolenoid:lastOutputs._310_SV_2561===true,
+    atomizationSolenoid:lastOutputs._310_SV_2563===true,
+  },dt);
+  if(hil.totalPulses>before.totalPulses){
+    for(let i=before.totalPulses;i<hil.totalPulses;i++)
+      enqueueHilWrite("_310_SQS_2561",true);
+  }
+  if(now-lastSensorWriteAt>=100){
+    lastSensorWriteAt=now;
+    const sensors=sensorsFromHil(hil);
+    for(const tag of ["_310_PI_2561","_310_PI_2560","_310_LSL"]){
+      if(sensors[tag]!==lastSentSensors[tag]&&enqueueHilWrite(tag,sensors[tag]))
+        lastSentSensors[tag]=sensors[tag];
+    }
+  }
+},50);
 
 server.on("connection",(ws)=>{
   clients.add(ws);
   ws.send(JSON.stringify(status(detail,live)));
+  ws.send(JSON.stringify({type:"physical",physical:hil,ts:Date.now()}));
   ws.on("message",(raw)=>{
     let m;
     try{m=JSON.parse(String(raw));}catch{
