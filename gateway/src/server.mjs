@@ -106,7 +106,12 @@ const physicalTimer=setInterval(()=>{
   const dt=Math.min(200,Math.max(0,now-lastHilTick));
   lastHilTick=now;
   // Never simulate using missing/stale PLC outputs or when write is disabled.
-  if(!hil.enabled||!canWrite()||now-lastReadAt>1800)return;
+  if(!hil.enabled)return;
+  if(!canWrite()||(lastReadAt&&now-lastReadAt>1800)){
+    resetHil(); // Fail closed; explicit re-enable required after UA recovers.
+    return;
+  }
+  if(!lastReadAt)return;
   const before=hil;
   hil=stepHilPhysical(hil,{
     pumpSolenoid:lastOutputs._310_SV_2560===true,
