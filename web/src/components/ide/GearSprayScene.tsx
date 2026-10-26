@@ -609,14 +609,21 @@ export function GearSprayScene({project,mode,onResetProgram,
             <h4 className="text-[11px] font-semibold text-slate-200">Entradas analógicas</h4>
             <label className="flex cursor-pointer items-center gap-2 text-[11px] text-sky-200">
               <input type="checkbox" aria-label="Simulación física automática"
+                disabled={controllerSource==="opcua"&&!opcWritable}
                 checked={physics.enabled}
                 onChange={e=>onPhysicsChange({enabled:e.target.checked})}
                 className="accent-sky-500"/>
               Simulación física automática
             </label>
           </div>
+          {controllerSource==="opcua"&&<p className="mb-2 text-[10px] text-sky-300">
+            El modelo físico y los pulsos PDB de 100 ms se calculan en Node.js,
+            aunque cambies de pestaña o cierres el navegador. El gateway debe
+            permanecer abierto. Para detener el HIL, desmarca la simulación física.
+          </p>}
           {physics.enabled ? (
-                      <div className="mb-3 rounded border border-sky-900 bg-[#0c1d2a] p-3">
+                      <fieldset disabled={controllerSource==="opcua"&&!opcWritable}
+                        className="mb-3 rounded border border-sky-900 bg-[#0c1d2a] p-3 disabled:opacity-60">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h4 className="text-[11px] font-semibold text-sky-200">
@@ -706,7 +713,7 @@ export function GearSprayScene({project,mode,onResetProgram,
                 se utiliza DI_PDB para los pulsos de dosificación del sensor SQS-2561.
               </p>
             </>}
-          </div>
+          </fieldset>
           ) : (
                       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {GEAR_FIELD_INPUTS.filter(x=>x.type==="REAL").map(input=>{
