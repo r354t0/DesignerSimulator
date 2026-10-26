@@ -223,8 +223,6 @@ export default function App() {
   const [gearOpcSocketUrl,setGearOpcSocketUrl]=
     useState(GEAR_OPC_DEFAULT_SOCKET);
   const gearOpcClientRef=useRef<GearOpcUaClient|null>(null);
-  const gearOpcOutputsRef=useRef<Record<string,boolean>>({});
-  const gearOpcInputsSent=useRef<Record<string,boolean|number>>({});
   const gearSqsPulseTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
   const releaseGearSqsPulse=useCallback(()=>{
     if(gearSqsPulseTimer.current===null)return;
@@ -242,13 +240,10 @@ export default function App() {
   },[changeScan]);
   useEffect(()=>()=>{if(gearSqsPulseTimer.current!==null)
     clearTimeout(gearSqsPulseTimer.current);},[]);
-  const gearOpcStatusRef=useRef<GearOpcStatus>(initialGearOpcStatus());
     const setOpcStatus=useCallback((next:GearOpcStatus)=>{
-    gearOpcStatusRef.current=next;
     setGearOpcStatus(next);
     // Fail closed: on stale/offline UA, never display last known ON as current.
     if(!next.connected&&gearControllerSourceRef.current==="opcua"){
-      gearOpcOutputsRef.current={};
       changeScan(state=>{
         let project=state.project;
         for(const name of GEAR_OPC_OUTPUT_TAGS){
@@ -262,8 +257,6 @@ export default function App() {
   },[changeScan]);
   const disconnectGearOpc=useCallback(()=>{
     gearOpcClientRef.current?.disconnect();
-    gearOpcOutputsRef.current={};
-    gearOpcInputsSent.current={};
     setOpcStatus(initialGearOpcStatus());
   },[setOpcStatus]);
 
@@ -279,6 +272,11 @@ export default function App() {
   const setGearController=useCallback((source:GearControllerSource)=>{
     if(activeControllerScene.current!=="gear")return;
     releaseGearSqsPulse();
+    if(source==="virtual"&&gearControllerSourceRef.current==="opcua"&&
+      gearPhysicalRef.current.enabled){
+      window.alert("Desactiva la simulación física HIL antes de cambiar a PLC virtual.");
+      return;
+    }
     disconnectGearOpc();
     changeScan(stopPracticeScans);
     gearControllerSourceRef.current=source;
@@ -296,7 +294,6 @@ export default function App() {
       for(const name of GEAR_OPC_OUTPUT_TAGS){
         outputs[name]=message.outputs[name]===true;
       }
-      gearOpcOutputsRef.current=outputs;
       changeScan(state=>{
         let project=state.project;
         for(const name of GEAR_OPC_OUTPUT_TAGS){
@@ -320,10 +317,25 @@ export default function App() {
         }
         return project===state.project?state:{...state,project};
       });
+    },physical=>{
+      if(activeControllerScene.current!=="gear"||
+        gearControllerSourceRef.current!=="opcua")return;
+      changeGearPhysical(()=>physical);
+      const sensor=gearPhysicalSensors(physical);
+      changeScan(state=>{
+        let project=state.project;
+        for(const name of ["_310_PI_2561","_310_PI_2560",
+          "_310_SQS_2561","DI_PDB","_310_LSL"] as const){
+          const tag=project.tags.find(t=>t.name===name);
+          if(tag&&tag.value!==sensor[name])
+            project=setTagValue(project,name,sensor[name]);
+        }
+        return project===state.project?state:{...state,project};
+      });
     });
     gearOpcClientRef.current=client;
     client.connect(gearOpcSocketUrl);
-  },[changeScan,disconnectGearOpc,gearOpcSocketUrl,setOpcStatus]);
+  },[changeScan,changeGearPhysical,disconnectGearOpc,gearOpcSocketUrl,setOpcStatus]);
 
   useEffect(()=>()=>{gearOpcClientRef.current?.disconnect();},[]);
 
@@ -541,21 +553,19 @@ export default function App() {
   }, [practiceMode, simulationTab, changeTank, changeScan]);
 
   // Gear Spray phase 2: ONLY true PLC outputs drive pressure and dosing.
-  // No CCW routines/UDFB are simulated here. PAUSE, STOP and other scenes freeze
-  // this plant model. Changes to sensors are fed to the existing scan adapter.
+  // Virtual Ladder ONLY; real OPC UA physics runs independently in Node.js,
+  // including when the browser tab is hidden or closed.
   useEffect(()=>{
-    if(activeControllerScene.current!=="gear")return;
-    if(gearControllerSourceRef.current==="virtual"&&practiceMode!=="running")return;
+    if(activeControllerScene.current!=="gear"||
+      gearControllerSourceRef.current!=="virtual"||
+      practiceMode!=="running")return;
     const id=window.setInterval(()=>{
       const plc=scanRef.current;
       const physical=gearPhysicalRef.current;
-      if(activeControllerScene.current!=="gear"||!physical.enabled)return;
-      const real=gearControllerSourceRef.current==="opcua";
-      if(real&&!gearOpcStatusRef.current.connected)return;
-      if(!real&&plc.mode!=="running")return;
-      const getOutput=(name:string)=>real?
-        gearOpcOutputsRef.current[name]===true:plc.project.tags.some(t=>
-          t.name===name&&t.type==="BOOL"&&t.value===true);
+      if(plc.mode!=="running"||
+        activeControllerScene.current!=="gear"||!physical.enabled)return;
+      const getOutput=(name:string)=>plc.project.tags.some(t=>
+        t.name===name&&t.type==="BOOL"&&t.value===true);
       const next=stepGearPhysical(physical,{
         pumpSolenoid:getOutput("_310_SV_2560"),
         lubricantSolenoid:getOutput("_310_SV_2561"),
@@ -563,25 +573,6 @@ export default function App() {
       },50);
       if(next!==physical)changeGearPhysical(()=>next);
       const sensor=gearPhysicalSensors(next);
-      if(real){
-        for(const name of ["_310_PI_2561","_310_PI_2560",
-          "_310_SQS_2561","_310_LSL"] as const){
-          const value=sensor[name];
-          if(gearOpcInputsSent.current[name]!==value&&
-            gearOpcClientRef.current?.sendInput(name,value))
-            gearOpcInputsSent.current[name]=value;
-        }
-        changeScan(state=>{
-          let project=state.project;
-          for(const name of ["_310_PI_2561","_310_PI_2560",
-            "_310_SQS_2561","DI_PDB","_310_LSL"] as const){
-            if(project.tags.find(t=>t.name===name)?.value!==sensor[name])
-              project=setTagValue(project,name,sensor[name]);
-          }
-          return project===state.project?state:{...state,project};
-        });
-        return;
-      }
       changeScan(state=>{
         if(state.mode!=="running"||activeControllerScene.current!=="gear")return state;
         let result=state;
