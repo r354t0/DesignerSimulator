@@ -1,0 +1,872 @@
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { AlertTriangle, CheckCircle2, CircleHelp, Gauge,
+  Play, ShieldAlert, Wrench, RotateCcw, Settings2, Droplets } from "lucide-react";
+import type { PracticeProject } from "../../plc/practiceDocument";
+import type { ScanMode } from "../../plc/practiceScanCycle";
+import type {GearControllerSource,GearOpcStatus} from "../../plc/gearOpcUaBridge.ts";
+import {
+  gearSprayIsActive, type GearPhysicalState,
+} from "../../plc/gearSprayPhysics";
+import { MomentaryPushButton } from "./MomentaryPushButton";
+import { ScadaLedGroup } from "./ScadaLedGroup";
+import {
+  GEAR_FIELD_INPUTS, GEAR_FIELD_OUTPUTS, GEAR_HMI_PUSHBUTTONS,
+  GEAR_HMI_SETPOINTS, GEAR_SCADA_TAGS,
+  gearBool, gearNumber,
+  type GearPushButton, type GearDigitalInput, type GearAnalogInput,
+  type GearSetpoint,
+} from "../../plc/gearSpraySceneModel";
+
+interface Props {
+  project: PracticeProject;
+  mode: ScanMode;
+  onResetProgram:()=>void;
+  controllerSource:GearControllerSource;
+  onControllerSourceChange:(source:GearControllerSource)=>void;
+  opcStatus:GearOpcStatus;
+  opcSocketUrl:string;
+  onOpcSocketUrlChange:(url:string)=>void;
+  onOpcConnect:()=>void;
+  onOpcDisconnect:()=>void;
+  physics:GearPhysicalState;
+  onPhysicsChange:(patch:Partial<Pick<GearPhysicalState,
+    "enabled"|"airSupply"|"drumPercent"|"pressureDecayFactor"|"airLoss"|"filterBlocked"|"doserBlocked">>)=>void;
+  onPhysicsReset:()=>void;
+  setupError: string | null;
+  onPushButton: (tag: GearPushButton, value: boolean) => void;
+  onDigitalInput: (tag: GearDigitalInput, value: boolean) => void;
+  onAnalogInput: (tag: GearAnalogInput, value: number) => void;
+  onSetpoint: (tag: GearSetpoint, value: number) => void;
+  onPrepareTags: () => void;
+  onOpenTags: () => void;
+}
+
+const surfaces = {
+  active:"#087f67", off:"#64748b", air:"#0284c7",
+  lube:"#b45309", steel:"#334155",
+};
+
+/** Edición numérica sincronizada con el PLC: solo los valores analógicos con
+ * un máximo de escalamiento conocido muestran además barra deslizante.
+ * Los setpoints DINT se editan exclusivamente mediante número.
+ */
+function NumberSetting({label,name,value,onCommit,integer=false,caption,
+  min=0,max,step,disabled=false}:{label:string;name:string;value:number;
+  onCommit:(value:number)=>void;integer?:boolean;caption?:string;
+  min?:number;max?:number;step?:number;disabled?:boolean;
+}){
+  const [draft,setDraft]=useState(String(value));
+  const [error,setError]=useState("");
+  useEffect(()=>setDraft(String(value)),[value]);
+  const outOfRange=max!==undefined&&(value<min||value>max);
+  const save=()=>{
+    if(draft.trim()===""){setError("Introduce un valor.");setDraft(String(value));return;}
+    const parsed=Number(draft);
+    if(!Number.isFinite(parsed)||parsed<0||
+      (integer&&(!Number.isSafeInteger(parsed)||parsed>2147483647))){
+      setError("Valor numérico inválido.");
+      setDraft(String(value));return;
+    }
+    onCommit(parsed);setError("");
+  };
+  return <div className="min-w-0 rounded border border-[#354d62] bg-[#0f2434] p-2.5">
+    <label htmlFor={"gear-value-"+name} className="block">
+      <span className="block text-[11px] font-semibold text-slate-100">{label}</span>
+      <span className="mb-2 block break-all font-mono text-[10px] text-sky-300">{name}</span>
+    </label>
+    <input id={"gear-value-"+name} type="number" min={min} disabled={disabled}
+      step={integer?"1":"any"} value={draft}
+      onChange={e=>setDraft(e.target.value)} onBlur={save}
+      onKeyDown={e=>{if(e.key==="Enter")e.currentTarget.blur();}}
+      className="w-full min-w-0 rounded border border-[#466075] bg-[#0c1d2a] px-2 py-1.5 text-xs text-slate-100 outline-none focus:border-sky-400"
+      aria-label={label+" · valor numérico"}/>
+    {max!==undefined&&<>
+      <input type="range" min={min} max={max} step={step??0.1} disabled={disabled}
+        value={Math.min(max,Math.max(min,value))}
+        onChange={e=>{onCommit(Number(e.target.value));setError("");}}
+        className="mt-3 block h-2 w-full cursor-pointer accent-sky-500"
+        aria-label={label+" · barra deslizante"}/>
+      <div className="mt-1 flex items-center justify-between gap-1 text-[10px] tabular-nums text-slate-400">
+        <span>{min}</span><span>{max}</span>
+      </div>
+    </>}
+    {caption&&<span className="mt-1 block text-[10px] leading-snug text-slate-400">{caption}</span>}
+    {disabled&&<span className="mt-1 block text-[10px] text-sky-300">
+      Señal generada automáticamente por la física del proceso.
+    </span>}
+    {outOfRange&&<span className="block text-[10px] text-amber-300">
+      Valor fuera del rango de referencia. Usa el campo numérico para pruebas de falla.
+    </span>}
+    {error&&<span role="alert" className="block text-[10px] text-amber-400">{error}</span>}
+  </div>;
+}
+
+function Pilot({description,tag,active,tone="green"}:{
+  description:string;tag:string;active:boolean;
+  tone?:"green"|"amber"|"blue"|"red";
+}){
+  const tones={green:"bg-emerald-400 shadow-[0_0_11px_#34d399]",
+    amber:"bg-amber-400 shadow-[0_0_11px_#fbbf24]",
+    blue:"bg-sky-400 shadow-[0_0_11px_#38bdf8]",
+    red:"bg-red-400 shadow-[0_0_11px_#f87171]"};
+  return <div className="flex min-h-12 min-w-0 items-start gap-2 rounded border border-[#34495d] bg-[#101e2b] px-2 py-2">
+    <span className={"mt-1 size-3 shrink-0 rounded-full border border-slate-500 "+
+      (active?tones[tone]:"bg-slate-700")}/>
+    <span className="min-w-0 text-[10px] leading-snug text-slate-200">
+      <span className="block font-semibold">{description}</span>
+      <span className="mt-0.5 block break-all font-mono text-sky-300">
+        ({tag})
+      </span>
+    </span>
+  </div>;
+}
+
+/** Diagrama de proceso para la escena 06.
+ * Tuberías representadas como redes independientes: aire instrumental/atomización
+ * (azul) y lubricante presurizada (acero/ámbar). El SCADA únicamente lee tags PLC.
+ * Los cruces sin unión entre redes se muestran con un puente blanco.
+ */
+function ProcessGraphic({project,physics}: {project:PracticeProject;physics:GearPhysicalState}){
+  const v=(name:string)=>gearBool(project,name);
+  const pump=v("_310_SV_2560");
+  const air=v("_310_SV_2563");
+  const grease=v("_310_SV_2561");
+  const mill=v("_310_PLC104_YI_MillRun");
+  const dosing=v("_310_SQS_2561");
+  const low=v("_310_LSL");
+  const atomizing=physics.enabled?
+    gearSprayIsActive(physics,{pumpSolenoid:pump,
+      lubricantSolenoid:grease,atomizationSolenoid:air}):
+    air&&grease;
+  const nozzleYs=[326,366,406,446,486,526];
+
+  // Cada red tiene un trazo continuo: los ramales se unen con tees,
+  // no se dibujan como segmentos sueltos separados por un borde blanco.
+  const pipe=(d:string,kind:"air"|"lube",flow:boolean)=>(
+    <g fill="none" strokeLinejoin="round" strokeLinecap="round">
+      <path d={d} stroke="#334155" strokeWidth="11"/>
+      <path d={d} stroke={kind==="air"?"#168bd1":"#a4adb9"} strokeWidth="7"/>
+      {flow&&<path d={d} stroke={kind==="air"?"#a5ebff":"#f5bc62"}
+        strokeWidth="2" strokeDasharray="10 10"/>}
+    </g>
+  );
+  // Un punto distingue el empalme real de un cruce sin conexión.
+  const tee=(x:number,y:number,kind:"air"|"lube")=>(
+    <circle cx={x} cy={y} r="5.5" fill={kind==="air"?"#168bd1":"#a4adb9"}
+      stroke="#334155" strokeWidth="2"/>
+  );
+
+  const solenoid=(cx:number,cy:number,code:string,on:boolean,kind:"air"|"lube")=>(
+    <g>
+      <rect x={cx-19} y={cy-14} width="38" height="28" rx="5"
+        fill={on?"#c7f9da":"#e2e8f0"} stroke="#334155" strokeWidth="2"/>
+      <path d={"M"+(cx-18)+" "+(cy-12)+" L"+(cx+18)+" "+(cy+12)+
+        " M"+(cx+18)+" "+(cy-12)+" L"+(cx-18)+" "+(cy+12)}
+        stroke={on?"#047857":"#475569"} strokeWidth="2.5"/>
+      <rect x={cx-12} y={cy-33} width="24" height="15" rx="3"
+        fill={on?"#22c55e":"#94a3b8"} stroke="#334155" strokeWidth="1.5"/>
+      <path d={"M"+cx+" "+(cy-18)+" V"+(cy-14)} stroke="#334155" strokeWidth="2"/>
+      <text x={cx} y={cy-46} textAnchor="middle" fontSize="11" fontWeight="750"
+        fill={on?"#047857":"#475569"}>{on?"ON":"OFF"}</text>
+      <rect x={cx-47} y={cy+22} width="94" height="20" rx="4"
+        fill="#fff" stroke="#91a4b7"/>
+      <text x={cx} y={cy+36} textAnchor="middle" fontSize="11.5" fontWeight="750"
+        fill="#334155">{code}</text>
+      <title>{code+" · "+(kind==="air"?"Válvula de aire":"Válvula de lubricante")+
+        " · "+(on?"Activa":"Inactiva")}</title>
+    </g>
+  );
+
+  return <svg viewBox="0 0 1120 690" role="img"
+    aria-label="Gear Spray: aire instrumental desde acometida a SV-2560, SV-2563 y colector; transmisor PI-2561 próximo al dosificador; tambor, bomba, filtro, PI-2560, SV-2561, dosificador y seis boquillas"
+    className="block h-auto w-full min-w-[700px] rounded-lg border border-slate-300 bg-white">
+    <rect x="0" y="0" width="1120" height="690" rx="10" fill="#fff"/>
+    <text x="24" y="29" fontSize="17" fontWeight="750" fill="#0f2940">
+      LUBRICACIÓN DE CORONA · GEAR SPRAY
+    </text>
+    <text x="24" y="49" fontSize="11" fill="#64748b">
+      Escena 06 · Distribución de aire y lubricante · E/S físicas del Micro850
+    </text>
+    <g fontSize="10.5" fill="#334155">
+      <path d="M771 24 H801" stroke="#168bd1" strokeWidth="6"/>
+      <text x="811" y="28">Aire</text>
+      <path d="M869 24 H899" stroke="#a4adb9" strokeWidth="7"/>
+      <text x="909" y="28">Lubricante</text>
+      <circle cx="988" cy="24" r="6" fill="#16a34a"/>
+      <text x="1001" y="28">Activo</text>
+    </g>
+    <rect x="18" y="65" width="1084" height="590" rx="10"
+      fill="#f5f7fa" stroke="#d7e1e9"/>
+
+    {/* AIRE: una sola acometida con una tee en x=230. Dos válvulas:
+        SV-2560 acciona la bomba, SV-2563 alimenta la atomización. */}
+    <text x="38" y="264" fontSize="12" fontWeight="750" fill="#0369a1">
+      AIRE INSTRUMENTAL
+    </text>
+    <text x="38" y="282" fontSize="10.5" fill="#475569">Acometida de planta</text>
+    {pipe("M42 305 H230 V156 H964 V548","air",air)}
+    {pipe("M230 305 H370 V412 H305","air",pump)}
+    {tee(230,305,"air")}
+    <path d="M42 293 L27 305 L42 317" fill="none"
+      stroke="#0284c7" strokeWidth="3"/>
+    <text x="564" y="133" fontSize="11" fontWeight="700" fill="#075985">
+      AIRE DE ATOMIZACIÓN
+    </text>
+    {solenoid(464,156,"SV-2563",air,"air")}
+    {solenoid(300,305,"SV-2560",pump,"air")}
+
+    {/* Presión de aire en la zona del bloque dosificador.
+        La toma parte directamente del cabezal neumático mediante una tee. */}
+    {pipe("M704 156 V188","air",air)}
+    {tee(704,156,"air")}
+    <circle cx="704" cy="205" r="17" fill="#dbeafe"
+      stroke="#0369a1" strokeWidth="3"/>
+    <path d="M704 205 L714 197 M704 192 V195" stroke="#0369a1"
+      strokeWidth="2" fill="none"/>
+    <text x="638" y="247" fontSize="11.5" fontWeight="750" fill="#334155">
+      PI-2561 · AIRE
+    </text>
+    <rect x="638" y="255" width="124" height="34" rx="5"
+      fill="#dbeafe" stroke="#0284c7" strokeWidth="1.5"/>
+    <text x="700" y="277" textAnchor="middle" fontSize="17" fontWeight="750"
+      fill="#075985">{gearNumber(project,"_310_PI_2561").toFixed(1)}</text>
+
+    {/* LUBRICANTE: succión desde el tambor, descarga de la bomba, filtro y
+        válvula SV-2561 hasta la entrada lateral del dosificador. */}
+    <text x="433" y="491" fontSize="11.5" fontWeight="700" fill="#92400e">
+      CIRCUITO DE LUBRICANTE
+    </text>
+    <rect x="208" y="483" width="103" height="109" rx="9"
+      fill="#334155" stroke="#0f172a" strokeWidth="3"/>
+    {physics.enabled&&<rect x="213" y={588-physics.drumPercent*0.98}
+      width="93" height={physics.drumPercent*0.98} rx="3"
+      fill="#b6842b" opacity=".8"/>}
+    <ellipse cx="259" cy="483" rx="51" ry="11"
+      fill="#64748b" stroke="#0f172a" strokeWidth="2"/>
+    <path d="M208 521 H311 M208 555 H311" stroke="#94a3b8" strokeWidth="3"/>
+    <text x="259" y="529" fontSize="11" fontWeight="750" fill="#fff"
+      textAnchor="middle">TAMBOR</text>
+    <text x="259" y="547" fontSize="10" fill="#e2e8f0"
+      textAnchor="middle">310-LU-003-HE</text>
+    {physics.enabled&&<text x="259" y="570" fontSize="11" fontWeight="700"
+      fill="#fff" textAnchor="middle">{physics.drumPercent.toFixed(1)}%</text>}
+    <circle cx="331" cy="537" r="9" fill={low?"#ef4444":"#34d399"}
+      stroke="#0f172a" strokeWidth="2"/>
+    <text x="348" y="541" fontSize="10.5" fontWeight="650"
+      fill="#334155">LSL {low?"BAJO":"OK"}</text>
+    {pipe("M259 483 V445 H779","lube",grease&&pump)}
+    <rect x="224" y="412" width="79" height="55" rx="8"
+      fill={pump?"#ccf5e3":"#dce4ec"}
+      stroke={pump?surfaces.active:"#475569"} strokeWidth="3"/>
+    <circle cx="263" cy="439" r="19" fill="#fff" stroke="#475569" strokeWidth="2"/>
+    <path d="M251 449 L263 427 L275 449 Z"
+      fill={pump?surfaces.active:"#94a3b8"}/>
+    <rect x="296" y="405" width="15" height="14" rx="2"
+      fill={pump?"#0ea5e9":"#cbd5e1"} stroke="#475569" strokeWidth="2"/>
+    <text x="263" y="395" fontSize="11" fontWeight="750"
+      fill="#334155" textAnchor="middle">BOMBA NEUMÁTICA</text>
+
+    {/* Equipos montados sobre la tubería de lubricante, sin juntas ficticias. */}
+    {/* Filtro compacto para liberar espacio respecto al transmisor PI-2560. */}
+    <rect x="389" y="432" width="32" height="26" rx="4"
+      fill="#fff" stroke="#64748b" strokeWidth="2.5"/>
+    <path d="M394 454 L415 435 M394 443 L402 435 M407 454 L417 445"
+      stroke="#94a3b8" strokeWidth="2.4"/>
+    <text x="405" y="418" fontSize="10.5" fontWeight="750" fill="#334155"
+      textAnchor="middle">FILTRO</text>
+    {solenoid(659,445,"SV-2561",grease,"lube")}
+
+    {/* PI-2560: presión de lubricante en la toma entre el FILTRO y SV-2561.
+        Derivación vertical conectada al mismo tramo continuo de lubricante. */}
+    <path d="M530 445 V416" stroke="#64748b" strokeWidth="4" fill="none"/>
+    {tee(530,445,"lube")}
+    <circle cx="530" cy="402" r="14" fill="#ffedd5"
+      stroke="#d97706" strokeWidth="3"/>
+    <path d="M530 402 L538 396" stroke="#92400e" strokeWidth="2.5"/>
+    <text x="530" y="337" textAnchor="middle" fontSize="11.5" fontWeight="750" fill="#334155">
+      PI-2560 · LUBRICANTE
+    </text>
+    <rect x="473" y="345" width="114" height="34" rx="5"
+      fill="#ffedd5" stroke="#d97706" strokeWidth="1.5"/>
+    <text x="530" y="367" textAnchor="middle" fontSize="17" fontWeight="750"
+      fill="#92400e">{gearNumber(project,"_310_PI_2560").toFixed(1)}</text>
+
+    {/* Sensor de proximidad colocado encima del bloque. */}
+    <circle cx="845" cy="250" r="25" fill={dosing?"#22c55e":"#e2e8f0"}
+      stroke={dosing?"#15803d":"#64748b"} strokeWidth="3"/>
+    <text x="845" y="246" textAnchor="middle" fill="#0f172a"
+      fontSize="12" fontWeight="750">SQS</text>
+    <text x="845" y="260" textAnchor="middle" fill="#0f172a"
+      fontSize="12" fontWeight="750">2561</text>
+    <rect x="839" y="275" width="12" height="26" rx="2"
+      fill="#94a3b8" stroke="#475569" strokeWidth="2"/>
+
+    {/* Bloque de dosificación: la alimentación de lubricante entra por la
+        conexión izquierda; sus seis salidas alimentan las boquillas. */}
+    <rect x="779" y="301" width="132" height="251" rx="9"
+      fill="#cbd5e1" stroke="#475569" strokeWidth="3"/>
+    <rect x="790" y="311" width="109" height="231" rx="6"
+      fill="#e2e8f0" stroke="#94a3b8" strokeWidth="2"/>
+    <path d="M845 313 V540" stroke="#94a3b8" strokeWidth="2"/>
+    {nozzleYs.map((y,i)=><g key={"dist-"+i}>
+      <circle cx="845" cy={y} r="7" fill="#94a3b8"
+        stroke="#475569" strokeWidth="2"/>
+      <circle cx="845" cy={y} r="2.5" fill="#fff"/>
+      <rect x="902" y={y-9} width="18" height="18" rx="3"
+        fill="#cbd5e1" stroke="#475569" strokeWidth="1.5"/>
+    </g>)}
+    <text x="845" y="576" textAnchor="middle" fontSize="11.5"
+      fontWeight="750" fill="#334155">BLOQUE DOSIFICADOR</text>
+
+    {/* Cada boquilla es un cabezal mixto: una entrada de lubricante y otra de aire.
+        Las líneas cruzan el colector de aire SIN conectarse: el pequeño puente
+        blanco marca el cruce, y las dos entradas terminan en el mismo cabezal. */}
+    {nozzleYs.map((y,i)=><g key={"nozzle-"+i}>
+      {pipe("M911 "+(y+9)+" H1019","lube",grease&&pump)}
+      <path d={"M957 "+(y+9)+" H971"} stroke="#f5f7fa" strokeWidth="14"/>
+      <path d={"M957 "+(y+9)+" H971"} stroke="#334155" strokeWidth="11"/>
+      <path d={"M957 "+(y+9)+" H971"} stroke="#a4adb9" strokeWidth="7"/>
+      {pipe("M964 "+(y-12)+" H1019","air",air)}
+      <rect x="1014" y={y-19} width="46" height="39" rx="5"
+        fill={atomizing?"#c1dcee":"#d5dde5"}
+        stroke="#475569" strokeWidth="2.5"/>
+      <path d={"M1014 "+(y-12)+" h18 M1014 "+(y+9)+" h18"}
+        strokeWidth="5" stroke="#334155"/>
+      <ellipse cx="1060" cy={y} rx="9" ry="13"
+        fill="#cbd5e1" stroke="#475569" strokeWidth="2"/>
+      <path d={"M1068 "+y+" l20 -13 M1068 "+y+" h25 M1068 "+y+" l20 13"}
+        stroke={atomizing?"#0284c7":"#94a3b8"}
+        strokeWidth="2.5" strokeLinecap="round"/>
+      {atomizing&&<path d={"M1075 "+y+" l24 -19 M1075 "+y+" l24 19"}
+        stroke="#f59e0b" strokeWidth="2" strokeDasharray="4 5"/>}
+    </g>)}
+    <text x="1020" y="576" textAnchor="middle"
+      fontSize="11.5" fontWeight="750" fill="#334155">6 BOQUILLAS</text>
+
+    {/* La válvula de atomización y la de bomba solo cambian de color según
+        las salidas del PLC; esta vista no escribe ni fuerza E/S. */}
+    <rect x="34" y="607" width="265" height="27" rx="5"
+      fill="#e2e8f0" stroke="#cbd5e1"/>
+    <circle cx="49" cy="620" r="6" fill={pump?"#16a34a":"#94a3b8"}/>
+    <text x="63" y="624" fontSize="11" fill="#334155" fontWeight="650">
+      Bomba: {pump?"ON":"OFF"}
+    </text>
+    <circle cx="172" cy="620" r="6" fill={grease?"#16a34a":"#94a3b8"}/>
+    <text x="185" y="624" fontSize="11" fill="#334155" fontWeight="650">
+      Lubricante: {grease?"ON":"OFF"}
+    </text>
+    <rect x="860" y="606" width="186" height="28" rx="5"
+      fill={mill?"#d1fae5":"#e2e8f0"} stroke="#94a3b8"/>
+    <text x="953" y="625" textAnchor="middle" fontSize="11.5"
+      fontWeight="750" fill={mill?"#065f46":"#475569"}>
+      MOLINO {mill?"RUN":"STOP"}
+    </text>
+    <text x="25" y="679" fontSize="11" fill="#64748b">
+      Visualización CCW · Física FAT · Plantilla P01–P07 disponible para validación
+    </text>
+  </svg>;
+}
+
+function InfoModal({onClose,onOpenTags,onResetProgram,controllerSource}:{
+  onClose:()=>void;onOpenTags:()=>void;onResetProgram:()=>void;
+  controllerSource:GearControllerSource;
+}){
+  const headings:{title:string;content:readonly typeof GEAR_SCADA_TAGS[number][]}[]=[
+    {title:"Entradas de campo",content:GEAR_FIELD_INPUTS},
+    {title:"Salidas físicas",content:GEAR_FIELD_OUTPUTS},
+    {title:"Pulsadores HMI",content:GEAR_HMI_PUSHBUTTONS},
+    {title:"Consignas",content:GEAR_HMI_SETPOINTS},
+  ];
+  return <div className="fixed inset-0 z-[200] grid place-items-center bg-black/75 p-3"
+    onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}>
+    <div role="dialog" aria-modal="true" aria-labelledby="gear-info-title"
+      className="max-h-[90vh] w-[min(1050px,98vw)] overflow-y-auto rounded-lg border border-slate-600 bg-[#152535] p-4 text-slate-100 shadow-2xl">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 id="gear-info-title" className="text-sm font-bold">
+          Escena 06 · Gear Spray · Información del proyecto CCW
+        </h2>
+        <button type="button" onClick={onClose} aria-label="Cerrar información"
+          className="rounded border border-slate-500 px-3 py-1.5 text-xs hover:bg-slate-700">
+          Cerrar
+        </button>
+      </div>
+      <p className="text-xs leading-relaxed text-slate-300">
+        Control de lubricación de corona de molino de bolas · Proyecto
+        PLC_107_Molino_Bolas_SM · Rutinas P01–P07 y FB_GearSpray_Sequence.
+        La pantalla está conectada al motor de tags y MainRoutine de
+        DesignerSimulator. Fase 2: modelo físico determinista opcional de
+        presiones, depósito, pulsos y fallas de proceso.
+        P01–P07 están cargados por defecto como Ladder virtual, incluida
+        la secuencia, las alarmas, el mantenimiento y los diagnósticos.
+        La validación FAT integral sigue pendiente.
+      </p>
+      <div className="mt-3 rounded border border-amber-700/70 bg-amber-950/40 p-3 text-xs text-amber-100">
+        <strong>Asignación del dosificador:</strong> _310_SQS_2561 es la señal
+        física del sensor y alimenta DI_PDB, utilizada para contar los pulsos
+        de lubricación. La escala/unidad de presión y la polaridad de _310_LSL
+        aún requieren comprobación. P05 incluye AFI para la alarma de alta presión.
+      </div>
+      <div className="mt-4 space-y-4">
+        {headings.map(group=><section key={group.title}>
+          <h3 className="mb-1.5 text-xs font-bold text-sky-200">{group.title}</h3>
+          <div className="overflow-x-auto rounded border border-slate-600">
+            <table className="w-full min-w-[520px] border-collapse text-left text-xs">
+              <thead className="bg-[#263949] text-slate-200"><tr>
+                <th className="p-2">Tag CCW</th><th className="p-2">Tipo</th>
+                <th className="p-2">Descripción</th>
+              </tr></thead>
+              <tbody>{group.content.map(tag=><tr key={tag.name} className="border-t border-slate-700">
+                <td className="p-2 font-mono text-sky-100">{tag.name}</td>
+                <td className="p-2 text-slate-300">{tag.type}</td>
+                <td className="p-2 text-slate-300">{tag.description}</td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+        </section>)}
+      </div>
+      {controllerSource==="opcua"&&<p className="mt-3 rounded border border-sky-800 bg-[#0f2434] p-2 text-[11px] text-sky-100">
+        El modo Micro850 real lee y escribe mediante OPC UA. El botón
+        «Reiniciar programa» solo reinicia la copia virtual y desconecta el gateway;
+        NO modifica el Ladder, RUN/STOP ni la memoria del PLC físico.
+      </p>}
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <button type="button" onClick={()=>{onClose();onOpenTags();}}
+          className="rounded border border-sky-600 px-3 py-2 text-xs text-sky-200 hover:bg-sky-900">
+          Abrir Controller Tags
+        </button>
+        <button type="button" onClick={onResetProgram}
+          title="Restaurar P01–P07 y reiniciar tags, contadores y modelo físico"
+          className="flex items-center gap-2 rounded border border-amber-600 px-3 py-2 text-xs font-semibold text-amber-200 hover:bg-amber-950">
+          <RotateCcw size={14}/> Reiniciar programa
+        </button>
+      </div>
+    </div>
+  </div>;
+}
+
+/** Phase 2: SCADA only reads real PLC outputs. The optional independent plant
+ * model publishes physical input measurements, never a PLC interlock or command.
+ * The CCW application logic remains pending for phase 3.
+ */
+export function GearSprayScene({project,mode,onResetProgram,
+  controllerSource,onControllerSourceChange,opcStatus,opcSocketUrl,
+  onOpcSocketUrlChange,onOpcConnect,onOpcDisconnect,
+  physics,onPhysicsChange,onPhysicsReset,
+  setupError,onPushButton,onDigitalInput,onAnalogInput,onSetpoint,
+  onPrepareTags,onOpenTags}:Props){
+  const [openInfo,setOpenInfo]=useState(false);
+  const phase3Loaded=true; // Dedicated scene always has the P01–P07 controller
+  const sceneRef=useRef<HTMLDivElement>(null);
+  const v=(name:string)=>gearBool(project,name);
+  const modeLabel=controllerSource==="opcua"?
+    "MICRO850 REAL · OPC UA":mode==="running"?"PLC RUN":
+    mode==="paused"?"PLC PAUSE":"PLC STOP";
+  const opcReady=controllerSource==="opcua"&&opcStatus.connected;
+  const opcWritable=opcReady&&opcStatus.writable;
+  const observed=(name:string)=>controllerSource==="virtual"||
+    opcStatus.observedTags.includes(name);
+  useEffect(()=>{
+    const listener=(event:KeyboardEvent)=>{
+      if(event.key==="Escape")setOpenInfo(false);
+    };
+    window.addEventListener("keydown",listener);
+    return ()=>window.removeEventListener("keydown",listener);
+  },[]);
+  const processActive=physics.enabled?
+    gearSprayIsActive(physics,{
+      pumpSolenoid:v("_310_SV_2560"),
+      lubricantSolenoid:v("_310_SV_2561"),
+      atomizationSolenoid:v("_310_SV_2563"),
+    }):v("_310_SV_2561")&&v("_310_SV_2563");
+  const cycleState=gearNumber(project,"SM_Cycle_State");
+  const cycleName=({0:"INACTIVO",10:"ESPERA",20:"LUBRICACIÓN",
+    30:"PURGA",90:"BLOQUEADO"} as Record<number,string>)[cycleState]??"DESCONOCIDO";
+  const diagnostics:{label:string;value:ReactNode}[]=[
+    {label:"Presión de aire (valor CCW)",
+      value:gearNumber(project,"_310_PI_2561").toFixed(1)},
+    {label:"Presión de lubricante (valor CCW)",
+      value:gearNumber(project,"_310_PI_2560").toFixed(1)},
+    {label:"Molino",value:v("_310_PLC104_YI_MillRun")?"MARCHA":"DETENIDO"},
+    {label:"Pulso dosificador",value:v("_310_SQS_2561")?"ACTIVO":"INACTIVO"},
+    {label:"Pulverización",value:processActive?"SOLENOIDES ACTIVOS":"SIN ACTIVACIÓN"},
+    {label:"Secuencia CCW (P03)",value:phase3Loaded?cycleState+" · "+cycleName:"PENDIENTE"},
+  ];
+  return <div ref={sceneRef}
+    className="sort-scada-shell scada-control-shell gear-scada-shell flex h-full min-h-0 flex-col overflow-y-auto p-3 text-slate-100">
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="flex min-w-0 items-center gap-2">
+        <Droplets size={19} className="text-sky-300"/>
+        <div>
+          <h2 className="text-sm font-semibold">Escena 06 · Gear Spray</h2>
+          <p className="text-[10px] text-slate-400">Lubricación de corona · Molino de bolas</p>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="rounded border border-slate-600 px-2 py-1 text-[10px] text-slate-300">
+          {modeLabel}
+        </span>
+        <span className="rounded border border-amber-700 bg-amber-950/60 px-2 py-1 text-[10px] text-amber-200">
+          {phase3Loaded?"Fase 3 · P01–P07 cargadas":
+            physics.enabled?"Fase 2 · Física activa":"Fase 2 · Física manual"}
+        </span>
+        <button type="button" onClick={()=>setOpenInfo(true)}
+          className="flex items-center gap-1 rounded border border-slate-600 px-2 py-1.5 text-[11px] hover:bg-slate-700">
+          <CircleHelp size={15}/> Información
+        </button>
+      </div>
+    </div>
+    {setupError&&<div role="alert" className="mb-2 rounded border border-red-700 bg-red-950 p-2 text-xs text-red-200">
+      {setupError}
+      <button type="button" className="ml-3 underline" onClick={onPrepareTags}>Reintentar</button>
+    </div>}
+    <section aria-label="Conexión PLC Gear Spray"
+      className="mb-3 rounded-lg border border-[#34586a] bg-[#0f2434] p-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-xs font-semibold text-sky-200">
+            Origen del controlador · Gear Spray
+          </h3>
+          <p className="mt-1 text-[10px] text-slate-400">
+            El switch Ethernet conecta el Micro850 y los instrumentos.
+            OPC UA se obtiene desde FactoryTalk Linx Gateway u otro servidor compatible.
+          </p>
+        </div>
+        <div className="flex gap-2 text-[11px]">
+          <button type="button" aria-pressed={controllerSource==="virtual"}
+            onClick={()=>onControllerSourceChange("virtual")}
+            className={"rounded border px-3 py-1.5 "+
+              (controllerSource==="virtual"?"border-sky-500 bg-sky-900 text-white":
+              "border-slate-600 text-slate-300 hover:bg-slate-700")}>
+            PLC virtual
+          </button>
+          <button type="button" aria-pressed={controllerSource==="opcua"}
+            onClick={()=>onControllerSourceChange("opcua")}
+            className={"rounded border px-3 py-1.5 "+
+              (controllerSource==="opcua"?"border-sky-500 bg-sky-900 text-white":
+              "border-slate-600 text-slate-300 hover:bg-slate-700")}>
+            Micro850 real · OPC UA
+          </button>
+        </div>
+      </div>
+      {controllerSource==="opcua"&&<div className="mt-3 space-y-2 border-t border-[#34586a] pt-3">
+        <label className="block text-[11px] text-slate-300">
+          WebSocket del gateway local
+          <input type="text" value={opcSocketUrl}
+            onChange={e=>onOpcSocketUrlChange(e.target.value)}
+            spellCheck={false} aria-label="URL gateway OPC UA"
+            className="mt-1 block w-full rounded border border-slate-600 bg-[#071824] px-2 py-1.5 font-mono text-[11px] text-sky-200"/>
+        </label>
+        <div className="flex flex-wrap items-center gap-2">
+          <button type="button" onClick={onOpcConnect}
+            className="rounded border border-emerald-600 px-3 py-1.5 text-[11px] font-medium text-emerald-200 hover:bg-emerald-950">
+            Conectar OPC UA
+          </button>
+          <button type="button" onClick={onOpcDisconnect}
+            className="rounded border border-slate-600 px-3 py-1.5 text-[11px] text-slate-300 hover:bg-slate-700">
+            Desconectar
+          </button>
+          <span role="status" className={"text-[11px] "+
+            (opcReady?"text-emerald-300":"text-amber-300")}>
+            {opcReady?"● Conectado":"○ Sin comunicación"} · {opcStatus.detail}
+          </span>
+        </div>
+        <div className="text-[10px] text-slate-400">
+          Mapeos: {opcStatus.mappedInputs} entradas · {opcStatus.mappedOutputs} salidas.
+          {" "}Diagnósticos observados: {opcStatus.observedTags.length}.
+          {" "}Escritura: {opcWritable?"HABILITADA":"DESHABILITADA"}.
+          {" "}Última lectura: {opcStatus.lastUpdate?new Date(opcStatus.lastUpdate).toLocaleTimeString():"—"}.
+        </div>
+        <p className="text-[10px] text-amber-200">
+          RUN/STOP del Micro850 se opera desde CCW, no desde el editor.
+          Los mandos HMI requieren conexión con escritura habilitada.
+          Probar con actuadores físicos aislados y watchdog de comunicación en el PLC.
+        </p>
+      </div>}
+    </section>
+    <div className="scada-scene-workspace">
+      <section className="scada-process-panel min-w-0">
+        <h3 className="mb-2 text-xs font-semibold">Vista de proceso</h3>
+        <div className="overflow-x-auto rounded-lg bg-white">
+          <ProcessGraphic project={project} physics={physics}/>
+        </div>
+        <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {diagnostics.map(item=><div key={item.label}
+            className="rounded border border-[#344b60] bg-[#102333] p-2 text-center">
+            <div className="text-[10px] text-slate-400">{item.label}</div>
+            <div className="mt-1 text-xs font-semibold text-slate-100">{item.value}</div>
+          </div>)}
+        </div>
+        <section className="sort-panel mt-3 rounded-lg border border-[#344c5e] p-3">
+          <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold">
+            <Gauge size={15}/> Instrumentación y setpoints
+          </h3>
+          <p className="mb-3 text-[10px] text-slate-400">
+            En modo manual puedes inyectar presiones y señales. En modo físico,
+            el modelo publica presión, nivel y pulsos de dosificación en los tags
+            de entrada del PLC; los setpoints siguen siendo numéricos.
+          </p>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h4 className="text-[11px] font-semibold text-slate-200">Entradas analógicas</h4>
+            <label className="flex cursor-pointer items-center gap-2 text-[11px] text-sky-200">
+              <input type="checkbox" aria-label="Simulación física automática"
+                disabled={controllerSource==="opcua"&&!opcWritable}
+                checked={physics.enabled}
+                onChange={e=>onPhysicsChange({enabled:e.target.checked})}
+                className="accent-sky-500"/>
+              Simulación física automática
+            </label>
+          </div>
+          {controllerSource==="opcua"&&<p className="mb-2 text-[10px] text-sky-300">
+            El modelo físico y los pulsos PDB de 100 ms se calculan en Node.js,
+            aunque cambies de pestaña o cierres el navegador. El gateway debe
+            permanecer abierto. Para detener el HIL, desmarca la simulación física.
+          </p>}
+          {physics.enabled ? (
+                      <fieldset disabled={controllerSource==="opcua"&&!opcWritable}
+                        className="mb-3 rounded border border-sky-900 bg-[#0c1d2a] p-3 disabled:opacity-60">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h4 className="text-[11px] font-semibold text-sky-200">
+                  Modelo físico · Fase 2
+                </h4>
+                <p className="mt-1 text-[10px] text-slate-400">
+                  La física lee exclusivamente las salidas del PLC. Disponible en RUN.
+                </p>
+              </div>
+
+            </div>
+            {physics.enabled&&<>
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <label className="block min-w-0 text-[11px] text-slate-200">
+                  Aire disponible en la acometida
+                  <div className="mt-1 flex items-center gap-2">
+                    <input type="range" min={0} max={148} step={1}
+                      value={physics.airSupply}
+                      onChange={e=>onPhysicsChange({airSupply:Number(e.target.value)})}
+                      className="min-w-0 flex-1 accent-sky-500"
+                      aria-label="Presión disponible de aire"/>
+                    <span className="w-9 text-right tabular-nums">{physics.airSupply}</span>
+                  </div>
+                </label>
+                <label className="block min-w-0 text-[11px] text-slate-200">
+                  Lubricante disponible en el tambor
+                  <div className="mt-1 flex items-center gap-2">
+                    <input type="range" min={0} max={100} step={1}
+                      value={physics.drumPercent}
+                      onChange={e=>onPhysicsChange({drumPercent:Number(e.target.value)})}
+                      className="min-w-0 flex-1 accent-amber-500"
+                      aria-label="Nivel del tambor de lubricante"/>
+                    <span className="w-12 text-right tabular-nums">{physics.drumPercent.toFixed(1)}%</span>
+                  </div>
+                </label>
+              </div>
+              <label className="mt-3 block min-w-0 rounded border border-[#354d62] bg-[#122b3c] p-2.5 text-[11px] text-slate-200">
+                <span className="block font-semibold">
+                  Velocidad de pérdida de presión
+                </span>
+                <span className="mb-2 block text-[10px] text-slate-400">
+                  Controla la caída de presión de aire y lubricante; no modifica
+                  la velocidad de aumento de presión.
+                </span>
+                <div className="flex items-center gap-2">
+                  <input type="range" min={0.25} max={4} step={0.25}
+                    value={physics.pressureDecayFactor}
+                    onChange={e=>onPhysicsChange({
+                      pressureDecayFactor:Number(e.target.value)})}
+                    className="min-w-0 flex-1 accent-sky-500"
+                    aria-label="Velocidad de pérdida de presión"/>
+                  <span className="w-12 text-right font-mono font-semibold tabular-nums text-sky-200">
+                    {physics.pressureDecayFactor.toFixed(2)}×
+                  </span>
+                </div>
+                <div className="mt-1 flex justify-between text-[10px] text-slate-400">
+                  <span>Lenta (0.25×)</span>
+                  <span>Normal (1×)</span>
+                  <span>Rápida (4×)</span>
+                </div>
+              </label>
+              <p className="mb-2 mt-3 text-[10px] font-semibold text-slate-300">
+                Inyección de fallas físicas
+              </p>
+              <div className="grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-3">
+                {([
+                  ["airLoss","Pérdida de aire"],
+                  ["filterBlocked","Filtro obstruido"],
+                  ["doserBlocked","Dosificador atascado"],
+                ] as const).map(([key,label])=><label key={key}
+                  className="flex cursor-pointer items-start gap-2 rounded bg-[#172e3f] p-2">
+                  <input type="checkbox" checked={physics[key]}
+                    onChange={e=>onPhysicsChange({[key]:e.target.checked})}
+                    className="mt-0.5 accent-red-400"/>
+                  <span>{label}</span>
+                </label>)}
+              </div>
+              <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-200">
+                <span>Pulsos dosificador: <strong className="tabular-nums text-sky-200">{physics.totalPulses}</strong></span>
+                <button type="button" onClick={onPhysicsReset}
+                  className="rounded border border-slate-500 px-2 py-1 text-slate-200 hover:bg-slate-700">
+                  Restablecer física
+                </button>
+              </div>
+              <p className="mt-2 text-[10px] text-amber-200">
+                Modelo simplificado para FAT, no calibrado. Polaridad de LSL y
+                se utiliza DI_PDB para los pulsos de dosificación del sensor SQS-2561.
+              </p>
+            </>}
+          </fieldset>
+          ) : (
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {GEAR_FIELD_INPUTS.filter(x=>x.type==="REAL").map(input=>{
+              const isAir=input.name==="_310_PI_2561";
+              return <NumberSetting key={input.name} name={input.name}
+                label={isAir?"Presión de aire":"Presión de lubricante"}
+                min={0} max={isAir?148:1480} step={0.1}
+                disabled={controllerSource==="opcua"&&!opcWritable}
+                caption={isAir?"Referencia original: 0–148":
+                  "Referencia original: 0–1480"}
+                value={gearNumber(project,input.name)}
+                onCommit={value=>onAnalogInput(input.name as GearAnalogInput,value)}/>;
+            })}
+          </div>
+          )}
+          <h4 className="mb-2 mt-3 text-[11px] font-semibold text-slate-200">Setpoints de operación</h4>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {GEAR_HMI_SETPOINTS.map(sp=><NumberSetting key={sp.name}
+              name={sp.name} integer value={gearNumber(project,sp.name)}
+              label={sp.name==="TMR_Freq_SP"?"Frecuencia entre lubricaciones":
+                sp.name==="CNT_LubeFlo_SP"?"Pulsos por lubricación":
+                sp.name==="TMR_LubeFlo_SP"?"Tiempo de alarma por flujo bajo":
+                "Duración de mantenimiento"}
+              caption={sp.description}
+              onCommit={value=>onSetpoint(sp.name as GearSetpoint,value)}/>)}
+          </div>
+          <div className="mt-3 space-y-2 border-t border-slate-700 pt-3">
+            <h4 className="text-[11px] font-semibold">Entradas digitales de campo</h4>
+            {GEAR_FIELD_INPUTS.filter(x=>x.type==="BOOL").map(x=>
+              <label key={x.name} className="flex cursor-pointer items-start gap-2 rounded border border-[#354d62] bg-[#0f2434] p-2 text-[11px]">
+                <input type="checkbox" checked={v(x.name)}
+                  disabled={physics.enabled&&x.name!=="_310_PLC104_YI_MillRun"}
+                  onChange={event=>onDigitalInput(x.name as GearDigitalInput,event.target.checked)}
+                  className="mt-0.5 accent-sky-500"/>
+                <span className="min-w-0 break-words text-slate-200">
+                  {x.name==="_310_PLC104_YI_MillRun"?"Confirmación de molino en marcha":
+                    x.name==="_310_SQS_2561"?"Pulso del dosificador (100 ms)":
+                    "Sensor de nivel bajo de lubricante"}{" "}
+                  <span className="font-mono text-sky-300">({x.name})</span>
+                </span>
+              </label>)}
+          </div>
+        </section>
+      </section>
+      <aside className="scada-scene-sidebar min-w-0">
+        <section className="sort-panel rounded-lg border border-[#344c5e] p-3">
+          <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold">
+            <Settings2 size={15}/> Tablero de mando
+          </h3>
+          <p className="mb-3 text-[10px] text-slate-400">
+            Los botones escriben entradas PB momentáneas. Solo el programa PLC
+            gobierna las salidas.
+          </p>
+          <fieldset disabled={controllerSource==="opcua"&&!opcWritable}
+            className="grid grid-cols-2 gap-2 sm:grid-cols-3 disabled:opacity-50">
+            {GEAR_HMI_PUSHBUTTONS.map((tag,index)=>{
+              const glyph=[<Play size={14}/>,<Wrench size={14}/>,
+                <Wrench size={14}/>,<Droplets size={14}/>,
+                <RotateCcw size={14}/>,<Gauge size={14}/>][index];
+              return <MomentaryPushButton key={tag.name} compact
+                name={tag.name} pressed={v(tag.name)}
+                tone={tag.name==="PB_Reset"?"stop":
+                  tag.name==="PB_Auto"?"start":"drain"}
+                icon={glyph} onChange={pressed=>onPushButton(tag.name,pressed)}>
+                {tag.name.replace("PB_","").replace("_"," ")}
+              </MomentaryPushButton>;
+            })}
+          </fieldset>
+        </section>
+
+        <section className="sort-panel scada-led-panel min-w-0 rounded-lg border border-[#344c5e] p-3">
+          <h3 className="mb-3 text-xs font-semibold">Pilotos LED y equipos</h3>
+          <div className="space-y-3">
+            <div>
+              <h4 className="mb-2 text-[11px] font-semibold text-slate-300">
+                Estado del sistema
+              </h4>
+              <ScadaLedGroup kind="status">
+                <Pilot description="Sistema disponible"
+                  tag="_310_YI_SystemHealthy" active={v("_310_YI_SystemHealthy")}/>
+                <Pilot description="Lubricación en marcha"
+                  tag="_310_YI_LubricationSystemRunning"
+                  active={v("_310_YI_LubricationSystemRunning")}/>
+              </ScadaLedGroup>
+            </div>
+            <div>
+              <h4 className="mb-2 text-[11px] font-semibold text-slate-300">
+                Salidas digitales
+              </h4>
+              <ScadaLedGroup kind="outputs">
+                <Pilot description="Alarma sonora" tag="_310_UY_2560"
+                  active={v("_310_UY_2560")} tone="red"/>
+              </ScadaLedGroup>
+            </div>
+          </div>
+        </section>
+        <section className="rounded-lg border border-[#344c5e] bg-[#132432] p-3">
+          <h3 className="mb-2 flex items-center gap-2 text-xs font-semibold">
+            <ShieldAlert size={16}/> Alarmas y diagnóstico
+          </h3>
+          <div className="mb-2 rounded border border-amber-700/60 bg-amber-950/40 p-2 text-[11px] text-amber-200">
+            <AlertTriangle size={13} className="mr-1 inline"/>
+            {phase3Loaded?"P01–P07 cargados: estados, presión, alarmas, mantenimiento y diagnósticos. Validación FAT pendiente.":
+              "P01–P07 y FB_GearSpray_Sequence pendientes de portar."}
+            {phase3Loaded?
+              " P05 mantiene deshabilitado el fallo de presión alta (AFI original). Validar temporización y permisos con FAT.":
+              " Las alarmas y secuencias CCW aún no se calculan automáticamente."}
+          </div>
+          <div className="grid grid-cols-2 gap-2 text-[10px] text-slate-200">
+            <div className="rounded bg-[#0c1b28] p-2">
+              Máquina de estados: <strong> {observed("SM_Cycle_State")?
+              cycleState+" · "+cycleName:"Sin NodeId de lectura"}</strong>
+            </div>
+            <div className="rounded bg-[#0c1b28] p-2">
+              Código de falla (Fault_Code): <strong>{observed("Fault_Code")?
+                gearNumber(project,"Fault_Code"):"Sin NodeId de lectura"}</strong>
+              {observed("Fault_Code")&&<span className="block text-[10px] text-slate-400">
+                {({0:"Sin falla priorizada",1:"Falta de aire",2:"Flujo bajo",
+                  3:"Presión baja",4:"Presión alta",5:"Nivel bajo"} as Record<number,string>)[gearNumber(project,"Fault_Code")]??"Desconocido"}
+              </span>}
+            </div>
+            <div className="rounded bg-[#0c1b28] p-2">
+              Pulso del dosificador (DI_PDB):
+              <strong> {v("DI_PDB")?"ACTIVO":"INACTIVO"}</strong>
+            </div>
+            <div className="rounded bg-[#0c1b28] p-2">
+              Pulsos (CTN_Lubeflo):
+              <strong> {observed("CTN_Lubeflo.ACC")?
+                String((project.tags.find(t=>t.name==="CTN_Lubeflo")?.value as
+                  Record<string,number|boolean>|undefined)?.ACC??0):
+                "Sin NodeId de lectura"}</strong>
+            </div>
+          </div>
+          {phase3Loaded&&<div className="mt-2 grid grid-cols-2 gap-2 text-[10px] text-slate-200">
+              {([
+                ["Próximo ciclo (ms)","NextCycle_Show"],
+                ["Flujo: tiempo restante (ms)","FloAlrm_Remain"],
+                ["Mantenimiento restante (min)","Maint_Duration_Remain_Min"],
+                ["Parada restante (min)","Shutdown_Time_Remaining"],
+              ] as const).map(([title,name])=><div key={name} className="rounded bg-[#0c1b28] p-2">
+                <span className="block text-slate-400">{title}</span>
+                <strong className="font-mono tabular-nums">{gearNumber(project,name).toFixed(0)}</strong>
+                <span className="block break-all font-mono text-[9px] text-slate-500">({name})</span>
+              </div>)}
+            </div>}
+            <div className="mt-3 flex items-center gap-1 text-[10px] text-emerald-300">
+            <CheckCircle2 size={13}/> Las salidas visibles leen Controller Tags.
+          </div>
+        </section>
+      </aside>
+    </div>
+    {openInfo&&<InfoModal onClose={()=>setOpenInfo(false)}
+      onResetProgram={onResetProgram} controllerSource={controllerSource}
+      onOpenTags={onOpenTags}/>} 
+  </div>;
+}

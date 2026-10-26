@@ -1,0 +1,16 @@
+{
+  "name": "designer-simulator-opcua-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {"node": ">=20"},
+  "scripts": {
+    "start": "node src/server.mjs",
+    "check": "node --check src/server.mjs",
+    "test": "node --test tests/*.test.mjs"
+  },
+  "dependencies": {
+    "node-opcua": "^2.187.0",
+    "ws": "^8.18.3"
+  }
+}

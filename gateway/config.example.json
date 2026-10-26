@@ -1,0 +1,48 @@
+{
+  "endpoint": "opc.tcp://FACTORYTALK_GATEWAY_HOST:4990",
+  "securityMode": "SignAndEncrypt",
+  "securityPolicy": "Basic256Sha256",
+  "allowWrites": false,
+  "pollMs": 100,
+  "listenHost": "127.0.0.1",
+  "listenPort": 8765,
+  "allowedOrigins": [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173"
+  ],
+  "read": {
+    "_310_SV_2560": "",
+    "_310_SV_2561": "",
+    "_310_SV_2563": "",
+    "_310_UY_2560": "",
+    "_310_YI_SystemHealthy": "",
+    "_310_YI_LubricationSystemRunning": ""
+  },
+  "write": {
+    "_310_PI_2561": "",
+    "_310_PI_2560": "",
+    "_310_PLC104_YI_MillRun": "",
+    "_310_SQS_2561": "",
+    "_310_LSL": "",
+    "PB_Auto": "",
+    "PB_Manual": "",
+    "PB_Maint": "",
+    "PB_Extra": "",
+    "PB_Reset": "",
+    "PB_Lubpress_Release": "",
+    "TMR_Freq_SP": "",
+    "CNT_LubeFlo_SP": "",
+    "TMR_LubeFlo_SP": "",
+    "Maint_Duration_Min": ""
+  },
+  "observe": {
+    "SM_Cycle_State": "",
+    "Fault_Code": "",
+    "ST_Cycle_Rly": "",
+    "ST_General_Trip_Rly": "",
+    "DO_LS_Healthy": "",
+    "CTN_Lubeflo.ACC": ""
+  }
+}

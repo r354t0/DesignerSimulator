@@ -1,0 +1,207 @@
+# Micro850 real por OPC UA — DesignerSimulator Gear Spray
+
+Este gateway permite hacer pruebas **Hardware-in-the-Loop (HIL)** sin ejecutar el
+Ladder de DesignerSimulator como un segundo controlador. La lógica P01–P07 se
+ejecuta en el **Micro850 real** y la planta (aire, bomba, presión, dosificador,
+nivel) en el navegador. El switch Ethernet **no transforma protocolos**.
+
+## Arquitectura de red
+
+```text
+ Micro850 (programa CCW / P01-P07) —┐
+ Otros instrumentos Ethernet ————┤ SWITCH INDUSTRIAL (red OT aislada)
+ PC con FactoryTalk Linx Gateway —─┘
+                   │ servidor OPC UA (opc.tcp://IP:PUERTO)
+                   ▼
+             gateway/ (Node.js) en PC con navegador
+                   │ WebSocket local 127.0.0.1:8765
+                   ▼
+             DesignerSimulator · Escena 06 (PLC real)
+                   │
+       Salidas BOOL del Micro850 → física virtual
+       Física virtual / botones → entradas SIM_* del Micro850
+```
+
+Micro850 ofrece **CIP Symbolic**; FactoryTalk Linx/Gateway expone sus tags a
+clientes OPC UA. No atribuir al PLC un servidor OPC UA integrado sin confirmar
+el modelo exacto. Otros equipos del switch pueden usar EtherNet/IP, Modbus,
+OPC UA u otros protocolos; el switch no los convierte.
+
+## Requisitos
+
+- PLC Micro850 y switch industrial con puertos Ethernet, segmento OT protegido.
+- Proyecto CCW P01–P07 en el PLC; **instrumentos y actuadores de planta reales
+  aislados para pruebas**. Crear variables globales de simulación conmutadas
+  por un modo de laboratorio en CCW (por ejemplo `SIM_PI_2561`,
+  `SIM_PI_2560`, `SIM_SQS_2561`, `SIM_LSL`,
+  `SIM_PB_Auto`). No intentar escribir directamente los canales
+  físicos I/O de la máquina desde el navegador.
+- FactoryTalk Linx con el controlador visible (CIP symbolic) y
+  FactoryTalk Linx Gateway configurado como **OPC UA Server**.
+- Node.js **20 o posterior** en el PC donde abrirás DesignerSimulator.
+- OPC UA Client compatible con navegación de NodeIds (por ejemplo UaExpert).
+- Certificados cliente/servidor OPC UA confiables, seguridad
+  **SignAndEncrypt + Basic256Sha256** o una política moderna compatible.
+  Es posible que se requiera configurar el trust store del gateway y del
+  servidor. No desactivar seguridad para compensar un error de certificados.
+- Crear en CCW un watchdog de simulación: una pérdida de comunicación debe
+  conducir a un estado seguro decidido **en el PLC**. El WebSocket y el
+  navegador no son mecanismos de parada de seguridad.
+
+## Instalación (Windows PowerShell)
+
+Desde la raíz del repositorio:
+
+```powershell
+cd gateway
+Copy-Item config.example.json config.json
+npm install
+npm test
+```
+
+Abre `config.json`:
+
+1. `endpoint`: URL copiada del endpoint OPC UA real de FactoryTalk Linx
+   Gateway, por ejemplo `opc.tcp://192.168.10.30:4990` **solo como ejemplo**.
+2. `read`: asigna los **6 NodeIds de salidas** (solo lectura) que produce
+   P01–P07. Cada valor debe ser el NodeId real consultado con un navegador OPC UA;
+   no basta con colocar el nombre del tag.
+3. `write`: asigna los **15 NodeIds** de variables globales de simulación/HMI
+   **escribibles**. Los nombres son claves lógicas de DesignerSimulator, el
+   NodeId puede pertenecer a una variable `SIM_*` del PLC.
+4. `observe`: opcional. Asigna NodeIds a `SM_Cycle_State`, `Fault_Code`,
+   `ST_Cycle_Rly`, `ST_General_Trip_Rly`, `DO_LS_Healthy` y
+   `CTN_Lubeflo.ACC`. Si no los configuras el SCADA mostrará
+   «Sin NodeId de lectura» para los valores que lo necesitan.
+5. `pollMs`: 50 o 100 ms como valor de ensayo. No garantiza captura de
+   pulsos cortos; para contar pulsos de dosificación de 100 ms, considera
+   una retención de flancos o contador en el PLC para no perder eventos.
+6. `allowedOrigins`: orígenes de DesignerSimulator admitidos en localhost.
+   El servidor WebSocket escucha **solo en 127.0.0.1**. Si usas otra máquina
+   para el navegador, ejecuta el gateway allí y comunica OPC UA por Ethernet;
+   no abras el servidor WebSocket directamente a la red OT.
+7. `allowWrites`: conserva inicialmente `false` para validar lectura.
+   Solo pon `true` cuando **todos los 15 NodeIds** de escritura estén
+   revisados y el PLC esté aislado de los actuadores físicos. El proceso
+   rechazará por diseño mapeos incompletos.
+
+En caso de autentificación por usuario OPC UA, puedes pasar las credenciales
+sin guardarlas en `config.json`:
+
+```powershell
+$env:GEAR_OPCUA_USERNAME = "usuario_opc"
+$env:GEAR_OPCUA_PASSWORD = "<tu contraseña OPC UA>"
+npm start
+```
+
+Si el endpoint no requiere usuario: simplemente `npm start`. El gateway
+muestra `ws://127.0.0.1:8765`. **No confirma comunicación OPC UA hasta que
+los seis valores de salida sean BOOL y presenten calidad Good.**
+
+En DesignerSimulator: **Escena 06 → Micro850 real · OPC UA → Conectar OPC UA**.
+Mantén el motor Ladder de DesignerSimulator sin RUN. Cuando aparezcan
+«Conectado» y las lecturas de salidas, habilita «Simulación física automática»:
+el micro850 controla las válvulas, la física calcula los sensores y el gateway
+escribe solo las entradas correspondientes cuando `allowWrites=true`.
+
+### Comprobación sugerida en laboratorio
+
+1. **Solo lectura:** Micro850 en CCW, seis NodeIds de salidas validados,
+   `allowWrites=false`. Comprobar cambios en pilotos de válvulas y estado.
+2. **Escritura de AI:** habilitar simulación y `allowWrites=true` solo
+   después de aislar salidas de potencia. Comparar presión `_310_PI_2561`
+   y `_310_PI_2560` en CCW y DesignerSimulator.
+3. **DI:** comprobar que `_310_SQS_2561` y `_310_LSL` alcanzan
+   los globales configurados en CCW.
+4. **HMI:** enviar `PB_Manual` momentáneo y confirmar que P02 lo reconoce.
+5. **Ciclo completo:** observar estados 0/10/20/30/90 y las salidas físicas
+   virtuales. Inyectar fallas en la planta y observar P05.
+6. **Desconexión:** retirar cable Ethernet del banco; el SCADA debe mostrar
+   desconexión y limpiar salidas visibles; verificar **separadamente** el
+   watchdog y el estado seguro en CCW.
+
+## Física HIL sin depender del navegador
+
+**Problema resuelto:** cuando el navegador pasaba a segundo plano, Chrome podía
+reducir la frecuencia de `setInterval` y detener la producción de pulsos PDB.
+Con un Micro850 real, ahora el proceso `node src/server.mjs` mantiene el
+modelo físico y el dosificador, con su propio temporizador nominal de 50 ms.
+
+- En modo **PLC virtual**, el simulador conserva su modelo físico en el navegador.
+- En modo **Micro850 real · OPC UA**, el navegador solo envía `physical-config`
+  (encender física, nivel del tambor, aire, fallas y factor de caída) o
+  `physical-reset`. El gateway calcula presiones y nivel a partir de las
+  salidas recibidas con calidad Good desde el Micro850 y publica telemetría
+  `physical` de vuelta a DesignerSimulator.
+- El gateway crea pulsos `_310_SQS_2561` de **100 ms** por cada dosis,
+  separados nominalmente **500 ms**, y los escribe directamente al PLC.
+  No recibe órdenes de pulso desde el reloj del navegador en este modo.
+- La física sigue funcionando si cambias de pestaña **o cierras la pestaña**,
+  siempre que el proceso Node.js continúe ejecutándose, el OPC UA esté
+  conectado y `allowWrites: true` con todos los NodeIds válidos.
+- **Para detenerla**, regresa a DesignerSimulator, pulsa Conectar OPC UA
+  si es necesario y **desmarca Simulación física automática**. También
+  puedes detener Node.js con Ctrl+C; el PLC debe contar con un watchdog
+  independiente y estado seguro ante pérdida de comunicación.
+- Ante calidad Bad, error de servidor UA, pérdida de sesión o inicio sin
+  permiso de escritura, el gateway deshabilita la física y no genera
+  pulsos. Después de recuperar OPC UA debes habilitarla nuevamente.
+- Solo un controlador gobierna la planta: el motor Ladder local no genera
+  física ni pulsos cuando está seleccionado Micro850 real.
+
+**Limitación temporal:** Node.js y OPC UA sobre Windows no garantizan tiempos
+duros de 100 ms. Un contador o flanco retenido en el Micro850 sigue siendo
+recomendable para FAT industrial. Verifica en CCW que
+`CTN_Lubeflo.ACC` cuenta cada activación también con Chrome minimizado.
+
+## SQS-2561: pulso automático de 100 ms
+
+El sensor `_310_SQS_2561` es una señal momentánea (BOOL), no un interruptor
+enclavado. Su flanco de subida representa una actuación del dosificador.
+
+- **Modelo físico (virtual y real):** genera un pulso alto de **100 ms** por dosis, con
+  intervalo nominal de **500 ms** entre dosificaciones consecutivas. Si la
+  válvula de lubricante se cierra durante el pulso, se completa igualmente
+  el tiempo alto ya iniciado.
+- **Entrada manual:** marcar «Pulso del dosificador (100 ms)» genera
+  automáticamente `TRUE → FALSE` después de 100 ms. No es necesario
+  desmarcarlo. Reiniciar o abandonar la escena cancela ese pulso.
+- **Micro850 real por OPC UA:** el gateway transforma cada activación
+  en una escritura `TRUE`, espera **100 ms desde la confirmación de
+  escritura OPC UA**, y escribe `FALSE` sobre el NodeId configurado de
+  `_310_SQS_2561`. Ignora solicitudes de bajar o repetir el pulso
+  mientras esté activo, evitando truncamientos por el navegador.
+- Este intervalo es **nominal**: Node.js, OPC UA y Windows no son
+  temporizadores de tiempo real. Confirma el ancho observado en CCW,
+  especialmente si el PLC o FactoryTalk tienen ciclos largos. Si
+  necesitas una garantía temporal industrial, incorpora un TON/TP o un
+  contador/flanco en el Micro850 y asigna al gateway únicamente el evento
+  de activación. El pulso no constituye una señal de seguridad.
+
+## Restricciones importantes
+
+- **READ** del PLC: `_310_SV_2560`, `_310_SV_2561`,
+  `_310_SV_2563`, `_310_UY_2560`,
+  `_310_YI_SystemHealthy`, `_310_YI_LubricationSystemRunning`.
+- **WRITE** hacia tags globales SIM del PLC: dos AI REAL (OPC UA Float), tres
+  DI BOOL, seis pulsadores BOOL y cuatro setpoints DINT (Int32).
+- La ruta OPC UA y los NodeIds dependen de tu aplicación FactoryTalk; el
+  archivo de ejemplo contiene NodeIds vacíos deliberadamente.
+- El gateway solo acepta conexiones WebSocket desde orígenes localhost y
+  valida el tipo de cada valor y su dirección. Rechaza NodeIds sin
+  configuración y nunca permite escritura de mandos de salida.
+- El servidor WebSocket no incluye TLS porque queda limitado a loopback.
+  Si publicas DesignerSimulator en HTTPS o usas navegador y gateway en PCs
+  distintos, configura un proxy WSS con certificado confiable; no expongas
+  `ws://...` a la LAN ni a Internet.
+- Si los valores dejan de actualizarse, DesignerSimulator marca la lectura
+  como vencida después de 1,8 s y deja de aceptar nuevos mandos. La
+  **protección de la maquinaria debe quedar dentro del PLC y del
+  circuito de seguridad**, no depender del navegador.
+
+## Referencias
+
+- Rockwell Automation `2080-UM002R-EN-E`: OPC mediante FactoryTalk Linx y
+  Gateway (Micro850 con firmware >=7.011).
+- Rockwell Automation: FactoryTalk Linx Gateway UA Server endpoints.
+- NodeOPCUA: API oficial del cliente para sesiones, lectura y escritura OPC UA.
