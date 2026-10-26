@@ -52,11 +52,11 @@ test("Only physical inputs and HMI commands may be written",()=>{
 test("Only one controller drives plant; real mode cannot run local Ladder",()=>{
   const app=source("../src/App.tsx");
   assert.match(app,/gearControllerSourceRef\.current==="opcua"/);
-  assert.match(app,/gearOpcOutputsRef\.current\[name\]===true/);
-  assert.match(app,/gearOpcClientRef\.current\?\.sendInput\(name,value\)/);
+  assert.match(app,/outputs\[name\]=message\.outputs\[name\]===true/);
+  assert.match(app,/gearOpcClientRef\.current\?\.sendPhysicalConfig\(patch\)/);
   assert.match(app,/return;/);
   assert.match(app,/changeScan\(stopPracticeScans\)/);
-  assert.match(app,/if\(!real&&plc\.mode!=="running"\)return/);
+  assert.match(app,/gearControllerSourceRef\.current!=="virtual"/);
   assert.match(app,/disconnectGearOpc\(\)/);
   assert.match(app,/GEAR_OPC_OUTPUT_TAGS/);
   assert.match(app,/const connectGearOpc=useCallback/);
